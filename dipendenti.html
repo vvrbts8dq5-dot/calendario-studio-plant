@@ -7,20 +7,24 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#0F0F0F;--ink2:#2A2A2A;--ink3:#555;--ink4:#888;
   --paper:#F7F5F0;--paper2:#EDEBE4;--white:#FFF;--border:#D8D4CB;
-  --blu:#1A56db;--blu-dark:#1245b5;--blu-light:#E3EEFA;
+  --blu:#1A56DB;--blu-dark:#1245b5;--blu-light:#E3EEFA;
   --verde:#1A7A4A;--verde-light:#E3F5EC;
   --amber:#C47B00;--amber-light:#FDF3DC;
-  --rosso:#c81e1e;--rosso-light:#FAE8E8;
+  --rosso:#C81E1E;--rosso-light:#FAE8E8;
+  --viola:#6B3FA0;--viola-light:#F0E8FA;
   --sidebar-w:240px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
 button{cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
 input,select,textarea{font-family:'DM Sans',sans-serif}
+a{text-decoration:none;color:inherit}
 
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
@@ -28,12 +32,13 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .login-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
 .login-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
 .login-sub{font-size:13px;color:var(--ink4);margin-bottom:28px}
-.login-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
-.login-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
-.login-input:focus{border-color:var(--blu);background:var(--white)}
+.f-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
+.f-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
+.f-input:focus{border-color:var(--blu);background:var(--white)}
+.f-select{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none}
 .login-btn{width:100%;padding:12px;background:var(--blu);color:#fff;border-radius:8px;font-size:14px;font-weight:500;margin-top:4px;transition:background .15s}
 .login-btn:hover{background:var(--blu-dark)}
-.login-error{font-size:12px;color:var(--rosso);margin-top:10px;text-align:center;min-height:18px;background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none}
+.login-error{font-size:12px;color:var(--rosso);margin-top:10px;background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none;margin-bottom:12px}
 
 /* APP */
 #app{display:none;height:100vh;overflow:hidden}
@@ -46,16 +51,27 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .logo-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
 .logo-sub{font-size:11px;color:#555;margin-top:3px}
 .sidebar-section{padding:14px 12px 6px}
-.sidebar-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+.sidebar-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#888;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:#1a1a1a;color:#fff}
 .nav-item.active{background:var(--blu);color:#fff}
 .nav-icon{font-size:15px;min-width:18px}
+.sidebar-divider{height:.5px;background:#222;margin:8px 12px}
 .sidebar-footer{padding:14px 20px;border-top:.5px solid #1e1e1e;margin-top:auto}
 .user-name{font-size:13px;font-weight:500;color:#ccc}
 .user-role{font-size:11px;color:#555;margin-bottom:8px}
 .logout-btn{font-size:11px;color:#555;cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;padding:0;transition:color .15s}
 .logout-btn:hover{color:var(--rosso)}
+
+/* SALDI SIDEBAR */
+.saldo-box{padding:12px 20px;border-top:.5px solid #1e1e1e}
+.saldo-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:#444;text-transform:uppercase;margin-bottom:8px}
+.saldo-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.saldo-label{font-size:11px;color:#666}
+.saldo-val{font-family:'DM Mono',monospace;font-size:11px;font-weight:500}
+.saldo-val.ok{color:var(--verde)}
+.saldo-val.warn{color:var(--amber)}
+.saldo-val.danger{color:var(--rosso)}
 
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
@@ -74,12 +90,23 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .btn-verde{background:var(--verde);color:#fff;border-color:#145c37}
 .btn-verde:hover{background:#145c37}
 .btn-rosso{background:var(--rosso);color:#fff;border-color:#a01e1e}
+.btn-rosso:hover{background:#a01e1e}
+.btn-viola{background:var(--viola);color:#fff;border-color:#4a2a70}
 .btn-sm{padding:5px 10px;font-size:11px}
 
 /* CARDS */
 .card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px}
 .section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
 .section-title::after{content:'';flex:1;height:.5px;background:var(--border)}
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+.page-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.badge-attesa{background:var(--amber-light);color:var(--amber)}
+.badge-approvata{background:var(--verde-light);color:var(--verde)}
+.badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
+.badge-malattia{background:var(--viola-light);color:var(--viola)}
 
 /* CALENDARIO */
 .cal-layout{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
@@ -87,20 +114,24 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .btn-mese{background:var(--white);border:.5px solid var(--border);color:var(--ink2);border-radius:6px;padding:6px 12px;font-size:14px;transition:all .15s}
 .btn-mese:hover{background:var(--paper2)}
 .sel-mese{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:500;background:var(--white);color:var(--ink);outline:none}
-.cal-grid-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
 .cal-dow{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);padding:4px 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s;position:relative;font-family:'DM Sans',sans-serif}
 .cal-day:hover{background:var(--paper2)}
 .cal-day.weekend{color:var(--ink4)}
-.cal-day.has-data{background:var(--verde-light);color:var(--verde)}
-.cal-day.has-data::after{content:'';position:absolute;bottom:2px;right:2px;width:4px;height:4px;background:var(--verde);border-radius:50%}
+.cal-day.festivo{color:var(--amber);font-weight:600}
+.cal-day.has-data{background:var(--blu-light);color:var(--blu)}
+.cal-day.has-data::after{content:'';position:absolute;bottom:2px;right:2px;width:4px;height:4px;background:var(--blu);border-radius:50%}
+.cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
+.cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
 .cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
 .cal-day.selected::after{display:none}
-.cal-legenda{margin-top:10px;display:flex;gap:14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)}
+.cal-legenda{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)}
+.cal-legenda span{display:flex;align-items:center;gap:4px}
 
 /* FORM GIORNO */
-.form-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.form-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px}
 .form-date{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
 .form-actions{display:flex;gap:8px;align-items:center}
 .save-status{font-family:'DM Mono',monospace;font-size:11px}
@@ -114,15 +145,17 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .field-input{padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;width:100%}
 .field-input:focus{border-color:var(--blu);background:var(--white)}
 .field-textarea{resize:vertical;min-height:72px}
+.totale-giorno{margin-top:16px;padding:12px 14px;background:var(--blu-light);border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.totale-giorno-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)}
+.totale-giorno-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--blu)}
 .placeholder-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--ink4);text-align:center}
 .placeholder-icon{font-size:32px;margin-bottom:10px;opacity:.4}
-.placeholder-text{font-size:13px}
 
 /* RIEPILOGO */
 .stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px}
 .stat-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
 .stat-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.stat-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--ink)}
+.stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;line-height:1;color:var(--ink)}
 .stat-unit{font-size:12px;font-weight:400;color:var(--ink4);margin-left:3px}
 .table-wrap{background:var(--white);border:.5px solid var(--border);border-radius:10px;overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:12px}
@@ -134,34 +167,52 @@ tbody tr:last-child{border-bottom:none}
 .td-r{text-align:right}
 .td-bold{font-weight:600;color:var(--blu)}
 
-/* FERIE */
-.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.page-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+/* ASSENZE */
+.assenze-tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:.5px solid var(--border);padding-bottom:0}
+.ass-tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--ink4);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .15s;font-family:'DM Sans',sans-serif;margin-bottom:-1px}
+.ass-tab.active{color:var(--blu);border-bottom-color:var(--blu)}
+.ass-subtab{display:none}
+.ass-subtab.active{display:block}
+.saldo-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.saldo-info{}
+.saldo-tipo{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:4px}
+.saldo-dettaglio{font-size:12px;color:var(--ink4)}
+.saldo-numeri{text-align:right}
+.saldo-residuo{font-family:'Syne',sans-serif;font-size:22px;font-weight:700}
+.saldo-residuo.ok{color:var(--verde)}
+.saldo-residuo.warn{color:var(--amber)}
+.saldo-residuo.danger{color:var(--rosso)}
+.saldo-sub{font-size:11px;color:var(--ink4);margin-top:2px;font-family:'DM Mono',monospace}
+.progress-bar{height:6px;background:var(--paper2);border-radius:3px;overflow:hidden;margin-top:8px;min-width:120px}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.fill-ok{background:var(--verde)}
+.fill-warn{background:var(--amber)}
+.fill-danger{background:var(--rosso)}
 .form-richiesta{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
 .form-richiesta.open{display:block}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.f-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
-.f-input,.f-select,.f-textarea{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none}
-.f-input:focus,.f-select:focus,.f-textarea:focus{border-color:var(--blu);background:var(--white)}
 .richieste-list{display:flex;flex-direction:column;gap:8px}
-.richiesta-row{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.r-info{}
+.richiesta-row{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .r-tipo{font-size:13px;font-weight:500;margin-bottom:3px}
-.r-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)}
-.r-nota{font-size:12px;color:var(--ink3);margin-top:3px}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;margin-left:8px}
-.badge-attesa{background:var(--amber-light);color:var(--amber)}
-.badge-approvata{background:var(--verde-light);color:var(--verde)}
-.badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
+.r-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4);margin-bottom:3px}
+.r-nota{font-size:12px;color:var(--ink3)}
+.r-admin-nota{font-size:12px;color:var(--amber);margin-top:3px}
 .alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
 .alert-ok{background:var(--verde-light);color:var(--verde)}
 .alert-err{background:var(--rosso-light);color:var(--rosso)}
 .empty-state{text-align:center;padding:40px;color:var(--ink4);font-size:13px}
 
+/* MALATTIA */
+.malattia-form{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px}
+.mal-item{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.mal-date{font-family:'DM Mono',monospace;font-size:12px;font-weight:500}
+.mal-giorni{font-size:12px;color:var(--ink4)}
+.mal-nota{font-size:12px;color:var(--ink3)}
+
 @media(max-width:768px){
   .cal-layout{grid-template-columns:1fr}
-  .sidebar{display:none}
   #app.visible{flex-direction:column}
+  .sidebar{display:none}
 }
 </style>
 </head>
@@ -174,10 +225,10 @@ tbody tr:last-child{border-bottom:none}
     <div class="login-title">Calendario Ore</div>
     <div class="login-sub">Accedi al tuo portale personale</div>
     <div class="login-error" id="login-error"></div>
-    <label class="login-label">Nome utente</label>
-    <input class="login-input" id="inp-user" type="text" placeholder="es. mario.rossi" autocomplete="username">
-    <label class="login-label">Password</label>
-    <input class="login-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <label class="f-label">Nome utente</label>
+    <input class="f-input" id="inp-user" type="text" placeholder="es. mario.rossi" autocomplete="username">
+    <label class="f-label">Password</label>
+    <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="login-btn" id="btn-login">Accedi</button>
   </div>
 </div>
@@ -188,23 +239,43 @@ tbody tr:last-child{border-bottom:none}
     <div class="sidebar-logo">
       <div class="logo-tag">Studio di Ingegneria</div>
       <div class="logo-name">Calendario Ore</div>
-      <div class="logo-sub">Portale Dipendenti</div>
+      <div class="logo-sub">Portale Dipendenti · 2026</div>
     </div>
     <div class="sidebar-section">
-      <div class="sidebar-label">Menu</div>
+      <div class="sidebar-lbl">Menu</div>
       <button class="nav-item active" data-page="calendario">
         <span class="nav-icon">📅</span> Calendario
       </button>
-      <button class="nav-item" data-page="ferie">
-        <span class="nav-icon">🏖️</span> Ferie & Permessi
+      <button class="nav-item" data-page="assenze">
+        <span class="nav-icon">🏖️</span> Ferie & Assenze
       </button>
       <button class="nav-item" data-page="riepilogo">
-        <span class="nav-icon">📊</span> Riepilogo Annuale
+        <span class="nav-icon">📊</span> Riepilogo Mensile
       </button>
+    </div>
+    <!-- SALDI SIDEBAR -->
+    <div class="saldo-box" id="sidebar-saldi">
+      <div class="saldo-title">I tuoi saldi</div>
+      <div class="saldo-row">
+        <span class="saldo-label">Ferie residue</span>
+        <span class="saldo-val ok" id="sb-ferie">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">Permessi residui</span>
+        <span class="saldo-val ok" id="sb-permessi">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">ROL residuo</span>
+        <span class="saldo-val ok" id="sb-rol">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">Giorni malattia</span>
+        <span class="saldo-val" id="sb-malattia" style="color:var(--viola)">0 gg</span>
+      </div>
     </div>
     <div class="sidebar-footer">
       <div class="user-name" id="sidebar-nome"></div>
-      <div class="user-role">Dipendente · 2026</div>
+      <div class="user-role" id="sidebar-ruolo">Dipendente · 2026</div>
       <button class="logout-btn" id="btn-logout">Esci dall'account →</button>
     </div>
   </aside>
@@ -226,73 +297,147 @@ tbody tr:last-child{border-bottom:none}
               <button class="btn-mese" id="mese-succ">›</button>
             </div>
             <div class="card">
-              <div class="cal-grid-dow" id="cal-dow"></div>
+              <div class="cal-dow-row" id="cal-dow"></div>
               <div class="cal-grid" id="cal-giorni"></div>
               <div class="cal-legenda">
-                <span>● compilato</span>
-                <span>grigio = weekend</span>
+                <span>🔵 ore lavoro</span>
+                <span>🟢 ferie approv.</span>
+                <span>🟣 malattia</span>
+                <span style="color:var(--amber)">★ festivo</span>
               </div>
             </div>
           </div>
           <div class="card" id="form-giorno">
             <div class="placeholder-box">
               <div class="placeholder-icon">📅</div>
-              <div class="placeholder-text">Seleziona un giorno<br>per inserire le ore</div>
+              <div style="font-size:13px">Seleziona un giorno<br>per inserire o vedere le ore</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- FERIE -->
-      <div class="page" id="page-ferie">
+      <!-- FERIE & ASSENZE -->
+      <div class="page" id="page-assenze">
         <div class="page-header">
-          <div class="page-title">Ferie & Permessi</div>
-          <button class="btn btn-blu" id="btn-nuova">+ Nuova Richiesta</button>
+          <div class="page-title">Ferie & Assenze</div>
         </div>
-        <div class="form-richiesta" id="form-rich">
-          <div id="alert-form"></div>
-          <div class="form-grid">
-            <div>
-              <label class="f-label">Tipo</label>
-              <select class="f-select" id="r-tipo">
-                <option value="ferie">🏖️ Ferie</option>
-                <option value="permesso">🕐 Permesso</option>
-                <option value="rol">🔄 ROL / Recupero</option>
-              </select>
+
+        <!-- Saldi -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px" id="saldi-cards"></div>
+
+        <!-- Tabs -->
+        <div class="assenze-tabs">
+          <button class="ass-tab active" onclick="setAssTab(this,'ferie')">🏖️ Ferie</button>
+          <button class="ass-tab" onclick="setAssTab(this,'permesso')">🕐 Permessi</button>
+          <button class="ass-tab" onclick="setAssTab(this,'rol')">🔄 ROL</button>
+          <button class="ass-tab" onclick="setAssTab(this,'malattia')">🤒 Malattia</button>
+        </div>
+
+        <!-- TAB FERIE -->
+        <div class="ass-subtab active" id="subtab-ferie">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Ferie</div>
+            <button class="btn btn-blu" id="btn-nuova-ferie">+ Richiedi Ferie</button>
+          </div>
+          <div class="form-richiesta" id="form-ferie">
+            <div id="alert-form-ferie"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-ferie"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-ferie"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-ferie" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
             </div>
-            <div>
-              <label class="f-label">Data Inizio</label>
-              <input class="f-input" type="date" id="r-inizio">
-            </div>
-            <div>
-              <label class="f-label">Data Fine</label>
-              <input class="f-input" type="date" id="r-fine">
-            </div>
-            <div style="grid-column:1/-1">
-              <label class="f-label">Note (opzionale)</label>
-              <textarea class="f-textarea" id="r-note" rows="2" placeholder="Aggiungi una nota..."></textarea>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('ferie')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('ferie')">Annulla</button>
             </div>
           </div>
-          <div style="margin-top:14px;display:flex;gap:8px">
-            <button class="btn btn-blu" id="btn-invia">📤 Invia Richiesta</button>
-            <button class="btn" id="btn-annulla-form">Annulla</button>
-          </div>
+          <div id="lista-ferie"><div class="empty-state">Caricamento...</div></div>
         </div>
-        <div id="alert-globale"></div>
-        <div id="lista-richieste"><div class="empty-state">Caricamento...</div></div>
+
+        <!-- TAB PERMESSI -->
+        <div class="ass-subtab" id="subtab-permesso">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Permessi</div>
+            <button class="btn btn-blu" id="btn-nuova-permesso">+ Richiedi Permesso</button>
+          </div>
+          <div class="form-richiesta" id="form-permesso">
+            <div id="alert-form-permesso"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-permesso"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-permesso"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-permesso" placeholder="es. 4" min="0.5" step="0.5"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-permesso" rows="2"></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('permesso')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('permesso')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-permesso"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB ROL -->
+        <div class="ass-subtab" id="subtab-rol">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico ROL / Recupero</div>
+            <button class="btn btn-blu" id="btn-nuova-rol">+ Richiedi ROL</button>
+          </div>
+          <div class="form-richiesta" id="form-rol">
+            <div id="alert-form-rol"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-rol"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-rol"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-rol" placeholder="es. 8" min="0.5" step="0.5"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-rol" rows="2"></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('rol')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('rol')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-rol"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB MALATTIA -->
+        <div class="ass-subtab" id="subtab-malattia">
+          <div class="malattia-form">
+            <div class="section-title">Inserisci Periodo di Malattia</div>
+            <div id="alert-malattia"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="mal-inizio"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="mal-fine"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note / Numero certificato</label><textarea class="f-input field-textarea" style="margin:0" id="mal-note" rows="2" placeholder="es. Certificato n. 12345..."></textarea></div>
+            </div>
+            <button class="btn btn-viola" style="margin-top:12px" onclick="inserisciMalattia()">🤒 Registra Malattia</button>
+          </div>
+          <div class="section-title">Storico Malattie</div>
+          <div id="lista-malattia"><div class="empty-state">Caricamento...</div></div>
+        </div>
       </div>
 
       <!-- RIEPILOGO -->
       <div class="page" id="page-riepilogo">
         <div class="page-header">
-          <div class="page-title">Riepilogo Annuale 2026</div>
+          <div class="page-title">Riepilogo Mensile</div>
+          <div style="display:flex;gap:8px">
+            <select class="f-select" id="sel-mese-riepilogo" style="width:auto;padding:7px 12px;font-size:13px"></select>
+            <button class="btn btn-verde" onclick="esportaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso" onclick="esportaPDF()">📄 PDF</button>
+          </div>
         </div>
-        <div class="stat-row" id="stat-row"></div>
-        <div class="section-title">Dettaglio Mensile</div>
-        <div class="table-wrap">
+        <div class="stat-row" id="stat-row-riepilogo"></div>
+        <div class="section-title">Dettaglio per Giorno</div>
+        <div class="table-wrap" id="table-riepilogo-wrap">
           <table id="tab-riepilogo">
             <thead><tr id="thead-r"></tr></thead>
             <tbody id="tbody-r"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px" class="section-title">Totali Mensili per Tipologia</div>
+        <div class="table-wrap">
+          <table id="tab-totali">
+            <thead><tr><th>Tipologia</th><th class="td-r">Totale</th></tr></thead>
+            <tbody id="tbody-totali"></tbody>
           </table>
         </div>
       </div>
@@ -309,6 +454,10 @@ const db=firebase.firestore();
 const ANNO=2026;
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+// Festività nazionali 2026
+const FESTIVITA=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
+
 const CAMPI=[
   {k:'commessa',l:'N° Commessa',t:'text',ph:'es. 2026-001'},
   {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'number'},
@@ -326,18 +475,31 @@ const CAMPI=[
   {k:'note',l:'Note',t:'textarea'},
 ];
 const CN=CAMPI.filter(c=>c.t==='number');
-const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL'};
 
-let U=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
+let U=null,profilo=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
+let assenzeProprie=[];
+let assTab='ferie';
 
 function pad(n){return String(n).padStart(2,'0')}
+function dsOf(m,g){return `${ANNO}-${pad(m+1)}-${pad(g)}`}
 function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function isFestivo(ds){return FESTIVITA.includes(ds)}
 function getDays(m){return new Date(ANNO,m+1,0).getDate()}
 function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
-function hasD(d){if(!d)return false;return CAMPI.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
-function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]}`}
+function hasD(d){if(!d)return false;return CN.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
+function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]} ${y}`}
 function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);return n+'h'}
-function dsOf(m,g){return `${ANNO}-${pad(m+1)}-${pad(g)}`}
+function totaleGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
+function giorniLavorativi(dal,al){
+  let cnt=0;
+  const d=new Date(dal),fine=new Date(al);
+  while(d<=fine){
+    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))cnt++;
+    d.setDate(d.getDate()+1);
+  }
+  return cnt;
+}
 
 // LOGIN
 document.getElementById('btn-login').addEventListener('click',doLogin);
@@ -345,8 +507,7 @@ document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='E
 async function doLogin(){
   const u=document.getElementById('inp-user').value.trim().toLowerCase();
   const p=document.getElementById('inp-pass').value;
-  const errEl=document.getElementById('login-error');
-  errEl.style.display='none';
+  const errEl=document.getElementById('login-error');errEl.style.display='none';
   if(!u||!p){showLoginErr('Inserisci username e password.');return}
   document.getElementById('btn-login').textContent='Accesso...';
   try{
@@ -355,8 +516,8 @@ async function doLogin(){
     const d=snap.data();
     if(!d.abilitato){showLoginErr('Account non abilitato. Contatta l\'amministratore.');return}
     if(d.password!==p){showLoginErr('Password errata.');return}
-    U={username:u,nome:d.nome||u,cognome:d.cognome||''};
-    sessionStorage.setItem('dip_sess',JSON.stringify(U));
+    U={username:u};profilo=d;
+    sessionStorage.setItem('dip_sess',JSON.stringify({username:u}));
     startApp();
   }catch(e){showLoginErr('Errore: '+e.message)}
   finally{document.getElementById('btn-login').textContent='Accedi'}
@@ -364,20 +525,34 @@ async function doLogin(){
 function showLoginErr(m){const e=document.getElementById('login-error');e.textContent=m;e.style.display='block'}
 
 const sess=sessionStorage.getItem('dip_sess');
-if(sess){try{U=JSON.parse(sess);startApp()}catch(e){sessionStorage.removeItem('dip_sess')}}
+if(sess){
+  try{
+    const s=JSON.parse(sess);
+    db.collection('dipendenti').doc(s.username).get().then(snap=>{
+      if(snap.exists&&snap.data().abilitato){U={username:s.username};profilo=snap.data();startApp()}
+      else{sessionStorage.removeItem('dip_sess')}
+    });
+  }catch(e){sessionStorage.removeItem('dip_sess')}
+}
 
 function startApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
-  const nome=`${U.nome} ${U.cognome}`.trim();
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
   document.getElementById('sidebar-nome').textContent=nome;
+  const orario=profilo.tipoOrario==='ridotto'?'Orario ridotto (6h)':'Orario pieno (8h)';
+  document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
   initCal();
   loadMese(meseSel);
+  aggiornaRiepilogoSaldi();
+  // init select riepilogo mesi
+  const sr=document.getElementById('sel-mese-riepilogo');
+  MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m+' '+ANNO;if(i===meseSel)o.selected=true;sr.appendChild(o)});
+  sr.addEventListener('change',()=>loadRiepilogoMese(parseInt(sr.value)));
 }
 
-// LOGOUT
 document.getElementById('btn-logout').addEventListener('click',()=>{
-  sessionStorage.removeItem('dip_sess');U=null;giornoSel=null;cache={};
+  sessionStorage.removeItem('dip_sess');U=null;profilo=null;giornoSel=null;cache={};assenzeProprie=[];
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('inp-user').value='';document.getElementById('inp-pass').value='';
@@ -389,30 +564,143 @@ document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
     document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
     document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
-    const pid='page-'+b.dataset.page;
-    document.getElementById(pid).classList.add('active');
-    const titles={calendario:'Calendario',ferie:'Ferie & Permessi',riepilogo:'Riepilogo Annuale'};
+    document.getElementById('page-'+b.dataset.page).classList.add('active');
+    const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile'};
     document.getElementById('topbar-title').textContent=titles[b.dataset.page]||'';
-    if(b.dataset.page==='riepilogo')loadRiepilogo();
-    if(b.dataset.page==='ferie')loadRichieste();
+    if(b.dataset.page==='assenze'){loadTutteAssenze()}
+    if(b.dataset.page==='riepilogo'){loadRiepilogoMese(parseInt(document.getElementById('sel-mese-riepilogo').value))}
   });
 });
 
+// ASSEENZE TABS
+function setAssTab(btn,tab){
+  assTab=tab;
+  document.querySelectorAll('.ass-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.ass-subtab').forEach(s=>s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('subtab-'+tab).classList.add('active');
+  if(tab==='malattia')loadMalattie();
+}
+
+// BTN NUOVA RICHIESTA
+['ferie','permesso','rol'].forEach(tipo=>{
+  document.getElementById('btn-nuova-'+tipo).addEventListener('click',()=>{
+    document.getElementById('form-'+tipo).classList.add('open');
+    document.getElementById('btn-nuova-'+tipo).style.display='none';
+  });
+});
+function chiudiForm(tipo){
+  document.getElementById('form-'+tipo).classList.remove('open');
+  document.getElementById('btn-nuova-'+tipo).style.display='';
+}
+
+// SALDI
+async function aggiornaRiepilogoSaldi(){
+  if(!profilo)return;
+  const monteFerie=profilo.monteFerie||0;
+  const montePermesso=profilo.montePermesso||0;
+  const monteRol=profilo.monteRol||0;
+  const oreGiorno=profilo.tipoOrario==='ridotto'?6:8;
+
+  // Calcola ore usate da richieste approvate
+  let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMalattia=0;
+  const snap=await db.collection('richieste_assenza').where('username','==',U.username).get();
+  snap.forEach(d=>{
+    const r=d.data();
+    if(r.stato==='approvata'){
+      if(r.tipo==='ferie'){const gg=giorniLavorativi(r.dataInizio,r.dataFine);ferieUsate+=gg*oreGiorno}
+      if(r.tipo==='permesso'){permessiUsati+=parseFloat(r.oreRichieste)||0}
+      if(r.tipo==='rol'){rolUsato+=parseFloat(r.oreRichieste)||0}
+    }
+  });
+  // Malattie
+  const mSnap=await db.collection('malattie').where('username','==',U.username).get();
+  mSnap.forEach(d=>{
+    const r=d.data();
+    giorniMalattia+=giorniLavorativi(r.dataInizio,r.dataFine);
+  });
+
+  const ferieRes=monteFerie-ferieUsate;
+  const permRes=montePermesso-permessiUsati;
+  const rolRes=monteRol-rolUsato;
+
+  // Sidebar
+  document.getElementById('sb-ferie').textContent=ferieRes+'h';
+  document.getElementById('sb-ferie').className='saldo-val '+(ferieRes>monteFerie*0.3?'ok':ferieRes>0?'warn':'danger');
+  document.getElementById('sb-permessi').textContent=permRes+'h';
+  document.getElementById('sb-permessi').className='saldo-val '+(permRes>0?'ok':'danger');
+  document.getElementById('sb-rol').textContent=rolRes+'h';
+  document.getElementById('sb-rol').className='saldo-val '+(rolRes>0?'ok':'danger');
+  document.getElementById('sb-malattia').textContent=giorniMalattia+' gg';
+
+  // Cards nella pagina assenze
+  const html=`
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🏖️ Ferie</div><div class="saldo-dettaglio">Monte: ${monteFerie}h · Usate: ${ferieUsate}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${ferieRes>monteFerie*0.3?'fill-ok':ferieRes>0?'fill-warn':'fill-danger'}" style="width:${monteFerie>0?Math.max(0,Math.round(ferieRes/monteFerie*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${ferieRes>monteFerie*0.3?'ok':ferieRes>0?'warn':'danger'}">${ferieRes}h</div><div class="saldo-sub">residue</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🕐 Permessi</div><div class="saldo-dettaglio">Monte: ${montePermesso}h · Usati: ${permessiUsati}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${permRes>0?'fill-ok':'fill-danger'}" style="width:${montePermesso>0?Math.max(0,Math.round(permRes/montePermesso*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${permRes>0?'ok':'danger'}">${permRes}h</div><div class="saldo-sub">residui</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🔄 ROL</div><div class="saldo-dettaglio">Monte: ${monteRol}h · Usato: ${rolUsato}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${rolRes>0?'fill-ok':'fill-danger'}" style="width:${monteRol>0?Math.max(0,Math.round(rolRes/monteRol*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${rolRes>0?'ok':'danger'}">${rolRes}h</div><div class="saldo-sub">residuo</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati nel 2026</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--viola)">${giorniMalattia}</div><div class="saldo-sub">giorni</div></div>
+    </div>
+  `;
+  document.getElementById('saldi-cards').innerHTML=html;
+}
+
 // CALENDARIO
 function initCal(){
-  const dow=document.getElementById('cal-dow');
-  dow.innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  document.getElementById('cal-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
   const sel=document.getElementById('sel-mese');
-  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===meseSel?' selected':''}>${m} ${ANNO}</option>`).join('');
-  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);loadMese(meseSel)});
-  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;sel.value=meseSel;loadMese(meseSel)}});
-  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;sel.value=meseSel;loadMese(meseSel)}});
+  MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m+' '+ANNO;if(i===meseSel)o.selected=true;sel.appendChild(o)});
+  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);cache={};loadMese(meseSel)});
+  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;document.getElementById('sel-mese').value=meseSel;cache={};loadMese(meseSel)}});
+  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;document.getElementById('sel-mese').value=meseSel;cache={};loadMese(meseSel)}});
 }
 
 async function loadMese(m){
   const ms=pad(m+1);
   const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
   snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))cache[d.id]=d.data()});
+  // Carica assenze approvate per colorare il calendario
+  const aSnap=await db.collection('richieste_assenza').where('username','==',U.username).get();
+  aSnap.forEach(d=>{
+    const r=d.data();
+    if(r.stato==='approvata'){
+      const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+      const cur=new Date(inizio);
+      while(cur<=fine){
+        const ds=cur.toISOString().split('T')[0];
+        if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+        cur.setDate(cur.getDate()+1);
+      }
+    }
+  });
+  // Malattie
+  const mSnap=await db.collection('malattie').where('username','==',U.username).get();
+  mSnap.forEach(d=>{
+    const r=d.data();
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
   renderCal(m);
 }
 
@@ -422,9 +710,18 @@ function renderCal(m){
   for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
   for(let day=1;day<=giorni;day++){
     const ds=dsOf(m,day);
+    const dati=cache[ds];
+    const festivo=isFestivo(ds);
+    const assenza=dati?dati['_tipo_assenza']:null;
     const btn=document.createElement('button');
-    btn.className='cal-day'+(isWE(m,day)?' weekend':'')+(hasD(cache[ds])?' has-data':'')+(giornoSel===ds?' selected':'');
-    btn.textContent=day;
+    let cls='cal-day';
+    if(isWE(m,day))cls+=' weekend';
+    if(festivo)cls+=' festivo';
+    if(assenza==='ferie')cls+=' ferie-day';
+    else if(assenza==='malattia')cls+=' malattia-day';
+    else if(hasD(dati))cls+=' has-data';
+    if(giornoSel===ds)cls+=' selected';
+    btn.className=cls;btn.textContent=day;
     btn.onclick=()=>selectDay(ds);
     g.appendChild(btn);
   }
@@ -444,8 +741,13 @@ async function selectDay(ds){
 function renderForm(ds,dati){
   const[y,m,g]=ds.split('-');
   const label=`${g} ${MESI[parseInt(m)-1]} ${y}`;
+  const festivo=isFestivo(ds);
+  const totOre=totaleGiorno(dati);
   let html=`<div class="form-header">
-    <div class="form-date">${label}</div>
+    <div>
+      <div class="form-date">${label}</div>
+      ${festivo?'<div style="font-size:11px;color:var(--amber);margin-top:2px">★ Giorno festivo</div>':''}
+    </div>
     <div class="form-actions">
       <span class="save-status" id="sv-status"></span>
       <button class="btn btn-blu btn-sm" onclick="saveDayManual()">💾 Salva</button>
@@ -459,7 +761,10 @@ function renderForm(ds,dati){
       html+=`<div class="field-group"><label class="field-label">${c.l}</label><input class="field-input" type="${c.t}" id="f-${c.k}" value="${v}" ${c.t==='number'?'min="0" step="0.5"':''} placeholder="${c.ph||'0'}" oninput="fieldChange('${c.k}',this.value)"></div>`;
     }
   });
-  html+='</div>';
+  html+=`</div>`;
+  if(totOre>0){
+    html+=`<div class="totale-giorno"><span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${totOre}h</span></div>`;
+  }
   document.getElementById('form-giorno').innerHTML=html;
 }
 
@@ -468,6 +773,16 @@ function fieldChange(k,v){
   if(!cache[giornoSel])cache[giornoSel]={};
   cache[giornoSel][k]=CAMPI.find(c=>c.k===k)?.t==='number'?(v===''?'':parseFloat(v)||0):v;
   if(saveTimer)clearTimeout(saveTimer);
+  // Aggiorna totale in tempo reale
+  const tot=totaleGiorno(cache[giornoSel]);
+  const totEl=document.querySelector('.totale-giorno-val');
+  if(totEl)totEl.textContent=tot+'h';
+  else if(tot>0){
+    const form=document.getElementById('form-giorno');
+    const div=document.createElement('div');div.className='totale-giorno';
+    div.innerHTML=`<span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${tot}h</span>`;
+    form.appendChild(div);
+  }
   saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
 }
 
@@ -476,7 +791,9 @@ async function saveDay(ds){
   const st=document.getElementById('sv-status');
   if(st)st.innerHTML='<span class="save-loading">Salvataggio...</span>';
   try{
-    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...cache[ds],username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const toSave={};
+    Object.entries(cache[ds]).forEach(([k,v])=>{if(!k.startsWith('_'))toSave[k]=v});
+    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
     renderCal(meseSel);
     setTimeout(()=>{if(st)st.innerHTML=''},2500);
@@ -484,92 +801,208 @@ async function saveDay(ds){
 }
 function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)}
 
-// RIEPILOGO
-async function loadRiepilogo(){
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-  const all={};snap.forEach(d=>{all[d.id]=d.data()});
-  const tot={};CN.forEach(c=>{tot[c.k]=Object.values(all).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
-  const highlights=[{k:'oreElectriciMD',l:'Ore Elettrici',icon:'⚡'},{k:'oreMeccaniciMA',l:'Ore Meccanici',icon:'🔧'},{k:'oreFerie',l:'Ore Ferie',icon:'🏖️'},{k:'kmPercorsi',l:'Km Totali',icon:'🚗'}];
-  document.getElementById('stat-row').innerHTML=highlights.map(h=>`<div class="stat-box"><div class="stat-label">${h.icon} ${h.l}</div><div class="stat-val">${tot[h.k]||0}<span class="stat-unit">${h.k==='kmPercorsi'?'km':'h'}</span></div></div>`).join('');
-  const thead=document.getElementById('thead-r');
-  thead.innerHTML='<th>Campo</th>'+MB.map(m=>`<th class="td-r">${m}</th>`).join('')+'<th class="td-r td-bold">Tot</th>';
-  const tbody=document.getElementById('tbody-r');tbody.innerHTML='';
-  CN.forEach((c,fi)=>{
-    let html=`<td style="font-weight:500;white-space:nowrap">${c.l}</td>`;
-    let t=0;
-    for(let mi=0;mi<12;mi++){
-      const ms=pad(mi+1);
-      const v=Object.entries(all).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0);
-      html+=`<td class="td-r" style="color:${v>0?'var(--ink)':'var(--border)'}">${v>0?(v%1===0?v:v.toFixed(1)):'—'}</td>`;
-      t+=v;
-    }
-    html+=`<td class="td-r td-bold">${fmtN(t,c.k)}</td>`;
-    const tr=document.createElement('tr');tr.innerHTML=html;
-    if(fi%2===1)tr.style.background='var(--paper)';
-    tbody.appendChild(tr);
+// RICHIESTE ASSENZE
+async function inviaRichiesta(tipo){
+  const ini=document.getElementById(`f-inizio-${tipo}`).value;
+  const fin=document.getElementById(`f-fine-${tipo}`).value;
+  const note=document.getElementById(`f-note-${tipo}`).value;
+  const oreEl=document.getElementById(`f-ore-${tipo}`);
+  const ore=oreEl?parseFloat(oreEl.value)||0:0;
+  const ad=document.getElementById(`alert-form-${tipo}`);ad.innerHTML='';
+  if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  if((tipo==='permesso'||tipo==='rol')&&ore<=0){ad.innerHTML='<div class="alert-box alert-err">Inserisci le ore richieste.</div>';return}
+  const oreGiorno=profilo.tipoOrario==='ridotto'?6:8;
+  const gg=giorniLavorativi(ini,fin);
+  const oreTotali=tipo==='ferie'?gg*oreGiorno:ore;
+  try{
+    await db.collection('richieste_assenza').add({
+      username:U.username,
+      nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),
+      tipo,dataInizio:ini,dataFine:fin,note,
+      oreRichieste:oreTotali,
+      giorniLavorativi:gg,
+      stato:'in_attesa',
+      createdAt:new Date().toISOString(),
+    });
+    chiudiForm(tipo);
+    await loadTutteAssenze();
+    aggiornaRiepilogoSaldi();
+    document.getElementById(`f-inizio-${tipo}`).value='';
+    document.getElementById(`f-fine-${tipo}`).value='';
+    if(oreEl)oreEl.value='';
+    document.getElementById(`f-note-${tipo}`).value='';
+  }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+}
+
+async function loadTutteAssenze(){
+  const snap=await db.collection('richieste_assenza').where('username','==',U.username).get();
+  assenzeProprie=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  ['ferie','permesso','rol'].forEach(tipo=>{
+    const lista=assenzeProprie.filter(r=>r.tipo===tipo);
+    renderListaAssenze(tipo,lista);
   });
+  aggiornaRiepilogoSaldi();
 }
 
-// FERIE
-document.getElementById('btn-nuova').addEventListener('click',()=>{
-  document.getElementById('form-rich').classList.add('open');
-  document.getElementById('btn-nuova').style.display='none';
-});
-document.getElementById('btn-annulla-form').addEventListener('click',()=>{
-  document.getElementById('form-rich').classList.remove('open');
-  document.getElementById('btn-nuova').style.display='';
-});
-document.getElementById('btn-invia').addEventListener('click',inviaRichiesta);
-
-async function inviaRichiesta(){
-  const tipo=document.getElementById('r-tipo').value;
-  const ini=document.getElementById('r-inizio').value;
-  const fin=document.getElementById('r-fine').value;
-  const nota=document.getElementById('r-note').value;
-  const aDiv=document.getElementById('alert-form');aDiv.innerHTML='';
-  if(!ini||!fin){aDiv.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
-  if(fin<ini){aDiv.innerHTML='<div class="alert-box alert-err">La data fine deve essere uguale o successiva alla data inizio.</div>';return}
-  document.getElementById('btn-invia').textContent='Invio...';
-  try{
-    await db.collection('richieste_assenza').add({username:U.username,nomeCompleto:`${U.nome} ${U.cognome}`.trim(),tipo,dataInizio:ini,dataFine:fin,note:nota,stato:'in_attesa',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-    document.getElementById('alert-globale').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Richiesta inviata con successo.</div>';
-    setTimeout(()=>document.getElementById('alert-globale').innerHTML='',3000);
-    document.getElementById('form-rich').classList.remove('open');
-    document.getElementById('btn-nuova').style.display='';
-    document.getElementById('r-inizio').value='';document.getElementById('r-fine').value='';document.getElementById('r-note').value='';
-    loadRichieste();
-  }catch(e){aDiv.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
-  finally{document.getElementById('btn-invia').textContent='📤 Invia Richiesta'}
+function renderListaAssenze(tipo,lista){
+  const el=document.getElementById('lista-'+tipo);
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna richiesta di '+tipo+'.</div>';return}
+  el.innerHTML='<div class="richieste-list">'+lista.map(r=>{
+    const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
+    const bl=r.stato==='in_attesa'?'⏳ In lavorazione':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
+    const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
+    return `<div class="richiesta-row">
+      <div>
+        <div class="r-tipo"><span class="badge ${bc}">${bl}</span></div>
+        <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h</div>
+        ${r.note?`<div class="r-nota">${r.note}</div>`:''}
+        ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}
+      </div>
+      ${r.stato==='in_attesa'?`<button class="btn btn-rosso btn-sm" onclick="eliminaRichiesta('${r.id}')">Elimina</button>`:''}
+    </div>`;
+  }).join('')+'</div>';
 }
 
-async function loadRichieste(){
-  const el=document.getElementById('lista-richieste');
-  el.innerHTML='<div class="empty-state">Caricamento...</div>';
-  try{
-    const snap=await db.collection('richieste_assenza').where('username','==',U.username).orderBy('createdAt','desc').get();
-    if(snap.empty){el.innerHTML='<div class="empty-state">Nessuna richiesta presente.<br>Usa il pulsante qui sopra per crearne una.</div>';return}
-    el.innerHTML='<div class="richieste-list">'+snap.docs.map(d=>{
-      const r={id:d.id,...d.data()};
-      const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
-      const bl=r.stato==='in_attesa'?'In attesa':r.stato==='approvata'?'Approvata':'Rifiutata';
-      const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
-      return `<div class="richiesta-row">
-        <div class="r-info">
-          <div class="r-tipo">${TL[r.tipo]||r.tipo}<span class="badge ${bc}">${bl}</span></div>
-          <div class="r-date">${per}</div>
-          ${r.note?`<div class="r-nota">${r.note}</div>`:''}
-          ${r.notaAdmin?`<div class="r-nota" style="color:var(--amber)">💬 ${r.notaAdmin}</div>`:''}
-        </div>
-        ${r.stato==='in_attesa'?`<button class="btn btn-rosso btn-sm" onclick="delRichiesta('${r.id}')">Elimina</button>`:''}
-      </div>`;
-    }).join('')+'</div>';
-  }catch(e){el.innerHTML=`<div class="empty-state">Errore: ${e.message}</div>`}
-}
-
-async function delRichiesta(id){
+async function eliminaRichiesta(id){
   if(!confirm('Eliminare questa richiesta?'))return;
   await db.collection('richieste_assenza').doc(id).delete();
-  loadRichieste();
+  loadTutteAssenze();
+}
+
+// MALATTIA
+async function inserisciMalattia(){
+  const ini=document.getElementById('mal-inizio').value;
+  const fin=document.getElementById('mal-fine').value;
+  const note=document.getElementById('mal-note').value;
+  const ad=document.getElementById('alert-malattia');ad.innerHTML='';
+  if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  const gg=giorniLavorativi(ini,fin);
+  try{
+    await db.collection('malattie').add({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
+    document.getElementById('mal-inizio').value='';document.getElementById('mal-fine').value='';document.getElementById('mal-note').value='';
+    ad.innerHTML='<div class="alert-box alert-ok">Malattia registrata ('+gg+' giorni lavorativi).</div>';
+    setTimeout(()=>ad.innerHTML='',3000);
+    loadMalattie();aggiornaRiepilogoSaldi();
+  }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+}
+
+async function loadMalattie(){
+  const el=document.getElementById('lista-malattia');
+  const snap=await db.collection('malattie').where('username','==',U.username).get();
+  const lista=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna malattia registrata.</div>';return}
+  el.innerHTML=lista.map(r=>`
+    <div class="mal-item">
+      <div>
+        <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
+        <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
+        ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
+      </div>
+      <span class="badge badge-malattia">Malattia</span>
+    </div>
+  `).join('');
+}
+
+// RIEPILOGO MENSILE
+async function loadRiepilogoMese(mese){
+  const ms=pad(mese+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+
+  // KPI
+  const totMensili={};CN.forEach(c=>{totMensili[c.k]=giorni.reduce((s,d)=>s+(parseFloat(all[d][c.k])||0),0)});
+  const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totMensili[c.k],0);
+  const highlights=[
+    {l:'Ore Totali Mese',v:totOre+'h',u:''},
+    {l:'Ore Elettrici M.D.',v:(totMensili.oreElectriciMD||0)+'h',u:''},
+    {l:'Ore Meccanici M.A.',v:(totMensili.oreMeccaniciMA||0)+'h',u:''},
+    {l:'Km Percorsi',v:(totMensili.kmPercorsi||0)+' km',u:''},
+  ];
+  document.getElementById('stat-row-riepilogo').innerHTML=highlights.map(h=>`<div class="stat-box"><div class="stat-label">${h.l}</div><div class="stat-val">${h.v}</div></div>`).join('');
+
+  // Tabella giornaliera
+  const thead=document.getElementById('thead-r');
+  thead.innerHTML='<th>Data</th>'+CN.map(c=>`<th class="td-r">${c.l}</th>`).join('')+'<th class="td-r">Totale Ore</th>';
+  const tbody=document.getElementById('tbody-r');tbody.innerHTML='';
+  giorni.forEach(ds=>{
+    const d=all[ds];const[y,m,g]=ds.split('-');
+    const tot=totaleGiorno(d);
+    let html=`<td style="font-family:'DM Mono',monospace;font-size:11px">${g}/${m}</td>`;
+    CN.forEach(c=>{const v=parseFloat(d[c.k])||0;html+=`<td class="td-r" style="color:${v>0?'var(--ink)':'var(--border)'}">${v>0?fmtN(v,c.k):'—'}</td>`});
+    html+=`<td class="td-r td-bold">${tot>0?tot+'h':'—'}</td>`;
+    const tr=document.createElement('tr');tr.innerHTML=html;tbody.appendChild(tr);
+  });
+
+  // Tabella totali per tipologia
+  const tbody2=document.getElementById('tbody-totali');tbody2.innerHTML='';
+  CN.forEach(c=>{
+    if(totMensili[c.k]>0){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td style="font-weight:500">${c.l}</td><td class="td-r td-bold">${fmtN(totMensili[c.k],c.k)}</td>`;
+      tbody2.appendChild(tr);
+    }
+  });
+  if(!tbody2.innerHTML)tbody2.innerHTML='<tr><td colspan="2" class="empty-state">Nessun dato per questo mese.</td></tr>';
+}
+
+// EXPORT EXCEL
+async function esportaExcel(){
+  const mese=parseInt(document.getElementById('sel-mese-riepilogo').value);
+  const ms=pad(mese+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
+  const wb=XLSX.utils.book_new();
+  const hh=['Data',...CN.map(c=>c.l),'Totale Ore'];
+  const rr=giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN.map(c=>parseFloat(d[c.k])||0),totaleGiorno(d)]});
+  // Totali
+  const tot=['TOTALE',...CN.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0)];
+  rr.push(tot);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[mese]);
+  XLSX.writeFile(wb,`${nome}_${MESI[mese]}_${ANNO}.xlsx`);
+}
+
+// EXPORT PDF
+async function esportaPDF(){
+  const mese=parseInt(document.getElementById('sel-mese-riepilogo').value);
+  const ms=pad(mese+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.text(`Riepilogo Ore — ${nome}`,14,16);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(`${MESI[mese]} ${ANNO}`,14,23);
+  let y=32;
+  const cols=['Data',...CN.slice(0,8).map(c=>c.l.substring(0,12)),'Tot.h'];
+  const colW=[18,...Array(8).fill(22),14];
+  // Header
+  doc.setFillColor(26,86,219);doc.rect(14,y,272,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(7);
+  let x=14;cols.forEach((c,i)=>{doc.text(c,x+1,y+5,{maxWidth:colW[i]-2});x+=colW[i]});
+  y+=7;doc.setTextColor(0,0,0);
+  giorni.forEach((ds,idx)=>{
+    const d=all[ds];const[yr,m,g]=ds.split('-');
+    if(y>185){doc.addPage();y=20}
+    if(idx%2===0)doc.setFillColor(247,245,240);else doc.setFillColor(255,255,255);
+    doc.rect(14,y,272,6,'F');
+    x=14;doc.setFontSize(7);
+    const row=[`${g}/${m}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?String(v):''}),totaleGiorno(d)>0?String(totaleGiorno(d))+'h':''];
+    row.forEach((val,i)=>{doc.text(val,x+1,y+4,{maxWidth:colW[i]-2});x+=colW[i]});
+    y+=6;
+  });
+  // Totali
+  y+=4;doc.setFont('helvetica','bold');doc.setFontSize(9);
+  const totOre=giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0);
+  doc.text(`Totale ore mese: ${totOre}h`,14,y);
+  doc.save(`${nome}_${MESI[mese]}_${ANNO}.pdf`);
 }
 </script>
 </body>

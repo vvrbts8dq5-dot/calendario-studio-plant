@@ -8,15 +8,17 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
   --ink:#0F0F0F;--ink2:#2A2A2A;--ink3:#555;--ink4:#888;
   --paper:#F7F5F0;--paper2:#EDEBE4;--white:#FFF;--border:#D8D4CB;
-  --blu:#1A56db;--blu-dark:#1245b5;--blu-light:#E3EEFA;
+  --blu:#1A56DB;--blu-dark:#1245b5;--blu-light:#E3EEFA;
   --verde:#1A7A4A;--verde-light:#E3F5EC;
   --amber:#C47B00;--amber-light:#FDF3DC;
-  --rosso:#c81e1e;--rosso-light:#FAE8E8;
-  --sidebar-w:240px;
+  --rosso:#C81E1E;--rosso-light:#FAE8E8;
+  --viola:#6B3FA0;--viola-light:#F0E8FA;
+  --sidebar-w:260px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
@@ -29,31 +31,38 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .login-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
 .login-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
 .login-sub{font-size:13px;color:var(--ink4);margin-bottom:28px}
-.login-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
-.login-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
-.login-input:focus{border-color:var(--blu);background:var(--white)}
+.f-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
+.f-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
+.f-input:focus{border-color:var(--blu);background:var(--white)}
+.f-select{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--white);color:var(--ink);outline:none}
 .login-btn{width:100%;padding:12px;background:var(--ink);color:#fff;border-radius:8px;font-size:14px;font-weight:500;margin-top:4px;transition:background .15s}
 .login-btn:hover{background:var(--ink2)}
-.login-error{font-size:12px;color:var(--rosso);margin-top:10px;background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none}
+.login-error{font-size:12px;color:var(--rosso);background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none;margin-bottom:12px}
 
 /* APP */
 #app{display:none;height:100vh;overflow:hidden}
-#app.visible{display:flex;flex-direction:row}
+#app.visible{display:flex}
 
 /* SIDEBAR */
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;height:100vh;overflow-y:auto;flex-shrink:0}
 .sidebar-logo{padding:20px 20px 16px;border-bottom:.5px solid #222}
 .logo-tag{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:4px}
 .logo-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
 .logo-sub{font-size:11px;color:#555;margin-top:3px}
 .sidebar-section{padding:14px 12px 6px}
-.sidebar-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+.sidebar-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#888;transition:all .15s;border:none;background:none;width:100%;text-align:left}
-.nav-item:hover{background:#1a1a1a;color:#fff}
+.nav-item:hover{background:#1a1a1a;color:#ccc}
 .nav-item.active{background:var(--blu);color:#fff}
-.nav-icon{font-size:15px;min-width:18px}
-.nav-badge{margin-left:auto;background:#2a2a2a;color:#555;font-size:10px;padding:1px 6px;border-radius:10px;font-family:'DM Mono',monospace}
+.nav-icon{font-size:14px;min-width:18px}
+.nav-badge{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:10px;font-family:'DM Mono',monospace;background:#2a2a2a;color:#555}
 .nav-item.active .nav-badge{background:rgba(255,255,255,.2);color:#fff}
+.nav-badge.alert{background:var(--rosso);color:#fff}
+.sidebar-divider{height:.5px;background:#222;margin:6px 12px}
+.dip-nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;color:#666;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.dip-nav-item:hover{background:#1a1a1a;color:#ccc}
+.dip-nav-item.active{background:#1a1a1a;color:#fff}
+.dip-avatar{width:22px;height:22px;border-radius:50%;background:var(--blu);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0}
 .sidebar-footer{padding:14px 20px;border-top:.5px solid #1e1e1e;margin-top:auto}
 .user-name{font-size:13px;font-weight:500;color:#ccc}
 .user-role{font-size:11px;color:#555;margin-bottom:8px}
@@ -64,7 +73,7 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .topbar{height:52px;background:var(--white);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
 .topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;flex:1}
-.topbar-tag{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em}
+.topbar-actions{display:flex;gap:8px;align-items:center}
 .content{flex:1;overflow-y:auto;padding:24px;background:var(--paper)}
 .page{display:none}
 .page.active{display:block}
@@ -81,34 +90,31 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .btn-rosso{background:var(--rosso);color:#fff;border-color:#a01e1e}
 .btn-rosso:hover{background:#a01e1e}
 .btn-amber{background:var(--amber);color:#fff;border-color:#9a6000}
+.btn-viola{background:var(--viola);color:#fff;border-color:#4a2a70}
 .btn-sm{padding:5px 10px;font-size:11px}
 
-/* CARDS */
+/* LAYOUT COMUNI */
 .card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px}
 .section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
 .section-title::after{content:'';flex:1;height:.5px;background:var(--border)}
 .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
 .page-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
-
-/* BADGE */
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
 .badge-attesa{background:var(--amber-light);color:var(--amber)}
 .badge-approvata{background:var(--verde-light);color:var(--verde)}
 .badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
+.badge-malattia{background:var(--viola-light);color:var(--viola)}
 .badge-attivo{background:var(--verde-light);color:var(--verde)}
 .badge-disab{background:var(--paper2);color:var(--ink4)}
-
-/* KPI */
-.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:24px}
-.kpi{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
-.kpi-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.kpi-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;line-height:1}
-.kpi-unit{font-size:13px;font-weight:400;color:var(--ink4);margin-left:2px}
+.alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
+.alert-ok{background:var(--verde-light);color:var(--verde)}
+.alert-err{background:var(--rosso-light);color:var(--rosso)}
+.empty-state{text-align:center;padding:32px;color:var(--ink4);font-size:13px}
 
 /* TABLE */
 .table-wrap{background:var(--white);border:.5px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{padding:10px 14px;text-align:left}
+th,td{padding:9px 14px;text-align:left}
 thead tr{border-bottom:.5px solid var(--border);background:var(--paper)}
 thead th{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;font-weight:400}
 tbody tr{border-bottom:.5px solid var(--paper2);transition:background .1s}
@@ -116,39 +122,35 @@ tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:var(--paper)}
 .td-r{text-align:right}
 .td-bold{font-weight:600;color:var(--blu)}
-.td-name{font-weight:500;cursor:pointer;color:var(--ink);text-decoration:none}
-.td-name:hover{color:var(--blu);text-decoration:underline}
 
-/* DIPENDENTI FORM */
-.form-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
-.form-box.open{display:block}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-.f-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
-.f-input,.f-select{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none}
-.f-input:focus,.f-select:focus{border-color:var(--blu);background:var(--white)}
-.alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
-.alert-ok{background:var(--verde-light);color:var(--verde)}
-.alert-err{background:var(--rosso-light);color:var(--rosso)}
-.empty-state{text-align:center;padding:40px;color:var(--ink4);font-size:13px}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
+.kpi-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;line-height:1}
+.kpi-unit{font-size:12px;font-weight:400;color:var(--ink4);margin-left:2px}
 
-/* FILTRI FERIE */
+/* FILTRI */
 .filtri{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
 .btn-filtro{padding:5px 12px;border-radius:10px;font-size:12px;font-weight:500;background:var(--white);color:var(--ink4);border:.5px solid var(--border);cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s}
 .btn-filtro.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
 /* DETTAGLIO DIPENDENTE */
-.det-layout{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start}
+.det-grid{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:start}
 .nav-mese{display:flex;gap:6px;align-items:center;margin-bottom:12px}
 .btn-mese{background:var(--white);border:.5px solid var(--border);color:var(--ink2);border-radius:6px;padding:6px 10px;font-size:14px;transition:all .15s}
 .btn-mese:hover{background:var(--paper2)}
-.sel-mese{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--white);outline:none}
+.sel-mese-det{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--white);outline:none}
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
 .cal-dow{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);padding:3px 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s}
+.cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s;position:relative}
 .cal-day:hover{background:var(--paper2)}
 .cal-day.weekend{color:var(--ink4)}
-.cal-day.has-data{background:var(--verde-light);color:var(--verde)}
+.cal-day.festivo{color:var(--amber);font-weight:600}
+.cal-day.has-data{background:var(--blu-light);color:var(--blu)}
+.cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
+.cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
 .tot-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
 .tot-row:last-child{border-bottom:none}
@@ -157,23 +159,42 @@ tbody tr:hover{background:var(--paper)}
 .det-day-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:.5px solid var(--paper2)}
 .det-day-row:last-child{border-bottom:none}
 .det-key{color:var(--ink4)}
+.totale-giorno-bar{background:var(--blu-light);border-radius:6px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .giorni-list{display:flex;flex-direction:column;gap:3px;margin-top:12px}
 .giorno-item{padding:7px 10px;border-radius:6px;background:var(--paper);cursor:pointer;display:flex;justify-content:space-between;font-size:12px;border:.5px solid transparent;transition:all .1s}
 .giorno-item:hover{border-color:var(--border)}
 .giorno-item.sel{background:var(--blu-light);border-color:var(--blu)}
-.back-btn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink4);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;padding:0;margin-bottom:16px;transition:color .15s}
-.back-btn:hover{color:var(--ink)}
+
+/* SALDI DIPENDENTE */
+.saldi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.saldo-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:14px 16px}
+.saldo-tipo{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:2px}
+.saldo-dettaglio{font-size:11px;color:var(--ink4);margin-bottom:8px}
+.saldo-res{font-family:'DM Mono',monospace;font-size:18px;font-weight:700}
+.saldo-res.ok{color:var(--verde)}
+.saldo-res.warn{color:var(--amber)}
+.saldo-res.danger{color:var(--rosso)}
+.progress-bar{height:5px;background:var(--paper2);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:3px}
+.fill-ok{background:var(--verde)}
+.fill-warn{background:var(--amber)}
+.fill-danger{background:var(--rosso)}
+
+/* FORM DIPENDENTE */
+.form-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
+.form-box.open{display:block}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.fl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
+.fi{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none}
+.fi:focus{border-color:var(--blu);background:var(--white)}
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:24px}
 .modal-overlay.open{display:flex}
-.modal{background:var(--white);border-radius:12px;padding:28px;max-width:460px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2)}
+.modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2)}
 .modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
 .modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
-.modal-nota-dip{background:var(--paper);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
-.modal-textarea{width:100%;padding:8px 12px;border:.5px solid var(--border);border-radius:6px;font-size:13px;resize:vertical;margin-bottom:16px;background:var(--paper);outline:none}
-.modal-textarea:focus{border-color:var(--blu);background:var(--white)}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -185,10 +206,10 @@ tbody tr:hover{background:var(--paper)}
     <div class="login-title">Admin Panel</div>
     <div class="login-sub">Accedi al pannello di controllo</div>
     <div class="login-error" id="login-error"></div>
-    <label class="login-label">Nome utente</label>
-    <input class="login-input" id="inp-user" type="text" placeholder="es. marco.d" autocomplete="username">
-    <label class="login-label">Password</label>
-    <input class="login-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <label class="f-label">Nome utente</label>
+    <input class="f-input" id="inp-user" type="text" placeholder="es. marco.d" autocomplete="username">
+    <label class="f-label">Password</label>
+    <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="login-btn" id="btn-login">Accedi come Amministratore</button>
   </div>
 </div>
@@ -203,16 +224,21 @@ tbody tr:hover{background:var(--paper)}
     </div>
     <div class="sidebar-section">
       <div class="sidebar-lbl">Gestione</div>
-      <button class="nav-item active" data-page="dashboard">
+      <button class="nav-item active" data-page="dashboard" onclick="goPage('dashboard',this)">
         <span class="nav-icon">📊</span> Dashboard
       </button>
-      <button class="nav-item" data-page="ferie">
-        <span class="nav-icon">🏖️</span> Ferie & Permessi
+      <button class="nav-item" data-page="ferie" onclick="goPage('ferie',this)">
+        <span class="nav-icon">🏖️</span> Ferie & Assenze
         <span class="nav-badge" id="badge-ferie">0</span>
       </button>
-      <button class="nav-item" data-page="dipendenti">
+      <button class="nav-item" data-page="dipendenti" onclick="goPage('dipendenti',this)">
         <span class="nav-icon">👥</span> Dipendenti
       </button>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-lbl">Accesso rapido</div>
+      <div id="dip-nav-list"></div>
     </div>
     <div class="sidebar-footer">
       <div class="user-name" id="sidebar-nome"></div>
@@ -224,7 +250,7 @@ tbody tr:hover{background:var(--paper)}
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Dashboard</div>
-      <div class="topbar-tag" id="topbar-tag">2026</div>
+      <div class="topbar-actions" id="topbar-actions"></div>
     </div>
     <div class="content">
 
@@ -232,71 +258,103 @@ tbody tr:hover{background:var(--paper)}
       <div class="page active" id="page-dashboard">
         <div class="page-header">
           <div class="page-title">Dashboard 2026</div>
-          <button class="btn btn-verde" onclick="esportaTutti()">📥 Esporta tutti Excel</button>
+          <button class="btn btn-verde" onclick="esportaTuttiExcel()">📥 Esporta tutti Excel</button>
         </div>
         <div class="kpi-row" id="kpi-row"></div>
-        <div class="section-title">Riepilogo per Dipendente</div>
+        <div class="section-title">Saldi Ferie & Assenze per Dipendente</div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr>
+              <th>Dipendente</th><th>Orario</th>
+              <th class="td-r">Monte Ferie</th><th class="td-r">Ferie Usate</th><th class="td-r">Ferie Residue</th>
+              <th class="td-r">Permessi Res.</th><th class="td-r">ROL Res.</th><th class="td-r">Malattie</th>
+            </tr></thead>
+            <tbody id="tbody-saldi"></tbody>
+          </table>
+        </div>
+        <div class="section-title">Ore Lavoro per Dipendente</div>
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Dipendente</th>
-              <th class="td-r">Ore Lavoro</th>
-              <th class="td-r">Ferie</th>
-              <th class="td-r">Permesso</th>
-              <th class="td-r">Straord.</th>
-              <th class="td-r">Km</th>
-              <th class="td-r">Spese</th>
+              <th>Dipendente</th><th class="td-r">Ore Lavoro</th><th class="td-r">Straord.</th>
+              <th class="td-r">Km</th><th class="td-r">Spese €</th>
             </tr></thead>
-            <tbody id="tbody-dash"><tr><td colspan="7" class="empty-state">Caricamento...</td></tr></tbody>
+            <tbody id="tbody-dash"></tbody>
           </table>
         </div>
       </div>
 
       <!-- DETTAGLIO DIPENDENTE -->
       <div class="page" id="page-dettaglio">
-        <button class="back-btn" id="back-dash">← Torna alla Dashboard</button>
         <div class="page-header">
-          <div class="page-title" id="det-nome-title"></div>
-          <button class="btn btn-verde btn-sm" onclick="esportaDipendente()">📥 Esporta Excel</button>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-sm" onclick="goPage('dashboard',document.querySelector('.nav-item[data-page=dashboard]'))">← Dashboard</button>
+            <div class="page-title" id="det-nome-title"></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-verde btn-sm" onclick="esportaDetExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="esportaDetPDF()">📄 PDF</button>
+          </div>
         </div>
-        <div class="det-layout">
+
+        <!-- Saldi dipendente -->
+        <div class="saldi-grid" id="det-saldi"></div>
+
+        <!-- Selector mese -->
+        <div class="nav-mese" style="margin-bottom:16px">
+          <button class="btn-mese" id="det-prec">‹</button>
+          <select class="sel-mese-det" id="det-sel-mese"></select>
+          <button class="btn-mese" id="det-succ">›</button>
+        </div>
+
+        <div class="det-grid">
+          <!-- Colonna sinistra: calendario + totali -->
           <div>
-            <div class="nav-mese">
-              <button class="btn-mese" id="det-prec">‹</button>
-              <select class="sel-mese" id="det-sel-mese"></select>
-              <button class="btn-mese" id="det-succ">›</button>
-            </div>
             <div class="card" style="padding:14px">
               <div class="cal-dow-row" id="det-dow"></div>
               <div class="cal-grid" id="det-cal"></div>
+              <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);display:flex;gap:10px;flex-wrap:wrap">
+                <span>🔵 ore lavoro</span><span>🟢 ferie</span><span>🟣 malattia</span>
+              </div>
             </div>
-            <div class="card" style="margin-top:12px;padding:14px" id="det-totali"></div>
+            <div class="card" style="margin-top:12px;padding:14px" id="det-totali-mese"></div>
           </div>
+          <!-- Colonna destra: dettaglio giorno -->
           <div>
             <div class="card" id="det-giorno-card">
-              <div class="empty-state" style="padding:32px">Clicca su un giorno per vedere il dettaglio</div>
+              <div class="empty-state">Clicca su un giorno per vedere il dettaglio</div>
             </div>
             <div id="det-lista-giorni"></div>
           </div>
         </div>
       </div>
 
-      <!-- FERIE -->
+      <!-- FERIE & ASSENZE -->
       <div class="page" id="page-ferie">
         <div class="page-header">
-          <div class="page-title">Ferie & Permessi</div>
-          <button class="btn btn-verde btn-sm" onclick="esportaFerie()">📥 Esporta Excel</button>
+          <div class="page-title">Ferie & Assenze</div>
+          <div style="display:flex;gap:8px">
+            <select class="f-select" id="filtro-tipo-ferie" onchange="renderFerie()" style="font-size:12px">
+              <option value="tutte">Tutti i tipi</option>
+              <option value="ferie">Ferie</option>
+              <option value="permesso">Permessi</option>
+              <option value="rol">ROL</option>
+              <option value="malattia">Malattia</option>
+            </select>
+            <button class="btn btn-verde btn-sm" onclick="esportaFerieExcel()">📥 Excel</button>
+          </div>
         </div>
         <div class="filtri">
-          <button class="btn-filtro active" onclick="setFiltro(this,'in_attesa')">In attesa <span id="cnt-attesa">0</span></button>
-          <button class="btn-filtro" onclick="setFiltro(this,'approvata')">Approvate <span id="cnt-approvata">0</span></button>
-          <button class="btn-filtro" onclick="setFiltro(this,'rifiutata')">Rifiutate <span id="cnt-rifiutata">0</span></button>
+          <button class="btn-filtro active" onclick="setFiltro(this,'in_attesa')">⏳ In attesa <span id="cnt-attesa">0</span></button>
+          <button class="btn-filtro" onclick="setFiltro(this,'approvata')">✓ Approvate <span id="cnt-approvata">0</span></button>
+          <button class="btn-filtro" onclick="setFiltro(this,'rifiutata')">✕ Rifiutate <span id="cnt-rifiutata">0</span></button>
+          <button class="btn-filtro" onclick="setFiltro(this,'malattia')">🤒 Malattie</button>
           <button class="btn-filtro" onclick="setFiltro(this,'tutte')">Tutte <span id="cnt-tutte">0</span></button>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Dipendente</th><th>Tipo</th><th>Periodo</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead>
-            <tbody id="tbody-ferie"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
+            <thead><tr><th>Dipendente</th><th>Tipo</th><th>Periodo</th><th>Ore/Giorni</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead>
+            <tbody id="tbody-ferie"></tbody>
           </table>
         </div>
       </div>
@@ -309,13 +367,23 @@ tbody tr:hover{background:var(--paper)}
         </div>
         <div id="alert-dip"></div>
         <div class="form-box" id="form-nuovo">
-          <div class="section-title" style="margin-bottom:16px">Crea Nuovo Dipendente</div>
+          <div class="section-title">Crea Nuovo Dipendente</div>
           <div id="alert-form-dip"></div>
           <div class="form-grid">
-            <div><label class="f-label">Username (ID login)</label><input class="f-input" id="new-u" placeholder="es. mario.rossi" type="text"></div>
-            <div><label class="f-label">Nome</label><input class="f-input" id="new-n" placeholder="Mario" type="text"></div>
-            <div><label class="f-label">Cognome</label><input class="f-input" id="new-c" placeholder="Rossi" type="text"></div>
-            <div><label class="f-label">Password</label><input class="f-input" id="new-p" placeholder="password iniziale" type="text"></div>
+            <div><label class="fl">Username (ID login)</label><input class="fi" id="new-u" placeholder="es. mario.rossi" type="text"></div>
+            <div><label class="fl">Nome</label><input class="fi" id="new-n" placeholder="Mario" type="text"></div>
+            <div><label class="fl">Cognome</label><input class="fi" id="new-c" placeholder="Rossi" type="text"></div>
+            <div><label class="fl">Password</label><input class="fi" id="new-p" placeholder="password" type="text"></div>
+            <div>
+              <label class="fl">Tipo Orario</label>
+              <select class="fi" id="new-orario">
+                <option value="pieno">Pieno (8h/giorno)</option>
+                <option value="ridotto">Ridotto (6h/giorno)</option>
+              </select>
+            </div>
+            <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="new-ferie" placeholder="es. 160" type="number"></div>
+            <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="new-permessi" placeholder="es. 32" type="number"></div>
+            <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="new-rol" placeholder="es. 32" type="number"></div>
           </div>
           <div style="margin-top:16px;display:flex;gap:8px">
             <button class="btn btn-ink" onclick="creaDipendente()">✓ Crea Dipendente</button>
@@ -324,8 +392,8 @@ tbody tr:hover{background:var(--paper)}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Stato</th><th>Azioni</th></tr></thead>
-            <tbody id="tbody-dip"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
+            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Orario</th><th>Monte Ferie</th><th>Stato</th><th>Azioni</th></tr></thead>
+            <tbody id="tbody-dip"></tbody>
           </table>
         </div>
       </div>
@@ -337,15 +405,43 @@ tbody tr:hover{background:var(--paper)}
 <!-- MODAL FERIE -->
 <div class="modal-overlay" id="modal-ferie">
   <div class="modal">
-    <div class="modal-title">Gestisci Richiesta</div>
+    <div class="modal-title" id="modal-title">Gestisci Richiesta</div>
     <div class="modal-sub" id="modal-sub"></div>
-    <div class="modal-nota-dip" id="modal-nota-dip"></div>
-    <label class="f-label" style="display:block;margin-bottom:5px">Nota per il dipendente (opzionale)</label>
-    <textarea class="modal-textarea" id="modal-nota-admin" rows="3" placeholder="Aggiungi una nota..."></textarea>
+    <div id="modal-nota-dip" style="background:var(--paper);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none"></div>
+    <label class="fl" style="margin-bottom:6px">Nota per il dipendente (opzionale)</label>
+    <textarea class="fi" id="modal-nota-admin" rows="3" placeholder="Aggiungi una nota..." style="resize:vertical;margin-bottom:0;width:100%"></textarea>
     <div class="modal-actions">
       <button class="btn" onclick="chiudiModal()">Annulla</button>
       <button class="btn btn-rosso" onclick="decidi('rifiutata')">✕ Rifiuta</button>
       <button class="btn btn-verde" onclick="decidi('approvata')">✓ Approva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MODIFICA DIPENDENTE -->
+<div class="modal-overlay" id="modal-dip">
+  <div class="modal">
+    <div class="modal-title">Modifica Dipendente</div>
+    <div class="modal-sub" id="modal-dip-sub"></div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div><label class="fl">Nome</label><input class="fi" id="edit-nome" type="text"></div>
+      <div><label class="fl">Cognome</label><input class="fi" id="edit-cognome" type="text"></div>
+      <div><label class="fl">Password</label><input class="fi" id="edit-password" type="text"></div>
+      <div>
+        <label class="fl">Tipo Orario</label>
+        <select class="fi" id="edit-orario">
+          <option value="pieno">Pieno (8h/giorno)</option>
+          <option value="ridotto">Ridotto (6h/giorno)</option>
+        </select>
+      </div>
+      <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
+      <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
+      <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
+    </div>
+    <div id="alert-edit-dip"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-dip').classList.remove('open')">Annulla</button>
+      <button class="btn btn-ink" onclick="salvaDipendente()">✓ Salva Modifiche</button>
     </div>
   </div>
 </div>
@@ -358,6 +454,7 @@ const db=firebase.firestore();
 const ANNO=2026;
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const FESTIVITA=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
 const CAMPI=[
   {k:'commessa',l:'N° Commessa',t:'text'},
   {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'n'},
@@ -375,19 +472,25 @@ const CAMPI=[
   {k:'note',l:'Note',t:'text'},
 ];
 const CN=CAMPI.filter(c=>c.t==='n');
-const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL'};
+const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia'};
 
-let ADM=null,dipData=[],tutteR=[],filtroF='in_attesa',modalId=null;
+let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa';
 let detUser=null,detMese=new Date().getMonth(),detDays={},detGiorno=null;
+let editUsername=null;
+let modalRichiestaId=null;
 
 function pad(n){return String(n).padStart(2,'0')}
 function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function isFestivo(ds){return FESTIVITA.includes(ds)}
 function getDays(m){return new Date(ANNO,m+1,0).getDate()}
 function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
-function hasD(d){if(!d)return false;return CAMPI.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
+function hasD(d){if(!d)return false;return CN.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
 function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]}`}
 function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);return n+'h'}
+function totGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
 function oreLav(t){return(t?.oreElectriciMD||0)+(t?.oreMeccaniciMA||0)+(t?.oreAttivitaGenerali||0)+(t?.oreStraordinariElettrico||0)+(t?.oreStraordinariMeccanico||0)}
+function giorniLav(dal,al){let cnt=0;const d=new Date(dal),fine=new Date(al);while(d<=fine){const dow=d.getDay(),ds=d.toISOString().split('T')[0];if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))cnt++;d.setDate(d.getDate()+1)}return cnt}
+function initials(n,c){return ((n||'?')[0]+(c||'?')[0]).toUpperCase()}
 
 // LOGIN
 document.getElementById('btn-login').addEventListener('click',doLogin);
@@ -430,16 +533,14 @@ document.getElementById('btn-logout').addEventListener('click',()=>{
 });
 
 // NAV
-document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
-  b.addEventListener('click',()=>goPage(b.dataset.page,b));
-});
 function goPage(pid,btn){
-  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-page]').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Permessi',dipendenti:'Dipendenti'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
+  document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
   if(pid==='dipendenti')loadDipendenti();
 }
@@ -447,136 +548,265 @@ function goPage(pid,btn){
 // DASHBOARD
 async function loadDashboard(){
   const usersSnap=await db.collection('dipendenti').get();
-  const emps=usersSnap.docs.filter(d=>d.data().abilitato!==false).map(d=>({username:d.id,...d.data()}));
-  dipData=await Promise.all(emps.map(async emp=>{
+  dipList=usersSnap.docs.map(d=>({username:d.id,...d.data()}));
+
+  // Sidebar rapido accesso
+  const navList=document.getElementById('dip-nav-list');
+  navList.innerHTML=dipList.map(d=>`
+    <button class="dip-nav-item" onclick="apriDettaglio('${d.username}')">
+      <div class="dip-avatar">${initials(d.nome,d.cognome)}</div>
+      <span>${d.nome||''} ${d.cognome||''}</span>
+    </button>
+  `).join('');
+
+  // Carica dati timesheets per ogni dipendente
+  dipDataCache={};
+  await Promise.all(dipList.map(async emp=>{
     try{
       const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
       const days={};snap.forEach(d=>{days[d.id]=d.data()});
-      const tot={};CN.forEach(c=>{tot[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
-      return{...emp,days,totals:tot};
-    }catch{return{...emp,days:{},totals:{}}}
+      const totals={};CN.forEach(c=>{totals[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
+      dipDataCache[emp.username]={days,totals};
+    }catch{dipDataCache[emp.username]={days:{},totals:{}}}
   }));
 
-  // KPI
-  const totOre=dipData.reduce((s,e)=>s+oreLav(e.totals),0);
-  const totFerie=dipData.reduce((s,e)=>s+(e.totals?.oreFerie||0),0);
-  const totKm=dipData.reduce((s,e)=>s+(e.totals?.kmPercorsi||0),0);
+  // KPI globali
+  const totOreAll=dipList.reduce((s,e)=>s+oreLav(dipDataCache[e.username]?.totals||{}),0);
+  const totFerieAll=dipList.reduce((s,e)=>s+(dipDataCache[e.username]?.totals?.oreFerie||0),0);
+  const totKmAll=dipList.reduce((s,e)=>s+(dipDataCache[e.username]?.totals?.kmPercorsi||0),0);
   document.getElementById('kpi-row').innerHTML=[
-    {l:'Dipendenti',v:dipData.length,u:''},
-    {l:'Ore Lavoro Tot.',v:totOre,u:'h'},
-    {l:'Ore Ferie Tot.',v:totFerie,u:'h'},
-    {l:'Km Totali',v:totKm,u:'km'},
+    {l:'Dipendenti',v:dipList.length,u:''},
+    {l:'Ore Lavoro Totali',v:totOreAll,u:'h'},
+    {l:'Ore Ferie Erogate',v:totFerieAll,u:'h'},
+    {l:'Km Totali',v:totKmAll,u:' km'},
   ].map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}<span class="kpi-unit">${k.u}</span></div></div>`).join('');
 
-  const tbody=document.getElementById('tbody-dash');
-  if(!dipData.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessun dipendente.</td></tr>';return}
-  tbody.innerHTML=dipData.map(e=>`
-    <tr>
-      <td><span class="td-name" onclick="apriDettaglio('${e.username}')">${e.nome||''} ${e.cognome||''}</span></td>
-      <td class="td-r">${oreLav(e.totals)}h</td>
-      <td class="td-r">${e.totals?.oreFerie||0}h</td>
-      <td class="td-r">${e.totals?.orePermesso||0}h</td>
-      <td class="td-r">${(e.totals?.oreStraordinariElettrico||0)+(e.totals?.oreStraordinariMeccanico||0)}h</td>
-      <td class="td-r">${e.totals?.kmPercorsi||0}</td>
-      <td class="td-r">${e.totals?.speseExtra>0?'€'+e.totals.speseExtra.toFixed(2):'—'}</td>
-    </tr>
-  `).join('');
+  // Carica saldi per tutti
+  const richSnap=await db.collection('richieste_assenza').get();
+  const malSnap=await db.collection('malattie').get();
+  const richPerUser={},malPerUser={};
+  richSnap.forEach(d=>{const r=d.data();if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
+  malSnap.forEach(d=>{const r=d.data();if(!malPerUser[r.username])malPerUser[r.username]=[];malPerUser[r.username].push(r)});
+
+  // Tabella saldi
+  const tbodySaldi=document.getElementById('tbody-saldi');
+  tbodySaldi.innerHTML=dipList.map(emp=>{
+    const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+    const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
+    let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
+    (richPerUser[emp.username]||[]).forEach(r=>{
+      if(r.stato==='approvata'){
+        if(r.tipo==='ferie')ferieUsate+=parseFloat(r.oreRichieste)||0;
+        if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
+        if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
+      }
+    });
+    (malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
+    const ferieRes=monteFerie-ferieUsate;
+    const cls=ferieRes>monteFerie*0.3?'color:var(--verde)':ferieRes>0?'color:var(--amber)':'color:var(--rosso);font-weight:700';
+    return `<tr style="cursor:pointer" onclick="apriDettaglio('${emp.username}')">
+      <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
+      <td><span style="font-size:11px;color:var(--ink4)">${emp.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</span></td>
+      <td class="td-r">${monteFerie}h</td>
+      <td class="td-r">${ferieUsate}h</td>
+      <td class="td-r" style="${cls}">${ferieRes}h</td>
+      <td class="td-r">${montePermesso-permessiUsati}h</td>
+      <td class="td-r">${monteRol-rolUsato}h</td>
+      <td class="td-r" style="color:var(--viola)">${giorniMal} gg</td>
+    </tr>`;
+  }).join('');
+
+  // Tabella ore lavoro
+  document.getElementById('tbody-dash').innerHTML=dipList.map(emp=>{
+    const t=dipDataCache[emp.username]?.totals||{};
+    return `<tr style="cursor:pointer" onclick="apriDettaglio('${emp.username}')">
+      <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
+      <td class="td-r">${oreLav(t)}h</td>
+      <td class="td-r">${(t.oreStraordinariElettrico||0)+(t.oreStraordinariMeccanico||0)}h</td>
+      <td class="td-r">${t.kmPercorsi||0} km</td>
+      <td class="td-r">${t.speseExtra>0?'€'+(t.speseExtra||0).toFixed(2):'—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 // DETTAGLIO DIPENDENTE
-function apriDettaglio(username){
+async function apriDettaglio(username){
   detUser=username;detMese=new Date().getMonth();detGiorno=null;
-  const emp=dipData.find(e=>e.username===username);
-  detDays=emp?.days||{};
-  const nome=`${emp?.nome||''} ${emp?.cognome||''}`.trim()||username;
+  const emp=dipList.find(e=>e.username===username)||{username};
+  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||username;
   document.getElementById('det-nome-title').textContent=nome;
-  // init mesi select
+
+  // Carica saldi
+  await caricaDetSaldi(emp);
+
+  // Init mesi select
   const sel=document.getElementById('det-sel-mese');
-  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===detMese?' selected':''}>${m}</option>`).join('');
-  sel.onchange=()=>{detMese=parseInt(sel.value);detGiorno=null;renderDetCal()};
-  document.getElementById('det-prec').onclick=()=>{if(detMese>0){detMese--;sel.value=detMese;detGiorno=null;renderDetCal()}};
-  document.getElementById('det-succ').onclick=()=>{if(detMese<11){detMese++;sel.value=detMese;detGiorno=null;renderDetCal()}};
+  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===detMese?' selected':''}>${m} ${ANNO}</option>`).join('');
+  sel.onchange=()=>{detMese=parseInt(sel.value);detGiorno=null;loadDetMese()};
+  document.getElementById('det-prec').onclick=()=>{if(detMese>0){detMese--;sel.value=detMese;detGiorno=null;loadDetMese()}};
+  document.getElementById('det-succ').onclick=()=>{if(detMese<11){detMese++;sel.value=detMese;detGiorno=null;loadDetMese()}};
   document.getElementById('det-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
-  document.getElementById('back-dash').onclick=()=>{
-    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-    document.getElementById('page-dashboard').classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-    document.querySelector('.nav-item[data-page="dashboard"]').classList.add('active');
-    document.getElementById('topbar-title').textContent='Dashboard';
-  };
-  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-dettaglio').classList.add('active');
-  document.getElementById('topbar-title').textContent=nome;
+
+  // Evidenzia nella sidebar
+  document.querySelectorAll('.dip-nav-item').forEach(b=>b.classList.remove('active'));
+  const navItems=document.querySelectorAll('.dip-nav-item');
+  navItems.forEach(b=>{if(b.querySelector('span')?.textContent?.includes(emp.nome||''))b.classList.add('active')});
+
+  goPage('dettaglio',null);
+  document.querySelector('.nav-item[data-page="dashboard"]')?.classList.remove('active');
+  await loadDetMese();
+}
+
+async function caricaDetSaldi(emp){
+  const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+  const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
+  let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
+  const snap=await db.collection('richieste_assenza').where('username','==',emp.username).get();
+  snap.forEach(d=>{
+    const r=d.data();
+    if(r.stato==='approvata'){
+      if(r.tipo==='ferie')ferieUsate+=parseFloat(r.oreRichieste)||0;
+      if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
+      if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
+    }
+  });
+  const mSnap=await db.collection('malattie').where('username','==',emp.username).get();
+  mSnap.forEach(d=>{giorniMal+=d.data().giorniLavorativi||0});
+  const ferieRes=monteFerie-ferieUsate,permRes=montePermesso-permessiUsati,rolRes=monteRol-rolUsato;
+  function cls(res,tot){return res>tot*0.3?'ok':res>0?'warn':'danger'}
+  document.getElementById('det-saldi').innerHTML=`
+    <div class="saldo-card"><div class="saldo-tipo">🏖️ Ferie</div><div class="saldo-dettaglio">Monte ${monteFerie}h · Usate ${ferieUsate}h</div>
+      <div class="progress-bar"><div class="progress-fill fill-${cls(ferieRes,monteFerie)}" style="width:${monteFerie>0?Math.max(0,Math.round(ferieRes/monteFerie*100)):0}%"></div></div>
+      <div class="saldo-res ${cls(ferieRes,monteFerie)}" style="margin-top:6px">${ferieRes}h</div><div style="font-size:11px;color:var(--ink4)">residue</div>
+    </div>
+    <div class="saldo-card"><div class="saldo-tipo">🕐 Permessi</div><div class="saldo-dettaglio">Monte ${montePermesso}h · Usati ${permessiUsati}h</div>
+      <div class="progress-bar"><div class="progress-fill fill-${cls(permRes,montePermesso)}" style="width:${montePermesso>0?Math.max(0,Math.round(permRes/montePermesso*100)):0}%"></div></div>
+      <div class="saldo-res ${cls(permRes,montePermesso)}" style="margin-top:6px">${permRes}h</div><div style="font-size:11px;color:var(--ink4)">residui</div>
+    </div>
+    <div class="saldo-card"><div class="saldo-tipo">🔄 ROL</div><div class="saldo-dettaglio">Monte ${monteRol}h · Usato ${rolUsato}h</div>
+      <div class="progress-bar"><div class="progress-fill fill-${cls(rolRes,monteRol)}" style="width:${monteRol>0?Math.max(0,Math.round(rolRes/monteRol*100)):0}%"></div></div>
+      <div class="saldo-res ${cls(rolRes,monteRol)}" style="margin-top:6px">${rolRes}h</div><div style="font-size:11px;color:var(--ink4)">residuo</div>
+    </div>
+    <div class="saldo-card"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati 2026</div>
+      <div class="saldo-res" style="color:var(--viola);margin-top:14px">${giorniMal}</div><div style="font-size:11px;color:var(--ink4)">giorni lavorativi</div>
+    </div>
+  `;
+}
+
+async function loadDetMese(){
+  const ms=pad(detMese+1);
+  // Timesheets
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
+  detDays={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))detDays[d.id]=d.data()});
+  // Assenze approvate (ferie/permesso/rol)
+  const aSnap=await db.collection('richieste_assenza').where('username','==',detUser).get();
+  aSnap.forEach(d=>{
+    const r=d.data();
+    if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')){
+      const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
+      while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
+    }
+  });
+  // Malattie
+  const mSnap=await db.collection('malattie').where('username','==',detUser).get();
+  mSnap.forEach(d=>{
+    const r=d.data();const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia'}cur.setDate(cur.getDate()+1)}
+  });
   renderDetCal();
+  renderDetTotali();
+  renderDetListaGiorni();
 }
 
 function renderDetCal(){
   const g=document.getElementById('det-cal');g.innerHTML='';
-  const ms=pad(detMese+1);
   const primo=getPrimo(detMese),giorni=getDays(detMese);
   for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
   for(let day=1;day<=giorni;day++){
-    const ds=`${ANNO}-${ms}-${pad(day)}`;
+    const ds=`${ANNO}-${pad(detMese+1)}-${pad(day)}`;
+    const dati=detDays[ds];
+    const assenza=dati?dati['_assenza']:null;
     const btn=document.createElement('button');
-    btn.className='cal-day'+(isWE(detMese,day)?' weekend':'')+(hasD(detDays[ds])?' has-data':'')+(detGiorno===ds?' selected':'');
-    btn.textContent=day;
+    let cls='cal-day';
+    if(isWE(detMese,day))cls+=' weekend';
+    if(isFestivo(ds))cls+=' festivo';
+    if(assenza==='ferie')cls+=' ferie-day';
+    else if(assenza==='malattia')cls+=' malattia-day';
+    else if(assenza)cls+=' ferie-day';
+    else if(hasD(dati))cls+=' has-data';
+    if(detGiorno===ds)cls+=' selected';
+    btn.className=cls;btn.textContent=day;
     btn.onclick=()=>{detGiorno=detGiorno===ds?null:ds;renderDetCal();renderDetGiorno()};
     g.appendChild(btn);
   }
-  // Totali mese
-  const totDiv=document.getElementById('det-totali');
-  const tots={};
-  CN.forEach(c=>{tots[c.k]=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0)});
-  const hasAny=Object.values(tots).some(v=>v>0);
-  totDiv.innerHTML=`<div class="section-title" style="margin-bottom:10px">Totali ${MESI[detMese]}</div>`+(hasAny?CN.filter(c=>tots[c.k]>0).map(c=>`<div class="tot-row"><span class="tot-key">${c.l}</span><span class="tot-val">${fmtN(tots[c.k],c.k)}</span></div>`).join(''):'<div style="font-size:12px;color:var(--ink4)">Nessun dato per questo mese.</div>');
-  // Lista giorni
-  const msGiorni=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).sort(([a],[b])=>a.localeCompare(b));
-  const ldiv=document.getElementById('det-lista-giorni');
-  if(msGiorni.length){
-    ldiv.innerHTML='<div class="card" style="margin-top:14px"><div class="section-title" style="margin-bottom:10px">Giorni compilati ('+msGiorni.length+')</div><div class="giorni-list">'+
-      msGiorni.map(([ds,dd])=>{
-        const[,m,g]=ds.split('-');
-        const ore=(parseFloat(dd.oreElectriciMD)||0)+(parseFloat(dd.oreMeccaniciMA)||0)+(parseFloat(dd.oreAttivitaGenerali)||0);
-        return `<div class="giorno-item${detGiorno===ds?' sel':''}" onclick="detGiorno='${ds}';renderDetCal();renderDetGiorno()">
-          <span style="font-weight:500">${g}/${m}</span>
-          <span style="color:var(--ink4)">${dd.commessa?'#'+dd.commessa:''} ${ore>0?ore+'h':''} ${dd.kmPercorsi>0?dd.kmPercorsi+'km':''}</span>
-        </div>`;
-      }).join('')+'</div></div>';
-  }else{ldiv.innerHTML=''}
+}
+
+function renderDetTotali(){
+  const ms=pad(detMese+1);
+  const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0)});
+  const totOre=totGiorno(totals)||CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
+  const el=document.getElementById('det-totali-mese');
+  el.innerHTML=`<div class="section-title" style="margin-bottom:10px">Totali ${MESI[detMese]}</div>`;
+  const hasAny=CN.some(c=>totals[c.k]>0);
+  if(!hasAny){el.innerHTML+='<div style="font-size:12px;color:var(--ink4)">Nessun dato per questo mese.</div>';return}
+  CN.filter(c=>totals[c.k]>0).forEach(c=>{
+    el.innerHTML+=`<div class="tot-row"><span class="tot-key">${c.l}</span><span class="tot-val">${fmtN(totals[c.k],c.k)}</span></div>`;
+  });
+  el.innerHTML+=`<div style="margin-top:10px;background:var(--blu-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${totOre}h</span></div>`;
+}
+
+function renderDetListaGiorni(){
+  const ms=pad(detMese+1);
+  const giorni=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).sort(([a],[b])=>a.localeCompare(b));
+  const el=document.getElementById('det-lista-giorni');
+  if(!giorni.length){el.innerHTML='';return}
+  el.innerHTML='<div class="card" style="margin-top:14px"><div class="section-title" style="margin-bottom:10px">Giorni ('+giorni.length+')</div><div class="giorni-list">'+
+    giorni.map(([ds,dd])=>{
+      const[,m,g]=ds.split('-');
+      const ore=totGiorno(dd);
+      const assenza=dd['_assenza'];
+      return `<div class="giorno-item${detGiorno===ds?' sel':''}" onclick="detGiorno='${ds}';renderDetCal();renderDetGiorno()">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:500">${g}/${m}</span>
+        <span style="color:var(--ink4);font-size:11px">${assenza?TL[assenza]:''} ${dd.commessa?'#'+dd.commessa:''} ${ore>0?ore+'h':''} ${dd.kmPercorsi>0?dd.kmPercorsi+'km':''}</span>
+      </div>`;
+    }).join('')+'</div></div>';
 }
 
 function renderDetGiorno(){
   const card=document.getElementById('det-giorno-card');
-  if(!detGiorno){card.innerHTML='<div class="empty-state" style="padding:32px">Clicca su un giorno per vedere il dettaglio</div>';return}
+  if(!detGiorno){card.innerHTML='<div class="empty-state">Clicca su un giorno per vedere il dettaglio</div>';return}
   const[y,m,g]=detGiorno.split('-');
   const dd=detDays[detGiorno];
-  if(!dd){card.innerHTML=`<div><div style="font-weight:700;margin-bottom:10px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div style="font-size:13px;color:var(--ink4)">Nessun dato per questo giorno.</div></div>`;return}
+  if(!dd){card.innerHTML=`<div><div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div style="font-size:13px;color:var(--ink4)">Nessun dato inserito per questo giorno.</div></div>`;return}
+  const assenza=dd['_assenza'];
+  const ore=totGiorno(dd);
+  let html=`<div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:4px">${g} ${MESI[parseInt(m)-1]} ${y}</div>`;
+  if(assenza)html+=`<div style="margin-bottom:10px">${{ferie:'<span class="badge badge-approvata">🏖️ Ferie approvate</span>',permesso:'<span class="badge badge-approvata">🕐 Permesso approvato</span>',rol:'<span class="badge badge-approvata">🔄 ROL approvato</span>',malattia:'<span class="badge badge-malattia">🤒 Malattia</span>'}[assenza]||''}</div>`;
   const righe=CAMPI.filter(c=>{const v=dd[c.k];return v!==undefined&&v!==''&&v!==0}).map(c=>`<div class="det-day-row"><span class="det-key">${c.l}</span><span style="font-weight:500">${dd[c.k]}${c.t==='n'?(c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'):''}</span></div>`).join('');
-  card.innerHTML=`<div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:14px">${g} ${MESI[parseInt(m)-1]} ${y}</div>${righe||'<div style="font-size:13px;color:var(--ink4)">Nessun dato rilevante.</div>'}`;
+  html+=righe||'<div style="font-size:13px;color:var(--ink4)">Nessuna voce compilata.</div>';
+  if(ore>0)html+=`<div class="totale-giorno-bar"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${ore}h</span></div>`;
+  card.innerHTML=html;
 }
 
-// FERIE
+// FERIE & ASSENZE
 async function loadRichiesteCount(){
-  try{
-    const snap=await db.collection('richieste_assenza').where('stato','==','in_attesa').get();
-    const cnt=snap.size;
-    document.getElementById('badge-ferie').textContent=cnt;
-    document.getElementById('badge-ferie').style.background=cnt>0?'var(--rosso)':'#2a2a2a';
-    document.getElementById('badge-ferie').style.color=cnt>0?'#fff':'#555';
-  }catch(e){}
+  const snap=await db.collection('richieste_assenza').where('stato','==','in_attesa').get();
+  const cnt=snap.size;
+  const badge=document.getElementById('badge-ferie');
+  badge.textContent=cnt;
+  badge.className='nav-badge'+(cnt>0?' alert':'');
 }
 
 async function loadRichieste(){
-  try{
-    const snap=await db.collection('richieste_assenza').orderBy('createdAt','desc').get();
-    tutteR=snap.docs.map(d=>({id:d.id,...d.data()}));
-    document.getElementById('cnt-attesa').textContent=tutteR.filter(r=>r.stato==='in_attesa').length;
-    document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
-    document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
-    document.getElementById('cnt-tutte').textContent=tutteR.length;
-    renderFerie();
-  }catch(e){console.error(e)}
+  const snap=await db.collection('richieste_assenza').get();
+  tutteR=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const mSnap=await db.collection('malattie').get();
+  tutteMalattie=mSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  document.getElementById('cnt-attesa').textContent=tutteR.filter(r=>r.stato==='in_attesa').length;
+  document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
+  document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
+  document.getElementById('cnt-tutte').textContent=tutteR.length;
+  renderFerie();
 }
 
 function setFiltro(btn,f){
@@ -587,38 +817,59 @@ function setFiltro(btn,f){
 }
 
 function renderFerie(){
-  const lista=filtroF==='tutte'?tutteR:tutteR.filter(r=>r.stato===filtroF);
+  const tipoFiltro=document.getElementById('filtro-tipo-ferie')?.value||'tutte';
+  let lista;
+  if(filtroF==='malattia'){
+    // Mostra malattie
+    const tbody=document.getElementById('tbody-ferie');
+    if(!tutteMalattie.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna malattia registrata.</td></tr>';return}
+    tbody.innerHTML=tutteMalattie.map(r=>`<tr style="cursor:default">
+      <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
+      <td><span class="badge badge-malattia">🤒 Malattia</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`}</td>
+      <td class="td-r">${r.giorniLavorativi||0} gg lav.</td>
+      <td><span class="badge badge-malattia">Registrata</span></td>
+      <td style="font-size:12px;color:var(--ink4)">${r.note||'—'}</td>
+      <td>—</td>
+    </tr>`).join('');
+    return;
+  }
+  lista=tutteR;
+  if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
+  if(tipoFiltro!=='tutte')lista=lista.filter(r=>r.tipo===tipoFiltro);
   const tbody=document.getElementById('tbody-ferie');
-  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Nessuna richiesta.</td></tr>';return}
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna richiesta.</td></tr>';return}
   tbody.innerHTML=lista.map(r=>{
     const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
-    const bl=r.stato==='in_attesa'?'In attesa':r.stato==='approvata'?'Approvata':'Rifiutata';
+    const bl=r.stato==='in_attesa'?'⏳ In attesa':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
     const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
     return `<tr style="cursor:default">
       <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
       <td>${TL[r.tipo]||r.tipo}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${per}</td>
+      <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
-      <td style="font-size:12px;color:var(--ink4);max-width:140px">${r.note||'—'}</td>
+      <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
       <td>${r.stato==='in_attesa'?`<button class="btn btn-blu btn-sm" onclick="apriModal('${r.id}')">Gestisci</button>`:`<span style="font-size:11px;color:var(--ink4)">${r.notaAdmin||'—'}</span>`}</td>
     </tr>`;
   }).join('');
 }
 
 function apriModal(id){
-  modalId=id;
+  modalRichiestaId=id;
   const r=tutteR.find(r=>r.id===id);
-  document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${TL[r.tipo]} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine}`;
+  document.getElementById('modal-title').textContent='Gestisci Richiesta — '+( TL[r.tipo]||r.tipo);
+  document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine} · ${r.oreRichieste||0}h`;
   const nd=document.getElementById('modal-nota-dip');
-  if(r.note){nd.style.display='block';nd.textContent='💬 '+r.note}else{nd.style.display='none'}
+  if(r.note){nd.style.display='block';nd.textContent='💬 Nota dipendente: '+r.note}else{nd.style.display='none'}
   document.getElementById('modal-nota-admin').value='';
   document.getElementById('modal-ferie').classList.add('open');
 }
-function chiudiModal(){document.getElementById('modal-ferie').classList.remove('open');modalId=null}
+function chiudiModal(){document.getElementById('modal-ferie').classList.remove('open');modalRichiestaId=null}
 async function decidi(stato){
-  if(!modalId)return;
+  if(!modalRichiestaId)return;
   const nota=document.getElementById('modal-nota-admin').value;
-  await db.collection('richieste_assenza').doc(modalId).update({stato,notaAdmin:nota,decisionAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await db.collection('richieste_assenza').doc(modalRichiestaId).update({stato,notaAdmin:nota,decisionAt:new Date().toISOString()});
   chiudiModal();loadRichieste();loadRichiesteCount();
 }
 
@@ -627,31 +878,29 @@ document.getElementById('btn-nuovo-dip').addEventListener('click',()=>{
   document.getElementById('form-nuovo').classList.add('open');
   document.getElementById('btn-nuovo-dip').style.display='none';
 });
-function chiudiFormDip(){
-  document.getElementById('form-nuovo').classList.remove('open');
-  document.getElementById('btn-nuovo-dip').style.display='';
-}
+function chiudiFormDip(){document.getElementById('form-nuovo').classList.remove('open');document.getElementById('btn-nuovo-dip').style.display=''}
 
 async function loadDipendenti(){
   const snap=await db.collection('dipendenti').get();
-  const lista=snap.docs.map(d=>({username:d.id,...d.data()}));
+  dipList=snap.docs.map(d=>({username:d.id,...d.data()}));
   const tbody=document.getElementById('tbody-dip');
-  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Nessun dipendente.</td></tr>';return}
-  tbody.innerHTML=lista.map(d=>`
-    <tr style="cursor:default">
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
-      <td style="font-weight:500">${d.nome||''}</td>
-      <td>${d.cognome||''}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--ink3)">${d.password||''}</td>
-      <td><span class="badge ${d.abilitato?'badge-attivo':'badge-disab'}">${d.abilitato?'Attivo':'Disabilitato'}</span></td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-sm" onclick="toggleDip('${d.username}',${d.abilitato})" style="${d.abilitato?'':'background:var(--verde-light);color:var(--verde)'}">${d.abilitato?'🔒 Disabilita':'🔓 Abilita'}</button>
-          <button class="btn btn-rosso btn-sm" onclick="eliminaDip('${d.username}','${d.nome} ${d.cognome}')">🗑</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  if(!dipList.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Nessun dipendente.</td></tr>';return}
+  tbody.innerHTML=dipList.map(d=>`<tr style="cursor:default">
+    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
+    <td style="font-weight:500">${d.nome||''}</td>
+    <td>${d.cognome||''}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:12px">${d.password||''}</td>
+    <td style="font-size:12px">${d.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</td>
+    <td class="td-r">${d.monteFerie||0}h</td>
+    <td><span class="badge ${d.abilitato?'badge-attivo':'badge-disab'}">${d.abilitato?'Attivo':'Disabilitato'}</span></td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="apriModificaDip('${d.username}')">✏️ Modifica</button>
+        <button class="btn btn-sm" onclick="toggleDip('${d.username}',${d.abilitato})" style="${!d.abilitato?'color:var(--verde)':''}">${d.abilitato?'🔒':'🔓'}</button>
+        <button class="btn btn-rosso btn-sm" onclick="eliminaDip('${d.username}','${d.nome} ${d.cognome}')">🗑</button>
+      </div>
+    </td>
+  </tr>`).join('');
 }
 
 async function creaDipendente(){
@@ -659,16 +908,56 @@ async function creaDipendente(){
   const n=document.getElementById('new-n').value.trim();
   const c=document.getElementById('new-c').value.trim();
   const p=document.getElementById('new-p').value;
+  const orario=document.getElementById('new-orario').value;
+  const ferie=parseFloat(document.getElementById('new-ferie').value)||0;
+  const permessi=parseFloat(document.getElementById('new-permessi').value)||0;
+  const rol=parseFloat(document.getElementById('new-rol').value)||0;
   const ad=document.getElementById('alert-form-dip');ad.innerHTML='';
-  if(!u||!n||!c||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi.</div>';return}
+  if(!u||!n||!c||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi obbligatori.</div>';return}
   if(!/^[a-z0-9._-]+$/.test(u)){ad.innerHTML='<div class="alert-box alert-err">Username: solo lettere minuscole, numeri, punto e trattino.</div>';return}
   try{
-    await db.collection('dipendenti').doc(u).set({nome:n,cognome:c,password:p,abilitato:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await db.collection('dipendenti').doc(u).set({nome:n,cognome:c,password:p,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()});
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
-    document.getElementById('new-u').value='';document.getElementById('new-n').value='';
-    document.getElementById('new-c').value='';document.getElementById('new-p').value='';
-    chiudiFormDip();loadDipendenti();
+    ['new-u','new-n','new-c','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
+    chiudiFormDip();loadDipendenti();loadDashboard();
+  }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+function apriModificaDip(username){
+  editUsername=username;
+  const emp=dipList.find(e=>e.username===username);
+  if(!emp)return;
+  document.getElementById('modal-dip-sub').textContent=emp.username;
+  document.getElementById('edit-nome').value=emp.nome||'';
+  document.getElementById('edit-cognome').value=emp.cognome||'';
+  document.getElementById('edit-password').value=emp.password||'';
+  document.getElementById('edit-orario').value=emp.tipoOrario||'pieno';
+  document.getElementById('edit-ferie').value=emp.monteFerie||0;
+  document.getElementById('edit-permessi').value=emp.montePermesso||0;
+  document.getElementById('edit-rol').value=emp.monteRol||0;
+  document.getElementById('alert-edit-dip').innerHTML='';
+  document.getElementById('modal-dip').classList.add('open');
+}
+
+async function salvaDipendente(){
+  if(!editUsername)return;
+  const ad=document.getElementById('alert-edit-dip');
+  try{
+    await db.collection('dipendenti').doc(editUsername).update({
+      nome:document.getElementById('edit-nome').value.trim(),
+      cognome:document.getElementById('edit-cognome').value.trim(),
+      password:document.getElementById('edit-password').value,
+      tipoOrario:document.getElementById('edit-orario').value,
+      monteFerie:parseFloat(document.getElementById('edit-ferie').value)||0,
+      montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
+      monteRol:parseFloat(document.getElementById('edit-rol').value)||0,
+    });
+    document.getElementById('modal-dip').classList.remove('open');
+    editUsername=null;
+    document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente aggiornato.</div>';
+    setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
+    loadDipendenti();loadDashboard();
   }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
@@ -679,51 +968,96 @@ async function toggleDip(username,attuale){
 async function eliminaDip(username,nome){
   if(!confirm('Eliminare il profilo di "'+nome+'"?'))return;
   await db.collection('dipendenti').doc(username).delete();
-  loadDipendenti();
+  loadDipendenti();loadDashboard();
 }
 
-// EXPORT EXCEL
-function esportaTutti(){
+// EXPORT EXCEL DASHBOARD
+async function esportaTuttiExcel(){
   const wb=XLSX.utils.book_new();
-  const headers=['Dipendente',...CN.map(c=>c.l)];
-  const rows=dipData.map(e=>{const r=[`${e.nome||''} ${e.cognome||''}`.trim()];CN.forEach(c=>r.push(e.totals?.[c.k]||0));return r});
-  const tot=['TOTALE'];CN.forEach((c,i)=>tot.push(rows.reduce((s,r)=>s+(r[i+1]||0),0)));
-  rows.push(tot);
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...rows]),'Riepilogo');
-  dipData.forEach(e=>{
-    const rig=[['Campo',...MB,'TOTALE']];
-    CN.forEach(c=>{const r=[c.l];let t=0;for(let m=0;m<12;m++){const ms=pad(m+1);const v=Object.entries(e.days||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);r.push(v||0);t+=v}r.push(t);rig.push(r)});
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rig),(`${e.nome||''} ${e.cognome||''}`.trim()||e.username).substring(0,31));
+  // Riepilogo
+  const hh=['Dipendente',...CN.map(c=>c.l)];
+  const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0)]});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Riepilogo');
+  // Saldo ferie
+  const snap=await db.collection('richieste_assenza').get();
+  const richPerUser={};snap.forEach(d=>{const r=d.data();if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
+  const sh=[['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato']];
+  dipList.forEach(emp=>{
+    const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+    let fu=0,pu=0,ru=0;
+    (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')fu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
+    sh.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
   });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sh),'Saldi Ferie');
   XLSX.writeFile(wb,`Timesheets_Tutti_${ANNO}.xlsx`);
 }
 
-function esportaDipendente(){
-  const emp=dipData.find(e=>e.username===detUser);if(!emp)return;
-  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||emp.username;
+// EXPORT EXCEL DETTAGLIO
+async function esportaDetExcel(){
+  const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
+  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
   const wb=XLSX.utils.book_new();
-  const rig=[['Campo',...MB,'TOTALE']];
-  CN.forEach(c=>{const r=[c.l];let t=0;for(let m=0;m<12;m++){const ms=pad(m+1);const v=Object.entries(emp.days||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);r.push(v||0);t+=v}r.push(t);rig.push(r)});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rig),'Riepilogo');
+  // Un foglio per mese
   for(let m=0;m<12;m++){
     const ms=pad(m+1);
-    const giorni=Object.entries(emp.days||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).sort(([a],[b])=>a.localeCompare(b));
-    const hh=['Data',...CAMPI.map(c=>c.l)];
-    const rr=giorni.map(([ds,dd])=>{const[y,mo,g]=ds.split('-');return[`${g}/${mo}/${y}`,...CAMPI.map(c=>dd[c.k]??'')]});
-    const tt=['TOTALE',...CAMPI.map(c=>c.t==='n'?giorni.reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0):'')];
-    rr.push(tt);
+    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
+    const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+    const giorni=Object.keys(all).sort();
+    const hh=['Data',...CN.map(c=>c.l),'Totale Ore'];
+    const rr=giorni.map(ds=>{const d=all[ds];const[y,mo,g]=ds.split('-');return[`${g}/${mo}/${y}`,...CN.map(c=>parseFloat(d[c.k])||0),totGiorno(d)]});
+    const tot=['TOTALE',...CN.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0)];
+    rr.push(tot);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[m]);
   }
   XLSX.writeFile(wb,`Timesheet_${nome.replace(/\s+/g,'_')}_${ANNO}.xlsx`);
 }
 
-function esportaFerie(){
-  const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL'};
-  const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Stato','Note','Nota Admin'];
-  const rr=tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']);
+// EXPORT PDF DETTAGLIO
+async function esportaDetPDF(){
+  const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
+  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
+  const ms=pad(detMese+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.text(`Riepilogo Ore — ${nome}`,14,16);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(`${MESI[detMese]} ${ANNO} · Orario ${emp.tipoOrario==='ridotto'?'ridotto (6h)':'pieno (8h)'}`,14,23);
+  let y=32;
+  const cols=['Data',...CN.slice(0,8).map(c=>c.l.substring(0,12)),'Tot.h'];
+  const colW=[18,...Array(8).fill(22),14];
+  doc.setFillColor(26,86,219);doc.rect(14,y,272,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(7);
+  let x=14;cols.forEach((c,i)=>{doc.text(c,x+1,y+5);x+=colW[i]});
+  y+=7;doc.setTextColor(0,0,0);
+  giorni.forEach((ds,idx)=>{
+    const d=all[ds];const[yr,m,g]=ds.split('-');
+    if(y>185){doc.addPage();y=20}
+    if(idx%2===0)doc.setFillColor(247,245,240);else doc.setFillColor(255,255,255);
+    doc.rect(14,y,272,6,'F');
+    x=14;doc.setFontSize(7);
+    const row=[`${g}/${m}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?String(v):''}),totGiorno(d)>0?String(totGiorno(d)):''];
+    row.forEach((val,i)=>{doc.text(val,x+1,y+4);x+=colW[i]});
+    y+=6;
+  });
+  y+=6;doc.setFont('helvetica','bold');doc.setFontSize(9);
+  const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
+  doc.text(`Totale ore ${MESI[detMese]}: ${totOre}h`,14,y);
+  doc.save(`${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
+}
+
+// EXPORT FERIE EXCEL
+async function esportaFerieExcel(){
+  const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL',malattia:'Malattia'};
+  const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Ore/Giorni','Stato','Note','Nota Admin'];
+  const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']),
+    ...tutteMalattie.map(r=>[r.nomeCompleto||r.username,'Malattia',r.dataInizio,r.dataFine,(r.giorniLavorativi||0)+' gg','Registrata',r.note||','',''])];
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Richieste');
-  XLSX.writeFile(wb,`Ferie_Permessi_${ANNO}.xlsx`);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Ferie e Assenze');
+  XLSX.writeFile(wb,`Ferie_Assenze_${ANNO}.xlsx`);
 }
 </script>
 </body>
