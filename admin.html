@@ -1054,7 +1054,7 @@ async function esportaFerieExcel(){
   const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL',malattia:'Malattia'};
   const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Ore/Giorni','Stato','Note','Nota Admin'];
   const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']),
-    ...tutteMalattie.map(r=>[r.nomeCompleto||r.username,'Malattia',r.dataInizio,r.dataFine,(r.giorniLavorativi||0)+' gg','Registrata',r.note||','',''])];
+    ...tutteMalattie.map(r=>[r.nomeCompleto||r.username,'Malattia',r.dataInizio,r.dataFine,(r.giorniLavorativi||0)+' gg','Registrata',r.note||'',''])];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Ferie e Assenze');
   XLSX.writeFile(wb,`Ferie_Assenze_${ANNO}.xlsx`);
