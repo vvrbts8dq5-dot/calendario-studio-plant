@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Calendario Ore</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --blu-scuro:#1e3a5f;--blu:#1a56db;--blu-chiaro:#e8f0fe;
+    --verde:#057a55;--verde-chiaro:#def7ec;
+    --giallo:#c27803;--giallo-chiaro:#fdf6b2;
+    --rosso:#c81e1e;--rosso-chiaro:#fde8e8;
+    --grigio-50:#f9fafb;--grigio-100:#f3f4f6;--grigio-200:#e5e7eb;
+    --grigio-300:#d1d5db;--grigio-400:#9ca3af;--grigio-500:#6b7280;
+    --grigio-600:#4b5563;--grigio-700:#374151;--grigio-800:#1f2937;
+    --r:8px;--ombra:0 1px 3px rgba(0,0,0,.1);
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--grigio-50);color:var(--grigio-800);line-height:1.5}
+  button{cursor:pointer;border:none;font-family:inherit;font-size:14px}
+  input,select,textarea{font-family:inherit}
+
+  /* LOGIN */
+  #schermata-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#0f2140 100%)}
+  .login-card{background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:40px;width:100%;max-width:400px}
+  .login-icona{font-size:48px;text-align:center;margin-bottom:8px}
+  .login-titolo{font-size:22px;font-weight:700;text-align:center;color:var(--grigio-800)}
+  .login-sottotitolo{font-size:14px;color:var(--grigio-500);text-align:center;margin-bottom:28px}
+  .campo label{font-size:13px;font-weight:500;color:var(--grigio-600);display:block;margin-bottom:4px}
+  .campo input{width:100%;padding:10px 12px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;margin-bottom:14px}
+  .campo input:focus{outline:none;border-color:var(--blu)}
+  .btn-login{width:100%;padding:12px;background:var(--blu-scuro);color:white;border-radius:var(--r);font-size:15px;font-weight:600}
+  .errore-login{background:var(--rosso-chiaro);color:var(--rosso);padding:10px 14px;border-radius:var(--r);font-size:13px;margin-bottom:12px;display:none}
+
+  /* APP */
+  #app{display:none;min-height:100vh;flex-direction:column}
+  header{background:var(--blu-scuro);color:white;padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  .header-titolo{font-size:17px;font-weight:700}
+  .btn-esci{background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 14px;font-size:13px}
+
+  nav{background:white;border-bottom:1px solid var(--grigio-200);display:flex;padding:0 24px}
+  .tab{padding:14px 18px;font-size:14px;font-weight:500;color:var(--grigio-500);border-bottom:2px solid transparent;cursor:pointer;background:none}
+  .tab.attivo{color:var(--blu-scuro);border-bottom-color:var(--blu-scuro)}
+  .tab:hover:not(.attivo){color:var(--grigio-700)}
+
+  main{flex:1;padding:24px;max-width:1200px;margin:0 auto;width:100%}
+  .sezione{display:none}
+  .sezione.attiva{display:block}
+
+  /* CARD / TABLE */
+  .card{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:20px}
+  .card-titolo{font-size:15px;font-weight:600;margin-bottom:16px}
+  .tabella-wrap{background:white;border-radius:var(--r);box-shadow:var(--ombra);overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:10px 12px;text-align:left}
+  thead tr{border-bottom:2px solid var(--grigio-200);background:var(--grigio-50)}
+  tbody tr{border-bottom:1px solid var(--grigio-100);cursor:pointer}
+  tbody tr:hover{background:var(--grigio-50)}
+  .td-r{text-align:right}
+
+  /* BADGE */
+  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
+  .badge-attesa{background:var(--giallo-chiaro);color:var(--giallo)}
+  .badge-approvata{background:var(--verde-chiaro);color:var(--verde)}
+  .badge-rifiutata{background:var(--rosso-chiaro);color:var(--rosso)}
+  .badge-attivo{background:var(--verde-chiaro);color:var(--verde)}
+  .badge-disabilitato{background:var(--grigio-100);color:var(--grigio-500)}
+
+  /* BUTTONS */
+  .btn-p{background:var(--blu);color:white;border-radius:var(--r);padding:8px 16px;font-weight:500}
+  .btn-p:hover{background:#1245b5}
+  .btn-s{background:white;color:var(--grigio-700);border:1px solid var(--grigio-300);border-radius:var(--r);padding:8px 16px;font-weight:500}
+  .btn-s:hover{background:var(--grigio-50)}
+  .btn-v{background:var(--verde);color:white;border-radius:var(--r);padding:8px 16px;font-weight:500}
+  .btn-r{background:var(--rosso);color:white;border-radius:var(--r);padding:8px 16px;font-weight:500}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn-warn{background:var(--giallo);color:white;border-radius:var(--r);padding:5px 10px;font-size:12px}
+
+  /* DASHBOARD */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+  .stat-card{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:16px;text-align:center}
+  .stat-val{font-size:22px;font-weight:700;color:var(--blu)}
+  .stat-label{font-size:11px;color:var(--grigio-500);margin-top:2px}
+  .row-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+  .row-titolo{font-size:20px;font-weight:700}
+
+  /* DETTAGLIO DIPENDENTE */
+  .det-layout{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+  .det-col-sx{flex:0 0 auto;min-width:270px}
+  .det-col-dx{flex:1;min-width:260px}
+  .nav-mese{display:flex;gap:6px;align-items:center;margin-bottom:12px}
+  .btn-mese{background:white;border:1px solid var(--grigio-300);color:var(--grigio-700);border-radius:var(--r);padding:6px 10px}
+  .sel-mese{flex:1;padding:7px 10px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:13px;background:white}
+  .griglia-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .dow{text-align:center;font-size:10px;font-weight:600;color:var(--grigio-400);padding:3px 0}
+  .giorno-btn{aspect-ratio:1;border-radius:4px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--grigio-800)}
+  .giorno-btn.weekend{color:var(--grigio-400)}
+  .giorno-btn.compilato{background:var(--verde-chiaro)}
+  .giorno-btn.selezionato{background:var(--blu-scuro)!important;color:white!important;border-color:var(--blu-scuro)}
+  .totali-mese{margin-top:10px}
+  .tot-riga{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--grigio-100)}
+  .tot-label{color:var(--grigio-500)}
+  .tot-val{font-weight:600}
+  .dettaglio-giorno{display:flex;flex-direction:column;gap:5px}
+  .det-riga{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--grigio-100)}
+  .det-key{color:var(--grigio-500)}
+  .giorni-lista{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+  .giorno-lista-item{padding:7px 10px;border-radius:6px;background:var(--grigio-50);cursor:pointer;display:flex;justify-content:space-between;font-size:12px}
+  .giorno-lista-item.sel{background:var(--blu-chiaro)}
+  .vuoto{text-align:center;color:var(--grigio-400);padding:32px;font-size:14px}
+
+  /* FORM NUOVO DIPENDENTE */
+  .form-nuovo{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:20px;margin-bottom:20px;display:none}
+  .form-nuovo.aperto{display:block}
+  .griglia-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+  .campo-form label{font-size:13px;font-weight:500;color:var(--grigio-600);display:block;margin-bottom:4px}
+  .campo-form input,.campo-form select{width:100%;padding:8px 10px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;background:white}
+  .campo-form input:focus{outline:none;border-color:var(--blu)}
+  .alert{padding:10px 14px;border-radius:var(--r);font-size:13px;margin-bottom:12px}
+  .alert-ok{background:var(--verde-chiaro);color:var(--verde)}
+  .alert-err{background:var(--rosso-chiaro);color:var(--rosso)}
+
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:24px;display:none}
+  .modal-overlay.aperto{display:flex}
+  .modal{background:white;border-radius:12px;padding:28px;max-width:460px;width:100%}
+  .modal-titolo{font-size:17px;font-weight:700;margin-bottom:6px}
+  .modal-sub{color:var(--grigio-500);font-size:13px;margin-bottom:16px}
+  .modal-nota{background:var(--grigio-100);border-radius:var(--r);padding:10px 14px;font-size:13px;margin-bottom:14px}
+  .modal-textarea{width:100%;padding:8px 12px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;resize:vertical;margin-bottom:16px}
+  .modal-azioni{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+  /* FILTRI */
+  .filtri{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .btn-filtro{padding:6px 14px;border-radius:9999px;font-size:13px;font-weight:500;background:white;color:var(--grigio-600);border:1px solid var(--grigio-300)}
+  .btn-filtro.attivo{background:var(--blu-scuro);color:white;border-color:var(--blu-scuro)}
+
+  @media(max-width:600px){main{padding:16px}header{padding:0 16px}nav{padding:0 8px}.tab{font-size:13px;padding:12px 8px}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="schermata-login">
+  <div class="login-card">
+    <div class="login-icona">⚙️</div>
+    <div class="login-titolo">Admin Panel</div>
+    <div class="login-sottotitolo">Portale Amministratore</div>
+    <div class="errore-login" id="errore-login"></div>
+    <div class="campo">
+      <label>Nome utente</label>
+      <input type="text" id="input-username" placeholder="es. admin" autocomplete="username">
+    </div>
+    <div class="campo">
+      <label>Password</label>
+      <input type="password" id="input-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" id="btn-login-submit">Accedi come Amministratore</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;flex-direction:column">
+  <header>
+    <div class="header-titolo">⚙️ Admin — Calendario Ore</div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span id="nome-admin" style="font-size:13px;opacity:.9"></span>
+      <button class="btn-esci" id="btn-esci">Esci</button>
+    </div>
+  </header>
+  <nav>
+    <button class="tab attivo" data-tab="dashboard">📊 Dashboard</button>
+    <button class="tab" data-tab="ferie">🏖️ Ferie & Permessi</button>
+    <button class="tab" data-tab="dipendenti">👥 Dipendenti</button>
+  </nav>
+  <main>
+
+    <!-- DASHBOARD -->
+    <div class="sezione attiva" id="tab-dashboard">
+      <div class="row-header">
+        <div class="row-titolo">📊 Dashboard 2026</div>
+        <button class="btn-v btn-sm" onclick="esportaTutti()">📥 Esporta tutti Excel</button>
+      </div>
+      <div class="stat-grid" id="stat-grid"></div>
+      <div class="tabella-wrap">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--grigio-200);font-size:14px;font-weight:600">Riepilogo per Dipendente</div>
+        <table id="tabella-dashboard">
+          <thead><tr>
+            <th>Dipendente</th>
+            <th class="td-r">Ore Lavoro</th>
+            <th class="td-r">Ore Ferie</th>
+            <th class="td-r">Permesso</th>
+            <th class="td-r">Straord.</th>
+            <th class="td-r">Km</th>
+            <th class="td-r">Spese €</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="tbody-dashboard"><tr><td colspan="8" class="vuoto">Caricamento...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DETTAGLIO DIPENDENTE (nascosto, appare sopra dashboard) -->
+    <div class="sezione" id="tab-dettaglio">
+      <div class="row-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn-s btn-sm" onclick="tornaAllaLista()">← Dashboard</button>
+          <div class="row-titolo" id="det-nome"></div>
+        </div>
+        <button class="btn-v btn-sm" onclick="esportaDipendente()">📥 Esporta Excel</button>
+      </div>
+      <div class="det-layout">
+        <div class="det-col-sx">
+          <div class="nav-mese">
+            <button class="btn-mese" id="det-mese-prec">‹</button>
+            <select class="sel-mese" id="det-sel-mese"></select>
+            <button class="btn-mese" id="det-mese-succ">›</button>
+          </div>
+          <div class="card" style="padding:12px">
+            <div class="griglia-cal" id="det-header-dow"></div>
+            <div class="griglia-cal" id="det-griglia-giorni"></div>
+          </div>
+          <div class="card" style="margin-top:10px;padding:14px" id="det-totali-mese"></div>
+        </div>
+        <div class="det-col-dx">
+          <div class="card" id="det-card-giorno">
+            <div class="vuoto">Clicca su un giorno per vedere il dettaglio</div>
+          </div>
+          <div id="det-lista-giorni"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FERIE -->
+    <div class="sezione" id="tab-ferie">
+      <div class="row-header">
+        <div class="row-titolo">🏖️ Ferie & Permessi</div>
+        <button class="btn-v btn-sm" onclick="esportaFerie()">📥 Esporta Excel</button>
+      </div>
+      <div class="filtri">
+        <button class="btn-filtro attivo" data-filtro="in_attesa" onclick="setFiltro(this,'in_attesa')">In attesa (<span id="cnt-attesa">0</span>)</button>
+        <button class="btn-filtro" data-filtro="approvata" onclick="setFiltro(this,'approvata')">Approvate (<span id="cnt-approvata">0</span>)</button>
+        <button class="btn-filtro" data-filtro="rifiutata" onclick="setFiltro(this,'rifiutata')">Rifiutate (<span id="cnt-rifiutata">0</span>)</button>
+        <button class="btn-filtro" data-filtro="tutte" onclick="setFiltro(this,'tutte')">Tutte (<span id="cnt-tutte">0</span>)</button>
+      </div>
+      <div class="tabella-wrap">
+        <table>
+          <thead><tr><th>Dipendente</th><th>Tipo</th><th>Periodo</th><th>Stato</th><th>Note</th><th>Azioni</th></tr></thead>
+          <tbody id="tbody-ferie"><tr><td colspan="6" class="vuoto">Caricamento...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DIPENDENTI -->
+    <div class="sezione" id="tab-dipendenti">
+      <div class="row-header">
+        <div class="row-titolo">👥 Dipendenti</div>
+        <button class="btn-p" id="btn-nuovo-dip">+ Nuovo Dipendente</button>
+      </div>
+      <div id="alert-dipendenti"></div>
+      <div class="form-nuovo" id="form-nuovo-dip">
+        <div class="card-titolo">Crea Nuovo Dipendente</div>
+        <div id="alert-form-dip"></div>
+        <div class="griglia-form">
+          <div class="campo-form"><label>Username (ID login)</label><input type="text" id="new-username" placeholder="es. mario.rossi"></div>
+          <div class="campo-form"><label>Nome</label><input type="text" id="new-nome" placeholder="Mario"></div>
+          <div class="campo-form"><label>Cognome</label><input type="text" id="new-cognome" placeholder="Rossi"></div>
+          <div class="campo-form"><label>Password</label><input type="text" id="new-password" placeholder="password iniziale"></div>
+        </div>
+        <button class="btn-p" style="margin-top:14px" onclick="creaDipendente()">✓ Crea Dipendente</button>
+      </div>
+      <div class="tabella-wrap">
+        <table>
+          <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Stato</th><th>Azioni</th></tr></thead>
+          <tbody id="tbody-dipendenti"><tr><td colspan="6" class="vuoto">Caricamento...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL DECISIONE FERIE -->
+<div class="modal-overlay" id="modal-ferie">
+  <div class="modal">
+    <div class="modal-titolo">Gestisci Richiesta</div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="modal-nota" id="modal-nota-dip" style="display:none"></div>
+    <textarea class="modal-textarea" id="modal-nota-admin" rows="3" placeholder="Nota per il dipendente (opzionale)"></textarea>
+    <div class="modal-azioni">
+      <button class="btn-s" onclick="chiudiModal()">Annulla</button>
+      <button class="btn-r" onclick="decidiRichiesta('rifiutata')">✕ Rifiuta</button>
+      <button class="btn-v" onclick="decidiRichiesta('approvata')">✓ Approva</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE ─────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",
+  authDomain: "calendario-studio-plant.firebaseapp.com",
+  projectId: "calendario-studio-plant",
+  storageBucket: "calendario-studio-plant.firebasestorage.app",
+  messagingSenderId: "693007035080",
+  appId: "1:693007035080:web:026feab436ecd3814053fd"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ── COSTANTI ─────────────────────────────────────────────────
+const ANNO = 2026;
+const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const MESI_BREVI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const CAMPI = [
+  {k:'commessa',l:'N° Commessa',t:'text'},
+  {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'n'},
+  {k:'oreStraordinariElettrico',l:'Ore Straord. Elettrici',t:'n'},
+  {k:'oreMeccaniciMA',l:'Ore Meccanici M.A.',t:'n'},
+  {k:'oreStraordinariMeccanico',l:'Ore Straord. Meccanici',t:'n'},
+  {k:'oreAttivitaGenerali',l:'Ore Attività Generali',t:'n'},
+  {k:'oreFerie',l:'Ore Ferie',t:'n'},
+  {k:'orePermesso',l:'Ore Permesso',t:'n'},
+  {k:'oreFestivitaMalattia',l:'Ore Festività/Malattia',t:'n'},
+  {k:'oreRecuperoElettrico',l:'Ore Recupero Elettrici',t:'n'},
+  {k:'oreRecuperoMeccanico',l:'Ore Recupero Meccanici',t:'n'},
+  {k:'kmPercorsi',l:'Km Percorsi',t:'n'},
+  {k:'speseExtra',l:'Spese Extra (€)',t:'n'},
+  {k:'note',l:'Note',t:'text'},
+];
+const CAMPI_NUM = CAMPI.filter(c=>c.t==='n');
+const TIPI_LABEL = {ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL'};
+
+// ── STATO ────────────────────────────────────────────────────
+let adminSess = null;
+let tuttoDipendenti = []; // [{username, nome, cognome, daysData:{}, totals:{}}]
+let filtroFerie = 'in_attesa';
+let tutteRichieste = [];
+let modalRichiestaId = null;
+let detUsername = null;
+let detMese = new Date().getMonth();
+let detDaysData = {};
+let detGiornoSel = null;
+
+// ── UTILS ─────────────────────────────────────────────────────
+function pad(n){return String(n).padStart(2,'0')}
+function isWeekend(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function getDays(m){return new Date(ANNO,m+1,0).getDate()}
+function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
+function hasData(d){if(!d)return false;return CAMPI.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
+function fmtData(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]}`}
+function fmtNum(v,k){
+  if(!v&&v!==0)return '-';if(v===0)return '-';
+  const n=v%1===0?v:parseFloat(v).toFixed(1);
+  if(k==='kmPercorsi')return n+' km';
+  if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);
+  return n+'h';
+}
+function oreLavoro(t){return (t?.oreElectriciMD||0)+(t?.oreMeccaniciMA||0)+(t?.oreAttivitaGenerali||0)+(t?.oreStraordinariElettrico||0)+(t?.oreStraordinariMeccanico||0)}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+document.getElementById('btn-login-submit').addEventListener('click',doLogin);
+document.getElementById('input-password').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+async function doLogin(){
+  const u=document.getElementById('input-username').value.trim().toLowerCase();
+  const p=document.getElementById('input-password').value;
+  const errDiv=document.getElementById('errore-login');
+  errDiv.style.display='none';
+  if(!u||!p){mostraErr('Inserisci username e password.');return}
+  document.getElementById('btn-login-submit').textContent='Accesso...';
+  try{
+    const snap=await db.collection('admins').doc(u).get();
+    if(!snap.exists){mostraErr('Utente non trovato.');return}
+    const d=snap.data();
+    if(!d.abilitato){mostraErr('Account non abilitato.');return}
+    if(d.password!==p){mostraErr('Password errata.');return}
+    adminSess={username:u,nome:d.nome||u};
+    sessionStorage.setItem('admin_sess',JSON.stringify(adminSess));
+    avviaApp();
+  }catch(e){mostraErr('Errore: '+e.message)}
+  finally{document.getElementById('btn-login-submit').textContent='Accedi come Amministratore'}
+}
+function mostraErr(m){const e=document.getElementById('errore-login');e.textContent=m;e.style.display='block'}
+
+const salvato=sessionStorage.getItem('admin_sess');
+if(salvato){try{adminSess=JSON.parse(salvato);avviaApp()}catch(e){sessionStorage.removeItem('admin_sess')}}
+
+function avviaApp(){
+  document.getElementById('schermata-login').style.display='none';
+  const app=document.getElementById('app');app.style.display='flex';
+  document.getElementById('nome-admin').textContent='👤 '+adminSess.nome;
+  caricaDashboard();
+  caricaDipendenti();
+}
+
+document.getElementById('btn-esci').addEventListener('click',()=>{
+  sessionStorage.removeItem('admin_sess');adminSess=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('schermata-login').style.display='flex';
+});
+
+// ── NAV ───────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('attivo'));
+    document.querySelectorAll('.sezione').forEach(s=>s.classList.remove('attiva'));
+    tab.classList.add('attivo');
+    document.getElementById('tab-'+tab.dataset.tab).classList.add('attiva');
+    if(tab.dataset.tab==='ferie')caricaRichieste();
+    if(tab.dataset.tab==='dipendenti')caricaDipendenti();
+  });
+});
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+async function caricaDashboard(){
+  try{
+    const usersSnap=await db.collection('dipendenti').get();
+    const emps=usersSnap.docs.filter(d=>d.data().abilitato!==false).map(d=>({username:d.id,...d.data()}));
+
+    tuttoDipendenti=await Promise.all(emps.map(async emp=>{
+      try{
+        const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+        const daysData={};snap.forEach(d=>{daysData[d.id]=d.data()});
+        const totals={};
+        CAMPI_NUM.forEach(c=>{totals[c.k]=Object.values(daysData).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
+        return{...emp,daysData,totals};
+      }catch{return{...emp,daysData:{},totals:{}}}
+    }));
+
+    // Stat cards
+    const sg=document.getElementById('stat-grid');
+    const totOreAll=tuttoDipendenti.reduce((s,e)=>s+oreLavoro(e.totals),0);
+    const totFerieAll=tuttoDipendenti.reduce((s,e)=>s+(e.totals?.oreFerie||0),0);
+    const totKmAll=tuttoDipendenti.reduce((s,e)=>s+(e.totals?.kmPercorsi||0),0);
+    sg.innerHTML=[
+      {i:'👥',v:tuttoDipendenti.length,l:'Dipendenti'},
+      {i:'⏱',v:totOreAll+'h',l:'Ore Totali'},
+      {i:'🏖️',v:totFerieAll+'h',l:'Ore Ferie'},
+      {i:'🚗',v:totKmAll+' km',l:'Km Totali'},
+    ].map(s=>`<div class="stat-card"><div style="font-size:22px">${s.i}</div><div class="stat-val">${s.v}</div><div class="stat-label">${s.l}</div></div>`).join('');
+
+    // Tabella
+    const tbody=document.getElementById('tbody-dashboard');
+    if(!tuttoDipendenti.length){tbody.innerHTML='<tr><td colspan="8" class="vuoto">Nessun dipendente.</td></tr>';return}
+    tbody.innerHTML=tuttoDipendenti.map(e=>`
+      <tr onclick="apriDettaglio('${e.username}')">
+        <td style="font-weight:500">${e.nome||''} ${e.cognome||''}</td>
+        <td class="td-r">${oreLavoro(e.totals)}h</td>
+        <td class="td-r">${e.totals?.oreFerie||0}h</td>
+        <td class="td-r">${e.totals?.orePermesso||0}h</td>
+        <td class="td-r">${(e.totals?.oreStraordinariElettrico||0)+(e.totals?.oreStraordinariMeccanico||0)}h</td>
+        <td class="td-r">${e.totals?.kmPercorsi||0}</td>
+        <td class="td-r">${e.totals?.speseExtra>0?'€'+e.totals.speseExtra.toFixed(2):'-'}</td>
+        <td><button class="btn-s btn-sm" onclick="event.stopPropagation();apriDettaglio('${e.username}')">Dettaglio →</button></td>
+      </tr>
+    `).join('');
+  }catch(e){console.error(e)}
+}
+
+// ── DETTAGLIO DIPENDENTE ──────────────────────────────────────
+function apriDettaglio(username){
+  detUsername=username;
+  detMese=new Date().getMonth();
+  detGiornoSel=null;
+  const emp=tuttoDipendenti.find(e=>e.username===username);
+  detDaysData=emp?.daysData||{};
+  document.getElementById('det-nome').textContent=`${emp?.nome||''} ${emp?.cognome||''}`.trim()||username;
+
+  // Nascondi dashboard, mostra dettaglio
+  document.getElementById('tab-dashboard').classList.remove('attiva');
+  document.getElementById('tab-dettaglio').classList.add('attiva');
+
+  // Init select mesi
+  const sel=document.getElementById('det-sel-mese');
+  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===detMese?' selected':''}>${m}</option>`).join('');
+  sel.onchange=()=>{detMese=parseInt(sel.value);detGiornoSel=null;renderDetCalendario()};
+  document.getElementById('det-mese-prec').onclick=()=>{if(detMese>0){detMese--;sel.value=detMese;detGiornoSel=null;renderDetCalendario()}};
+  document.getElementById('det-mese-succ').onclick=()=>{if(detMese<11){detMese++;sel.value=detMese;detGiornoSel=null;renderDetCalendario()}};
+
+  // Dow header
+  const hDow=document.getElementById('det-header-dow');
+  hDow.innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="dow">${d}</div>`).join('');
+  renderDetCalendario();
+}
+
+function renderDetCalendario(){
+  const griglia=document.getElementById('det-griglia-giorni');
+  griglia.innerHTML='';
+  const primo=getPrimo(detMese);
+  const giorni=getDays(detMese);
+  const msStr=pad(detMese+1);
+  for(let i=0;i<primo;i++){griglia.innerHTML+='<div></div>'}
+  for(let g=1;g<=giorni;g++){
+    const ds=`${ANNO}-${msStr}-${pad(g)}`;
+    const hasDati=hasData(detDaysData[ds]);
+    const sel=detGiornoSel===ds;
+    const wd=isWeekend(detMese,g);
+    const btn=document.createElement('button');
+    btn.className='giorno-btn'+(wd?' weekend':'')+(hasDati?' compilato':'')+(sel?' selezionato':'');
+    btn.textContent=g;
+    btn.onclick=()=>{detGiornoSel=detGiornoSel===ds?null:ds;renderDetCalendario();renderDetGiorno()};
+    griglia.appendChild(btn);
+  }
+  // Totali mese
+  const totDiv=document.getElementById('det-totali-mese');
+  const totals={};
+  CAMPI_NUM.forEach(c=>{
+    totals[c.k]=Object.entries(detDaysData).filter(([d])=>d.startsWith(`${ANNO}-${msStr}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);
+  });
+  totDiv.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--grigio-500);margin-bottom:8px;text-transform:uppercase">Totali '+MESI[detMese]+'</div>'+
+    CAMPI_NUM.filter(c=>totals[c.k]>0).map(c=>`
+      <div class="tot-riga"><span class="tot-label">${c.l}</span><span class="tot-val">${fmtNum(totals[c.k],c.k)}</span></div>
+    `).join('');
+
+  // Lista giorni compilati
+  const msGiorni=Object.entries(detDaysData).filter(([d])=>d.startsWith(`${ANNO}-${msStr}`)).sort(([a],[b])=>a.localeCompare(b));
+  const listaDiv=document.getElementById('det-lista-giorni');
+  if(msGiorni.length){
+    listaDiv.innerHTML='<div class="card" style="margin-top:14px"><div style="font-size:13px;font-weight:600;margin-bottom:10px">Giorni compilati ('+msGiorni.length+')</div><div class="giorni-lista">'+
+      msGiorni.map(([ds,dd])=>{
+        const [,m,g]=ds.split('-');
+        const ore=(parseFloat(dd.oreElectriciMD)||0)+(parseFloat(dd.oreMeccaniciMA)||0)+(parseFloat(dd.oreAttivitaGenerali)||0);
+        return `<div class="giorno-lista-item${detGiornoSel===ds?' sel':''}" onclick="detGiornoSel='${ds}';renderDetCalendario();renderDetGiorno()">
+          <span style="font-weight:500">${g}/${m}</span>
+          <span style="color:var(--grigio-500)">${dd.commessa?'#'+dd.commessa:''} ${ore>0?ore+'h':''} ${dd.kmPercorsi>0?dd.kmPercorsi+'km':''}</span>
+        </div>`;
+      }).join('')+'</div></div>';
+  } else {
+    listaDiv.innerHTML='';
+  }
+}
+
+function renderDetGiorno(){
+  const card=document.getElementById('det-card-giorno');
+  if(!detGiornoSel){card.innerHTML='<div class="vuoto">Clicca su un giorno per vedere il dettaglio</div>';return}
+  const [y,m,g]=detGiornoSel.split('-');
+  const dd=detDaysData[detGiornoSel];
+  if(!dd){card.innerHTML=`<div><strong>${g} ${MESI[parseInt(m)-1]} ${y}</strong><p style="color:var(--grigio-400);font-size:13px;margin-top:8px">Nessun dato per questo giorno.</p></div>`;return}
+  const righe=CAMPI.filter(c=>{const v=dd[c.k];return v!==undefined&&v!==''&&v!==0}).map(c=>`
+    <div class="det-riga"><span class="det-key">${c.l}</span><span>${dd[c.k]}${c.t==='n'?(c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'):''}</span></div>
+  `).join('');
+  card.innerHTML=`<div style="font-weight:700;margin-bottom:12px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div class="dettaglio-giorno">${righe||'<p style="color:var(--grigio-400);font-size:13px">Nessun dato rilevante.</p>'}</div>`;
+}
+
+function tornaAllaLista(){
+  document.getElementById('tab-dettaglio').classList.remove('attiva');
+  document.getElementById('tab-dashboard').classList.add('attiva');
+  detUsername=null;
+}
+
+// ── FERIE ─────────────────────────────────────────────────────
+async function caricaRichieste(){
+  try{
+    const snap=await db.collection('richieste_assenza').orderBy('createdAt','desc').get();
+    tutteRichieste=snap.docs.map(d=>({id:d.id,...d.data()}));
+    document.getElementById('cnt-attesa').textContent=tutteRichieste.filter(r=>r.stato==='in_attesa').length;
+    document.getElementById('cnt-approvata').textContent=tutteRichieste.filter(r=>r.stato==='approvata').length;
+    document.getElementById('cnt-rifiutata').textContent=tutteRichieste.filter(r=>r.stato==='rifiutata').length;
+    document.getElementById('cnt-tutte').textContent=tutteRichieste.length;
+    renderFerie();
+  }catch(e){console.error(e)}
+}
+
+function setFiltro(btn,f){
+  filtroFerie=f;
+  document.querySelectorAll('.btn-filtro').forEach(b=>b.classList.remove('attivo'));
+  btn.classList.add('attivo');
+  renderFerie();
+}
+
+function renderFerie(){
+  const lista=filtroFerie==='tutte'?tutteRichieste:tutteRichieste.filter(r=>r.stato===filtroFerie);
+  const tbody=document.getElementById('tbody-ferie');
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" class="vuoto">Nessuna richiesta.</td></tr>';return}
+  tbody.innerHTML=lista.map(r=>{
+    const badge=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
+    const statoLabel=r.stato==='in_attesa'?'In attesa':r.stato==='approvata'?'Approvata':'Rifiutata';
+    const periodo=r.dataInizio===r.dataFine?fmtData(r.dataInizio):`${fmtData(r.dataInizio)} → ${fmtData(r.dataFine)}`;
+    const azioni=r.stato==='in_attesa'
+      ?`<button class="btn-p btn-sm" onclick="apriModal('${r.id}')">Gestisci</button>`
+      :`<span style="font-size:12px;color:var(--grigio-400)">${r.notaAdmin||'-'}</span>`;
+    return `<tr style="cursor:default">
+      <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
+      <td>${TIPI_LABEL[r.tipo]||r.tipo}</td>
+      <td style="font-size:12px;white-space:nowrap">${periodo}</td>
+      <td><span class="badge ${badge}">${statoLabel}</span></td>
+      <td style="font-size:12px;color:var(--grigio-500);max-width:150px">${r.note||'-'}</td>
+      <td>${azioni}</td>
+    </tr>`;
+  }).join('');
+}
+
+function apriModal(id){
+  modalRichiestaId=id;
+  const r=tutteRichieste.find(r=>r.id===id);
+  document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${TIPI_LABEL[r.tipo]} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine}`;
+  const notaDiv=document.getElementById('modal-nota-dip');
+  if(r.note){notaDiv.style.display='block';notaDiv.textContent='💬 '+r.note}else{notaDiv.style.display='none'}
+  document.getElementById('modal-nota-admin').value='';
+  document.getElementById('modal-ferie').classList.add('aperto');
+}
+function chiudiModal(){document.getElementById('modal-ferie').classList.remove('aperto');modalRichiestaId=null}
+
+async function decidiRichiesta(stato){
+  if(!modalRichiestaId)return;
+  const nota=document.getElementById('modal-nota-admin').value;
+  await db.collection('richieste_assenza').doc(modalRichiestaId).update({stato,notaAdmin:nota,decisionAt:firebase.firestore.FieldValue.serverTimestamp()});
+  chiudiModal();
+  caricaRichieste();
+}
+
+// ── DIPENDENTI ────────────────────────────────────────────────
+document.getElementById('btn-nuovo-dip').addEventListener('click',()=>{
+  const f=document.getElementById('form-nuovo-dip');
+  f.classList.toggle('aperto');
+  document.getElementById('btn-nuovo-dip').textContent=f.classList.contains('aperto')?'✕ Annulla':'+ Nuovo Dipendente';
+});
+
+async function caricaDipendenti(){
+  const snap=await db.collection('dipendenti').get();
+  const lista=snap.docs.map(d=>({username:d.id,...d.data()}));
+  const tbody=document.getElementById('tbody-dipendenti');
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="6" class="vuoto">Nessun dipendente.</td></tr>';return}
+  tbody.innerHTML=lista.map(d=>`
+    <tr style="cursor:default">
+      <td style="color:var(--grigio-500);font-size:12px">${d.username}</td>
+      <td style="font-weight:500">${d.nome||''}</td>
+      <td>${d.cognome||''}</td>
+      <td style="color:var(--grigio-400);font-size:12px">••••••••</td>
+      <td><span class="badge ${d.abilitato?'badge-attivo':'badge-disabilitato'}">${d.abilitato?'Attivo':'Disabilitato'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn-s btn-sm" onclick="toggleAbilitato('${d.username}',${d.abilitato})">${d.abilitato?'🔒 Disabilita':'🔓 Abilita'}</button>
+          <button class="btn-r btn-sm" onclick="eliminaDipendente('${d.username}','${d.nome} ${d.cognome}')">🗑</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function creaDipendente(){
+  const u=document.getElementById('new-username').value.trim().toLowerCase();
+  const n=document.getElementById('new-nome').value.trim();
+  const c=document.getElementById('new-cognome').value.trim();
+  const p=document.getElementById('new-password').value;
+  const alertDiv=document.getElementById('alert-form-dip');
+  alertDiv.innerHTML='';
+  if(!u||!n||!c||!p){alertDiv.innerHTML='<div class="alert alert-err">Compila tutti i campi.</div>';return}
+  if(!/^[a-z0-9._-]+$/.test(u)){alertDiv.innerHTML='<div class="alert alert-err">Username: solo lettere minuscole, numeri, punto, trattino.</div>';return}
+  try{
+    await db.collection('dipendenti').doc(u).set({nome:n,cognome:c,password:p,abilitato:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    document.getElementById('alert-dipendenti').innerHTML='<div class="alert alert-ok">Dipendente "'+n+' '+c+'" creato!</div>';
+    setTimeout(()=>document.getElementById('alert-dipendenti').innerHTML='',3000);
+    document.getElementById('new-username').value='';document.getElementById('new-nome').value='';
+    document.getElementById('new-cognome').value='';document.getElementById('new-password').value='';
+    document.getElementById('form-nuovo-dip').classList.remove('aperto');
+    document.getElementById('btn-nuovo-dip').textContent='+ Nuovo Dipendente';
+    caricaDipendenti();
+  }catch(e){alertDiv.innerHTML='<div class="alert alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function toggleAbilitato(username,attuale){
+  await db.collection('dipendenti').doc(username).update({abilitato:!attuale});
+  caricaDipendenti();
+}
+
+async function eliminaDipendente(username,nome){
+  if(!confirm('Eliminare il profilo di "'+nome+'"?'))return;
+  await db.collection('dipendenti').doc(username).delete();
+  caricaDipendenti();
+}
+
+// ── EXPORT EXCEL ──────────────────────────────────────────────
+function esportaTutti(){
+  const wb=XLSX.utils.book_new();
+  // Riepilogo generale
+  const headers=['Dipendente',...CAMPI_NUM.map(c=>c.l)];
+  const rows=tuttoDipendenti.map(e=>{
+    const r=[`${e.nome||''} ${e.cognome||''}`.trim()||e.username];
+    CAMPI_NUM.forEach(c=>r.push(e.totals?.[c.k]||0));
+    return r;
+  });
+  const tot=['TOTALE'];CAMPI_NUM.forEach((c,i)=>tot.push(rows.reduce((s,r)=>s+(r[i+1]||0),0)));
+  rows.push(tot);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...rows]),'Riepilogo');
+  tuttoDipendenti.forEach(e=>{
+    const riepilogo=[['Campo',...MESI_BREVI,'TOTALE']];
+    CAMPI_NUM.forEach(c=>{
+      const r=[c.l];let tot=0;
+      for(let m=0;m<12;m++){const ms=pad(m+1);const v=Object.entries(e.daysData||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);r.push(v||0);tot+=v}
+      r.push(tot);riepilogo.push(r);
+    });
+    const nome=(`${e.nome||''} ${e.cognome||''}`.trim()||e.username).substring(0,31);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(riepilogo),nome);
+  });
+  XLSX.writeFile(wb,`Timesheets_Tutti_${ANNO}.xlsx`);
+}
+
+function esportaDipendente(){
+  const emp=tuttoDipendenti.find(e=>e.username===detUsername);if(!emp)return;
+  const wb=XLSX.utils.book_new();
+  const riepilogo=[['Campo',...MESI_BREVI,'TOTALE']];
+  CAMPI_NUM.forEach(c=>{
+    const r=[c.l];let tot=0;
+    for(let m=0;m<12;m++){const ms=pad(m+1);const v=Object.entries(emp.daysData||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);r.push(v||0);tot+=v}
+    r.push(tot);riepilogo.push(r);
+  });
+  const nome=(`${emp.nome||''} ${emp.cognome||''}`.trim()||emp.username);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(riepilogo),'Riepilogo');
+  for(let m=0;m<12;m++){
+    const ms=pad(m+1);
+    const giorni=Object.entries(emp.daysData||{}).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).sort(([a],[b])=>a.localeCompare(b));
+    const headers=['Data',...CAMPI.map(c=>c.l)];
+    const rows=giorni.map(([ds,dd])=>{const[y,mo,g]=ds.split('-');return[`${g}/${mo}/${y}`,...CAMPI.map(c=>dd[c.k]??'')]});
+    const totR=['TOTALE',...CAMPI.map(c=>c.t==='n'?giorni.reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0):'')];
+    rows.push(totR);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...rows]),MESI[m]);
+  }
+  XLSX.writeFile(wb,`Timesheet_${nome.replace(/\s+/g,'_')}_${ANNO}.xlsx`);
+}
+
+function esportaFerie(){
+  const TIPI={ferie:'Ferie',permesso:'Permesso',rol:'ROL/Recupero'};
+  const headers=['Dipendente','Tipo','Data Inizio','Data Fine','Stato','Note','Nota Admin'];
+  const rows=tutteRichieste.map(r=>[r.nomeCompleto||r.username,TIPI[r.tipo]||r.tipo,r.dataInizio,r.dataFine,r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...rows]),'Richieste');
+  XLSX.writeFile(wb,`Ferie_Permessi_${ANNO}.xlsx`);
+}
+</script>
+</body>
+</html>
