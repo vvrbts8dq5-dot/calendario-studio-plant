@@ -2,648 +2,574 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Calendario Ore — Dipendenti</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --blu:#1a56db;--blu-scuro:#1245b5;--blu-chiaro:#e8f0fe;
-    --verde:#057a55;--verde-chiaro:#def7ec;
-    --giallo:#c27803;--giallo-chiaro:#fdf6b2;
-    --rosso:#c81e1e;--rosso-chiaro:#fde8e8;
-    --grigio-50:#f9fafb;--grigio-100:#f3f4f6;--grigio-200:#e5e7eb;
-    --grigio-300:#d1d5db;--grigio-400:#9ca3af;--grigio-500:#6b7280;
-    --grigio-600:#4b5563;--grigio-700:#374151;--grigio-800:#1f2937;
-    --r:8px;--ombra:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
-  }
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--grigio-50);color:var(--grigio-800);line-height:1.5;min-height:100vh}
-  button{cursor:pointer;border:none;font-family:inherit;font-size:14px}
-  input,select,textarea{font-family:inherit}
+:root{
+  --ink:#0F0F0F;--ink2:#2A2A2A;--ink3:#555;--ink4:#888;
+  --paper:#F7F5F0;--paper2:#EDEBE4;--white:#FFF;--border:#D8D4CB;
+  --blu:#1A56db;--blu-dark:#1245b5;--blu-light:#E3EEFA;
+  --verde:#1A7A4A;--verde-light:#E3F5EC;
+  --amber:#C47B00;--amber-light:#FDF3DC;
+  --rosso:#c81e1e;--rosso-light:#FAE8E8;
+  --sidebar-w:240px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
+input,select,textarea{font-family:'DM Sans',sans-serif}
 
-  /* LOGIN */
-  #schermata-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1a56db 0%,#1245b5 100%)}
-  .login-card{background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.15);padding:40px;width:100%;max-width:400px}
-  .login-icona{font-size:48px;text-align:center;margin-bottom:8px}
-  .login-titolo{font-size:22px;font-weight:700;text-align:center;color:var(--grigio-800)}
-  .login-sottotitolo{font-size:14px;color:var(--grigio-500);text-align:center;margin-bottom:28px}
-  .campo{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
-  .campo label{font-size:13px;font-weight:500;color:var(--grigio-600)}
-  .campo input{padding:10px 12px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;transition:border-color .15s}
-  .campo input:focus{outline:none;border-color:var(--blu);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
-  .btn-login{width:100%;padding:12px;background:var(--blu);color:white;border-radius:var(--r);font-size:15px;font-weight:600;margin-top:8px;transition:background .15s}
-  .btn-login:hover{background:var(--blu-scuro)}
-  .errore-login{background:var(--rosso-chiaro);color:var(--rosso);padding:10px 14px;border-radius:var(--r);font-size:13px;margin-bottom:12px;display:none}
+/* LOGIN */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.login-box{background:var(--white);border-radius:16px;padding:40px 44px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.login-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
+.login-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--ink4);margin-bottom:28px}
+.login-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
+.login-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
+.login-input:focus{border-color:var(--blu);background:var(--white)}
+.login-btn{width:100%;padding:12px;background:var(--blu);color:#fff;border-radius:8px;font-size:14px;font-weight:500;margin-top:4px;transition:background .15s}
+.login-btn:hover{background:var(--blu-dark)}
+.login-error{font-size:12px;color:var(--rosso);margin-top:10px;text-align:center;min-height:18px;background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none}
 
-  /* APP */
-  #app{display:none;min-height:100vh;flex-direction:column}
-  header{background:var(--blu);color:white;padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-  .header-titolo{font-size:17px;font-weight:700}
-  .header-utente{display:flex;align-items:center;gap:14px}
-  .header-nome{font-size:13px;opacity:.9}
-  .btn-esci{background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 14px;font-size:13px}
-  .btn-esci:hover{background:rgba(255,255,255,.25)}
+/* APP */
+#app{display:none;height:100vh;overflow:hidden}
+#app.visible{display:flex;flex-direction:row}
 
-  /* NAV TAB */
-  nav{background:white;border-bottom:1px solid var(--grigio-200);display:flex;padding:0 24px}
-  .tab{padding:14px 18px;font-size:14px;font-weight:500;color:var(--grigio-500);border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;background:none}
-  .tab.attivo{color:var(--blu);border-bottom-color:var(--blu)}
-  .tab:hover:not(.attivo){color:var(--grigio-700)}
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:.5px solid #222}
+.logo-tag{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:4px}
+.logo-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
+.logo-sub{font-size:11px;color:#555;margin-top:3px}
+.sidebar-section{padding:14px 12px 6px}
+.sidebar-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#888;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:#1a1a1a;color:#fff}
+.nav-item.active{background:var(--blu);color:#fff}
+.nav-icon{font-size:15px;min-width:18px}
+.sidebar-footer{padding:14px 20px;border-top:.5px solid #1e1e1e;margin-top:auto}
+.user-name{font-size:13px;font-weight:500;color:#ccc}
+.user-role{font-size:11px;color:#555;margin-bottom:8px}
+.logout-btn{font-size:11px;color:#555;cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;padding:0;transition:color .15s}
+.logout-btn:hover{color:var(--rosso)}
 
-  /* CONTENUTO */
-  main{flex:1;padding:24px;max-width:1100px;margin:0 auto;width:100%}
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:52px;background:var(--white);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
+.topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;flex:1}
+.topbar-tag{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em}
+.content{flex:1;overflow-y:auto;padding:24px;background:var(--paper)}
+.page{display:none}
+.page.active{display:block}
 
-  /* SEZIONI */
-  .sezione{display:none}
-  .sezione.attiva{display:block}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--white);color:var(--ink2);transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.btn:hover{background:var(--paper2)}
+.btn-blu{background:var(--blu);color:#fff;border-color:var(--blu-dark)}
+.btn-blu:hover{background:var(--blu-dark)}
+.btn-verde{background:var(--verde);color:#fff;border-color:#145c37}
+.btn-verde:hover{background:#145c37}
+.btn-rosso{background:var(--rosso);color:#fff;border-color:#a01e1e}
+.btn-sm{padding:5px 10px;font-size:11px}
 
-  /* CALENDARIO */
-  .calendario-layout{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap}
-  .col-calendario{flex:0 0 auto;min-width:300px}
-  .col-form{flex:1;min-width:300px}
+/* CARDS */
+.card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px}
+.section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
+.section-title::after{content:'';flex:1;height:.5px;background:var(--border)}
 
-  .nav-mese{display:flex;gap:8px;align-items:center;margin-bottom:14px}
-  .btn-mese{background:white;border:1px solid var(--grigio-300);color:var(--grigio-700);border-radius:var(--r);padding:7px 12px;font-size:15px}
-  .btn-mese:hover{background:var(--grigio-50)}
-  .sel-mese{flex:1;padding:8px 12px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;font-weight:600;text-align:center;background:white}
+/* CALENDARIO */
+.cal-layout{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+.nav-mese{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.btn-mese{background:var(--white);border:.5px solid var(--border);color:var(--ink2);border-radius:6px;padding:6px 12px;font-size:14px;transition:all .15s}
+.btn-mese:hover{background:var(--paper2)}
+.sel-mese{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:500;background:var(--white);color:var(--ink);outline:none}
+.cal-grid-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-dow{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);padding:4px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s;position:relative;font-family:'DM Sans',sans-serif}
+.cal-day:hover{background:var(--paper2)}
+.cal-day.weekend{color:var(--ink4)}
+.cal-day.has-data{background:var(--verde-light);color:var(--verde)}
+.cal-day.has-data::after{content:'';position:absolute;bottom:2px;right:2px;width:4px;height:4px;background:var(--verde);border-radius:50%}
+.cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
+.cal-day.selected::after{display:none}
+.cal-legenda{margin-top:10px;display:flex;gap:14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)}
 
-  .card{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:18px}
-  .griglia-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-  .dow{text-align:center;font-size:11px;font-weight:600;color:var(--grigio-400);padding:4px 0}
-  .giorno-btn{aspect-ratio:1;border-radius:6px;border:2px solid transparent;background:transparent;font-size:13px;cursor:pointer;position:relative;transition:all .1s;color:var(--grigio-800)}
-  .giorno-btn:hover{background:var(--grigio-100)}
-  .giorno-btn.weekend{color:var(--grigio-400)}
-  .giorno-btn.compilato{background:var(--verde-chiaro)}
-  .giorno-btn.compilato::after{content:'';position:absolute;bottom:2px;right:2px;width:4px;height:4px;background:var(--verde);border-radius:50%}
-  .giorno-btn.selezionato{background:var(--blu)!important;color:white!important;border-color:var(--blu)}
-  .giorno-btn.selezionato::after{display:none}
-  .leggenda{margin-top:10px;font-size:11px;color:var(--grigio-400);display:flex;gap:10px}
+/* FORM GIORNO */
+.form-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.form-date{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+.form-actions{display:flex;gap:8px;align-items:center}
+.save-status{font-family:'DM Mono',monospace;font-size:11px}
+.save-ok{color:var(--verde)}
+.save-err{color:var(--rosso)}
+.save-loading{color:var(--ink4)}
+.fields-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.field-group{display:flex;flex-direction:column;gap:4px}
+.field-group.full{grid-column:1/-1}
+.field-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase}
+.field-input{padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;width:100%}
+.field-input:focus{border-color:var(--blu);background:var(--white)}
+.field-textarea{resize:vertical;min-height:72px}
+.placeholder-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--ink4);text-align:center}
+.placeholder-icon{font-size:32px;margin-bottom:10px;opacity:.4}
+.placeholder-text{font-size:13px}
 
-  /* FORM GIORNO */
-  .form-titolo-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px}
-  .form-titolo{font-size:17px;font-weight:700}
-  .stato-salvataggio{font-size:12px}
-  .stato-ok{color:var(--verde)}
-  .stato-err{color:var(--rosso)}
-  .stato-carica{color:var(--grigio-400)}
-  .griglia-campi{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
-  .campo-ore label{font-size:12px;font-weight:500;color:var(--grigio-500);margin-bottom:3px;display:block}
-  .campo-ore input,.campo-ore textarea{width:100%;padding:8px 10px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;transition:border-color .15s;background:white}
-  .campo-ore input:focus,.campo-ore textarea:focus{outline:none;border-color:var(--blu);box-shadow:0 0 0 3px rgba(26,86,219,.1)}
-  .campo-ore textarea{resize:vertical;grid-column:1/-1}
-  .placeholder-form{text-align:center;color:var(--grigio-400);padding:48px;font-size:14px}
-  .placeholder-icona{font-size:36px;margin-bottom:10px}
+/* RIEPILOGO */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
+.stat-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.stat-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--ink)}
+.stat-unit{font-size:12px;font-weight:400;color:var(--ink4);margin-left:3px}
+.table-wrap{background:var(--white);border:.5px solid var(--border);border-radius:10px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:9px 14px;text-align:left}
+thead tr{border-bottom:.5px solid var(--border)}
+thead th{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;font-weight:400}
+tbody tr{border-bottom:.5px solid var(--paper2)}
+tbody tr:last-child{border-bottom:none}
+.td-r{text-align:right}
+.td-bold{font-weight:600;color:var(--blu)}
 
-  .btn-salva{background:var(--blu);color:white;border-radius:var(--r);padding:8px 16px;font-size:14px;font-weight:500}
-  .btn-salva:hover{background:var(--blu-scuro)}
+/* FERIE */
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.page-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+.form-richiesta{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
+.form-richiesta.open{display:block}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.f-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
+.f-input,.f-select,.f-textarea{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none}
+.f-input:focus,.f-select:focus,.f-textarea:focus{border-color:var(--blu);background:var(--white)}
+.richieste-list{display:flex;flex-direction:column;gap:8px}
+.richiesta-row{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.r-info{}
+.r-tipo{font-size:13px;font-weight:500;margin-bottom:3px}
+.r-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)}
+.r-nota{font-size:12px;color:var(--ink3);margin-top:3px}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;margin-left:8px}
+.badge-attesa{background:var(--amber-light);color:var(--amber)}
+.badge-approvata{background:var(--verde-light);color:var(--verde)}
+.badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
+.alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
+.alert-ok{background:var(--verde-light);color:var(--verde)}
+.alert-err{background:var(--rosso-light);color:var(--rosso)}
+.empty-state{text-align:center;padding:40px;color:var(--ink4);font-size:13px}
 
-  /* RIEPILOGO */
-  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px}
-  .stat-card{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:16px;text-align:center}
-  .stat-val{font-size:24px;font-weight:700;color:var(--blu)}
-  .stat-label{font-size:11px;color:var(--grigio-500);margin-top:2px}
-  .tabella-wrap{background:white;border-radius:var(--r);box-shadow:var(--ombra);overflow-x:auto}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{padding:9px 12px;text-align:left}
-  thead tr{border-bottom:2px solid var(--grigio-200)}
-  tbody tr{border-bottom:1px solid var(--grigio-100)}
-  tbody tr:hover{background:var(--grigio-50)}
-  .td-num{text-align:right}
-  .td-tot{text-align:right;font-weight:700;color:var(--blu)}
-
-  /* FERIE */
-  .btn-primario{background:var(--blu);color:white;border-radius:var(--r);padding:8px 16px;font-size:14px;font-weight:500}
-  .btn-primario:hover{background:var(--blu-scuro)}
-  .btn-secondario{background:white;color:var(--grigio-700);border:1px solid var(--grigio-300);border-radius:var(--r);padding:8px 16px;font-size:14px;font-weight:500}
-  .btn-secondario:hover{background:var(--grigio-50)}
-  .btn-pericolo{background:var(--rosso);color:white;border-radius:var(--r);padding:5px 10px;font-size:12px}
-  .sezione-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
-  .sezione-titolo{font-size:20px;font-weight:700}
-  .form-richiesta{background:white;border-radius:var(--r);box-shadow:var(--ombra);padding:20px;margin-bottom:20px;display:none}
-  .form-richiesta.aperto{display:block}
-  .griglia-richiesta{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
-  .campo-form label{font-size:13px;font-weight:500;color:var(--grigio-600);margin-bottom:4px;display:block}
-  .campo-form input,.campo-form select,.campo-form textarea{width:100%;padding:8px 10px;border:1px solid var(--grigio-300);border-radius:var(--r);font-size:14px;background:white}
-  .campo-form input:focus,.campo-form select:focus,.campo-form textarea:focus{outline:none;border-color:var(--blu)}
-  .lista-richieste{display:flex;flex-direction:column;gap:8px}
-  .richiesta-item{background:white;border:1px solid var(--grigio-200);border-radius:var(--r);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-  .richiesta-info{}
-  .richiesta-tipo{font-weight:600;font-size:14px;margin-bottom:2px}
-  .richiesta-date{font-size:13px;color:var(--grigio-500)}
-  .richiesta-nota{font-size:12px;color:var(--grigio-400);margin-top:2px}
-  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
-  .badge-attesa{background:var(--giallo-chiaro);color:var(--giallo)}
-  .badge-approvata{background:var(--verde-chiaro);color:var(--verde)}
-  .badge-rifiutata{background:var(--rosso-chiaro);color:var(--rosso)}
-  .alert{padding:10px 14px;border-radius:var(--r);font-size:13px;margin-bottom:12px}
-  .alert-ok{background:var(--verde-chiaro);color:var(--verde)}
-  .alert-err{background:var(--rosso-chiaro);color:var(--rosso)}
-  .vuoto{text-align:center;color:var(--grigio-400);padding:40px;font-size:14px}
-
-  @media(max-width:600px){
-    main{padding:16px}
-    .griglia-campi{grid-template-columns:1fr 1fr}
-    header{padding:0 16px}
-    nav{padding:0 8px}
-    .tab{padding:12px 10px;font-size:13px}
-  }
+@media(max-width:768px){
+  .cal-layout{grid-template-columns:1fr}
+  .sidebar{display:none}
+  #app.visible{flex-direction:column}
+}
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="schermata-login">
-  <div class="login-card">
-    <div class="login-icona">⏱</div>
-    <div class="login-titolo">Calendario Ore</div>
-    <div class="login-sottotitolo">Portale Dipendenti</div>
-    <div class="errore-login" id="errore-login"></div>
-    <div class="campo">
-      <label>Nome utente</label>
-      <input type="text" id="input-username" placeholder="es. mario.rossi" autocomplete="username">
-    </div>
-    <div class="campo">
-      <label>Password</label>
-      <input type="password" id="input-password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="btn-login" id="btn-login-submit">Accedi</button>
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-tag">Studio di Ingegneria</div>
+    <div class="login-title">Calendario Ore</div>
+    <div class="login-sub">Accedi al tuo portale personale</div>
+    <div class="login-error" id="login-error"></div>
+    <label class="login-label">Nome utente</label>
+    <input class="login-input" id="inp-user" type="text" placeholder="es. mario.rossi" autocomplete="username">
+    <label class="login-label">Password</label>
+    <input class="login-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="login-btn" id="btn-login">Accedi</button>
   </div>
 </div>
 
 <!-- APP -->
-<div id="app" style="display:none;flex-direction:column">
-  <header>
-    <div class="header-titolo">⏱ Calendario Ore</div>
-    <div class="header-utente">
-      <span class="header-nome" id="nome-utente"></span>
-      <button class="btn-esci" id="btn-esci">Esci</button>
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-tag">Studio di Ingegneria</div>
+      <div class="logo-name">Calendario Ore</div>
+      <div class="logo-sub">Portale Dipendenti</div>
     </div>
-  </header>
-  <nav>
-    <button class="tab attivo" data-tab="calendario">📅 Calendario</button>
-    <button class="tab" data-tab="ferie">🏖️ Ferie & Permessi</button>
-    <button class="tab" data-tab="riepilogo">📊 Riepilogo</button>
-  </nav>
-  <main>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Menu</div>
+      <button class="nav-item active" data-page="calendario">
+        <span class="nav-icon">📅</span> Calendario
+      </button>
+      <button class="nav-item" data-page="ferie">
+        <span class="nav-icon">🏖️</span> Ferie & Permessi
+      </button>
+      <button class="nav-item" data-page="riepilogo">
+        <span class="nav-icon">📊</span> Riepilogo Annuale
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-name" id="sidebar-nome"></div>
+      <div class="user-role">Dipendente · 2026</div>
+      <button class="logout-btn" id="btn-logout">Esci dall'account →</button>
+    </div>
+  </aside>
 
-    <!-- TAB CALENDARIO -->
-    <div class="sezione attiva" id="tab-calendario">
-      <div class="calendario-layout">
-        <div class="col-calendario">
-          <div class="nav-mese">
-            <button class="btn-mese" id="mese-prec">‹</button>
-            <select class="sel-mese" id="sel-mese"></select>
-            <button class="btn-mese" id="mese-succ">›</button>
-          </div>
-          <div class="card">
-            <div class="griglia-cal" id="header-dow"></div>
-            <div class="griglia-cal" id="griglia-giorni"></div>
-            <div class="leggenda">
-              <span>🟢 compilato</span>
-              <span>grigio = weekend</span>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Calendario</div>
+      <div class="topbar-tag">2026</div>
+    </div>
+    <div class="content">
+
+      <!-- CALENDARIO -->
+      <div class="page active" id="page-calendario">
+        <div class="cal-layout">
+          <div>
+            <div class="nav-mese">
+              <button class="btn-mese" id="mese-prec">‹</button>
+              <select class="sel-mese" id="sel-mese"></select>
+              <button class="btn-mese" id="mese-succ">›</button>
+            </div>
+            <div class="card">
+              <div class="cal-grid-dow" id="cal-dow"></div>
+              <div class="cal-grid" id="cal-giorni"></div>
+              <div class="cal-legenda">
+                <span>● compilato</span>
+                <span>grigio = weekend</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="col-form">
           <div class="card" id="form-giorno">
-            <div class="placeholder-form">
-              <div class="placeholder-icona">📅</div>
-              <div>Seleziona un giorno per inserire le ore</div>
+            <div class="placeholder-box">
+              <div class="placeholder-icon">📅</div>
+              <div class="placeholder-text">Seleziona un giorno<br>per inserire le ore</div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- TAB FERIE -->
-    <div class="sezione" id="tab-ferie">
-      <div class="sezione-header">
-        <div class="sezione-titolo">🏖️ Ferie & Permessi</div>
-        <button class="btn-primario" id="btn-nuova-richiesta">+ Nuova Richiesta</button>
-      </div>
-      <div class="form-richiesta" id="form-richiesta">
-        <div id="alert-richiesta"></div>
-        <div class="griglia-richiesta">
-          <div class="campo-form">
-            <label>Tipo</label>
-            <select id="tipo-richiesta">
-              <option value="ferie">🏖️ Ferie</option>
-              <option value="permesso">🕐 Permesso</option>
-              <option value="rol">🔄 ROL / Recupero</option>
-            </select>
+      <!-- FERIE -->
+      <div class="page" id="page-ferie">
+        <div class="page-header">
+          <div class="page-title">Ferie & Permessi</div>
+          <button class="btn btn-blu" id="btn-nuova">+ Nuova Richiesta</button>
+        </div>
+        <div class="form-richiesta" id="form-rich">
+          <div id="alert-form"></div>
+          <div class="form-grid">
+            <div>
+              <label class="f-label">Tipo</label>
+              <select class="f-select" id="r-tipo">
+                <option value="ferie">🏖️ Ferie</option>
+                <option value="permesso">🕐 Permesso</option>
+                <option value="rol">🔄 ROL / Recupero</option>
+              </select>
+            </div>
+            <div>
+              <label class="f-label">Data Inizio</label>
+              <input class="f-input" type="date" id="r-inizio">
+            </div>
+            <div>
+              <label class="f-label">Data Fine</label>
+              <input class="f-input" type="date" id="r-fine">
+            </div>
+            <div style="grid-column:1/-1">
+              <label class="f-label">Note (opzionale)</label>
+              <textarea class="f-textarea" id="r-note" rows="2" placeholder="Aggiungi una nota..."></textarea>
+            </div>
           </div>
-          <div class="campo-form">
-            <label>Data Inizio</label>
-            <input type="date" id="data-inizio-richiesta">
-          </div>
-          <div class="campo-form">
-            <label>Data Fine</label>
-            <input type="date" id="data-fine-richiesta">
-          </div>
-          <div class="campo-form" style="grid-column:1/-1">
-            <label>Note (opzionale)</label>
-            <textarea id="note-richiesta" rows="2" placeholder="Aggiungi una nota..."></textarea>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <button class="btn btn-blu" id="btn-invia">📤 Invia Richiesta</button>
+            <button class="btn" id="btn-annulla-form">Annulla</button>
           </div>
         </div>
-        <button class="btn-primario" id="btn-invia-richiesta" style="margin-top:14px">📤 Invia Richiesta</button>
+        <div id="alert-globale"></div>
+        <div id="lista-richieste"><div class="empty-state">Caricamento...</div></div>
       </div>
-      <div id="alert-globale-ferie"></div>
-      <div id="lista-richieste"><div class="vuoto">Caricamento...</div></div>
-    </div>
 
-    <!-- TAB RIEPILOGO -->
-    <div class="sezione" id="tab-riepilogo">
-      <h2 style="font-size:20px;font-weight:700;margin-bottom:20px">📊 Riepilogo Annuale 2026</h2>
-      <div class="stat-grid" id="stat-grid"></div>
-      <div class="tabella-wrap">
-        <table id="tabella-riepilogo">
-          <thead><tr id="thead-riepilogo"></tr></thead>
-          <tbody id="tbody-riepilogo"></tbody>
-        </table>
+      <!-- RIEPILOGO -->
+      <div class="page" id="page-riepilogo">
+        <div class="page-header">
+          <div class="page-title">Riepilogo Annuale 2026</div>
+        </div>
+        <div class="stat-row" id="stat-row"></div>
+        <div class="section-title">Dettaglio Mensile</div>
+        <div class="table-wrap">
+          <table id="tab-riepilogo">
+            <thead><tr id="thead-r"></tr></thead>
+            <tbody id="tbody-r"></tbody>
+          </table>
+        </div>
       </div>
-    </div>
 
-  </main>
+    </div>
+  </div>
 </div>
 
 <script>
-// ── FIREBASE CONFIG ──────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",
-  authDomain: "calendario-studio-plant.firebaseapp.com",
-  projectId: "calendario-studio-plant",
-  storageBucket: "calendario-studio-plant.firebasestorage.app",
-  messagingSenderId: "693007035080",
-  appId: "1:693007035080:web:026feab436ecd3814053fd"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const FC={apiKey:"AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",authDomain:"calendario-studio-plant.firebaseapp.com",projectId:"calendario-studio-plant",storageBucket:"calendario-studio-plant.firebasestorage.app",messagingSenderId:"693007035080",appId:"1:693007035080:web:026feab436ecd3814053fd"};
+firebase.initializeApp(FC);
+const db=firebase.firestore();
 
-// ── COSTANTI ─────────────────────────────────────────────────
-const ANNO = 2026;
-const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-const MESI_BREVI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-const CAMPI = [
-  {k:'commessa', l:'N° Commessa', t:'text', placeholder:'es. 2026-001'},
-  {k:'oreElectriciMD', l:'Ore Elettrici M.D.', t:'number'},
-  {k:'oreStraordinariElettrico', l:'Ore Straord. Elettrici', t:'number'},
-  {k:'oreMeccaniciMA', l:'Ore Meccanici M.A.', t:'number'},
-  {k:'oreStraordinariMeccanico', l:'Ore Straord. Meccanici', t:'number'},
-  {k:'oreAttivitaGenerali', l:'Ore Attività Generali', t:'number'},
-  {k:'oreFerie', l:'Ore Ferie', t:'number'},
-  {k:'orePermesso', l:'Ore Permesso', t:'number'},
-  {k:'oreFestivitaMalattia', l:'Ore Festività/Malattia', t:'number'},
-  {k:'oreRecuperoElettrico', l:'Ore Recupero Elettrici', t:'number'},
-  {k:'oreRecuperoMeccanico', l:'Ore Recupero Meccanici', t:'number'},
-  {k:'kmPercorsi', l:'Km Percorsi', t:'number'},
-  {k:'speseExtra', l:'Spese Extra (€)', t:'number'},
-  {k:'note', l:'Note', t:'textarea'},
+const ANNO=2026;
+const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const CAMPI=[
+  {k:'commessa',l:'N° Commessa',t:'text',ph:'es. 2026-001'},
+  {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'number'},
+  {k:'oreStraordinariElettrico',l:'Ore Straord. Elettrici',t:'number'},
+  {k:'oreMeccaniciMA',l:'Ore Meccanici M.A.',t:'number'},
+  {k:'oreStraordinariMeccanico',l:'Ore Straord. Meccanici',t:'number'},
+  {k:'oreAttivitaGenerali',l:'Ore Attività Generali',t:'number'},
+  {k:'oreFerie',l:'Ore Ferie',t:'number'},
+  {k:'orePermesso',l:'Ore Permesso',t:'number'},
+  {k:'oreFestivitaMalattia',l:'Ore Festività/Malattia',t:'number'},
+  {k:'oreRecuperoElettrico',l:'Ore Recupero Elettrici',t:'number'},
+  {k:'oreRecuperoMeccanico',l:'Ore Recupero Meccanici',t:'number'},
+  {k:'kmPercorsi',l:'Km Percorsi',t:'number'},
+  {k:'speseExtra',l:'Spese Extra (€)',t:'number'},
+  {k:'note',l:'Note',t:'textarea'},
 ];
-const CAMPI_NUM = CAMPI.filter(c => c.t === 'number');
-const TIPI_LABEL = {ferie:'🏖️ Ferie', permesso:'🕐 Permesso', rol:'🔄 ROL'};
+const CN=CAMPI.filter(c=>c.t==='number');
+const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL'};
 
-// ── STATO ────────────────────────────────────────────────────
-let utente = null;
-let meseSel = new Date().getMonth();
-let giornoCacheData = {}; // { 'YYYY-MM-DD': {...} }
-let giornoSel = null;
-let saveTimer = null;
+let U=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
 
-// ── UTILS ─────────────────────────────────────────────────────
 function pad(n){return String(n).padStart(2,'0')}
-function dataStr(m,g){return `${ANNO}-${pad(m+1)}-${pad(g)}`}
-function isWeekend(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
 function getDays(m){return new Date(ANNO,m+1,0).getDate()}
-function getPrimoGiorno(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
-function hasData(d){if(!d)return false;return CAMPI.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
-function fmtData(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]}`}
-function fmtNum(v,k){
-  if(!v&&v!==0)return '-';
-  if(v===0)return '-';
-  const n=v%1===0?v:parseFloat(v).toFixed(1);
-  if(k==='kmPercorsi')return n+' km';
-  if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);
-  return n+'h';
-}
+function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
+function hasD(d){if(!d)return false;return CAMPI.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
+function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]}`}
+function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);return n+'h'}
+function dsOf(m,g){return `${ANNO}-${pad(m+1)}-${pad(g)}`}
 
-// ── LOGIN ─────────────────────────────────────────────────────
-document.getElementById('btn-login-submit').addEventListener('click', doLogin);
-document.getElementById('input-password').addEventListener('keydown', e=>{if(e.key==='Enter')doLogin()});
-
+// LOGIN
+document.getElementById('btn-login').addEventListener('click',doLogin);
+document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 async function doLogin(){
-  const username = document.getElementById('input-username').value.trim().toLowerCase();
-  const password = document.getElementById('input-password').value;
-  const errDiv = document.getElementById('errore-login');
-  errDiv.style.display='none';
-  if(!username||!password){mostraErroreLogin('Inserisci username e password.');return}
-  document.getElementById('btn-login-submit').textContent='Accesso...';
-  try {
-    const snap = await db.collection('dipendenti').doc(username).get();
-    if(!snap.exists){mostraErroreLogin('Utente non trovato.');return}
-    const dati = snap.data();
-    if(!dati.abilitato){mostraErroreLogin('Account non abilitato. Contatta l\'amministratore.');return}
-    if(dati.password !== password){mostraErroreLogin('Password errata.');return}
-    utente = {username, nome:dati.nome||username, cognome:dati.cognome||''};
-    sessionStorage.setItem('dipendente', JSON.stringify(utente));
-    avviaApp();
-  } catch(e){mostraErroreLogin('Errore di connessione: '+e.message)}
-  finally{document.getElementById('btn-login-submit').textContent='Accedi'}
-}
-
-function mostraErroreLogin(msg){
-  const e=document.getElementById('errore-login');
-  e.textContent=msg;e.style.display='block';
-}
-
-// ── AVVIO APP ─────────────────────────────────────────────────
-function avviaApp(){
-  document.getElementById('schermata-login').style.display='none';
-  const app=document.getElementById('app');
-  app.style.display='flex';
-  document.getElementById('nome-utente').textContent=`👤 ${utente.nome} ${utente.cognome}`;
-  inizializzaCalendario();
-  caricaMese(meseSel);
-  caricaRiepilogo();
-}
-
-// Controlla sessione salvata
-const sessione = sessionStorage.getItem('dipendente');
-if(sessione){try{utente=JSON.parse(sessione);avviaApp()}catch(e){sessionStorage.removeItem('dipendente')}}
-
-// ── LOGOUT ────────────────────────────────────────────────────
-document.getElementById('btn-esci').addEventListener('click',()=>{
-  sessionStorage.removeItem('dipendente');
-  utente=null;giornoSel=null;giornoCacheData={};
-  document.getElementById('app').style.display='none';
-  document.getElementById('schermata-login').style.display='flex';
-  document.getElementById('input-username').value='';
-  document.getElementById('input-password').value='';
-});
-
-// ── NAV TAB ───────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(tab=>{
-  tab.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('attivo'));
-    document.querySelectorAll('.sezione').forEach(s=>s.classList.remove('attiva'));
-    tab.classList.add('attivo');
-    document.getElementById('tab-'+tab.dataset.tab).classList.add('attiva');
-    if(tab.dataset.tab==='riepilogo')caricaRiepilogo();
-    if(tab.dataset.tab==='ferie')caricaRichieste();
-  });
-});
-
-// ── CALENDARIO ────────────────────────────────────────────────
-function inizializzaCalendario(){
-  // Header giorni settimana
-  const headerDow = document.getElementById('header-dow');
-  headerDow.innerHTML='';
-  ['L','M','M','G','V','S','D'].forEach(d=>{
-    const el=document.createElement('div');
-    el.className='dow';el.textContent=d;
-    headerDow.appendChild(el);
-  });
-  // Popola select mesi
-  const sel=document.getElementById('sel-mese');
-  sel.innerHTML='';
-  MESI.forEach((m,i)=>{
-    const opt=document.createElement('option');
-    opt.value=i;opt.textContent=`${m} ${ANNO}`;
-    if(i===meseSel)opt.selected=true;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);caricaMese(meseSel)});
-  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;sel.value=meseSel;caricaMese(meseSel)}});
-  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;sel.value=meseSel;caricaMese(meseSel)}});
-}
-
-async function caricaMese(m){
-  const snap = await db.collection('timesheets').doc(String(ANNO))
-    .collection('dipendenti').doc(utente.username)
-    .collection('giorni').get();
-  const msStr = pad(m+1);
-  snap.forEach(d=>{
-    if(d.id.startsWith(`${ANNO}-${msStr}`)) giornoCacheData[d.id]=d.data();
-  });
-  renderCalendario(m);
-}
-
-function renderCalendario(m){
-  const griglia=document.getElementById('griglia-giorni');
-  griglia.innerHTML='';
-  const primo=getPrimoGiorno(m);
-  const giorni=getDays(m);
-  for(let i=0;i<primo;i++){
-    const vuoto=document.createElement('div');griglia.appendChild(vuoto);
-  }
-  for(let g=1;g<=giorni;g++){
-    const ds=dataStr(m,g);
-    const btn=document.createElement('button');
-    btn.className='giorno-btn';
-    btn.textContent=g;
-    if(isWeekend(m,g))btn.classList.add('weekend');
-    if(hasData(giornoCacheData[ds]))btn.classList.add('compilato');
-    if(giornoSel===ds)btn.classList.add('selezionato');
-    btn.addEventListener('click',()=>selezionaGiorno(ds));
-    btn.dataset.ds=ds;
-    griglia.appendChild(btn);
-  }
-}
-
-async function selezionaGiorno(ds){
-  giornoSel=ds;
-  renderCalendario(meseSel);
-  const dati = giornoCacheData[ds] || await caricaGiorno(ds);
-  renderFormGiorno(ds, dati||{});
-}
-
-async function caricaGiorno(ds){
+  const u=document.getElementById('inp-user').value.trim().toLowerCase();
+  const p=document.getElementById('inp-pass').value;
+  const errEl=document.getElementById('login-error');
+  errEl.style.display='none';
+  if(!u||!p){showLoginErr('Inserisci username e password.');return}
+  document.getElementById('btn-login').textContent='Accesso...';
   try{
-    const snap=await db.collection('timesheets').doc(String(ANNO))
-      .collection('dipendenti').doc(utente.username)
-      .collection('giorni').doc(ds).get();
-    if(snap.exists){giornoCacheData[ds]=snap.data();return snap.data()}
-    return null;
-  }catch(e){console.error(e);return null}
+    const snap=await db.collection('dipendenti').doc(u).get();
+    if(!snap.exists){showLoginErr('Utente non trovato.');return}
+    const d=snap.data();
+    if(!d.abilitato){showLoginErr('Account non abilitato. Contatta l\'amministratore.');return}
+    if(d.password!==p){showLoginErr('Password errata.');return}
+    U={username:u,nome:d.nome||u,cognome:d.cognome||''};
+    sessionStorage.setItem('dip_sess',JSON.stringify(U));
+    startApp();
+  }catch(e){showLoginErr('Errore: '+e.message)}
+  finally{document.getElementById('btn-login').textContent='Accedi'}
+}
+function showLoginErr(m){const e=document.getElementById('login-error');e.textContent=m;e.style.display='block'}
+
+const sess=sessionStorage.getItem('dip_sess');
+if(sess){try{U=JSON.parse(sess);startApp()}catch(e){sessionStorage.removeItem('dip_sess')}}
+
+function startApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  const nome=`${U.nome} ${U.cognome}`.trim();
+  document.getElementById('sidebar-nome').textContent=nome;
+  initCal();
+  loadMese(meseSel);
 }
 
-function renderFormGiorno(ds, dati){
-  const [y,m,g]=ds.split('-');
-  const dataLabel=`${g} ${MESI[parseInt(m)-1]} ${y}`;
-  let html=`
-    <div class="form-titolo-row">
-      <div class="form-titolo">${dataLabel}</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span class="stato-salvataggio" id="stato-salv"></span>
-        <button class="btn-salva" onclick="salvaManualeGiorno()">💾 Salva</button>
-      </div>
+// LOGOUT
+document.getElementById('btn-logout').addEventListener('click',()=>{
+  sessionStorage.removeItem('dip_sess');U=null;giornoSel=null;cache={};
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('inp-user').value='';document.getElementById('inp-pass').value='';
+});
+
+// NAV
+document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const pid='page-'+b.dataset.page;
+    document.getElementById(pid).classList.add('active');
+    const titles={calendario:'Calendario',ferie:'Ferie & Permessi',riepilogo:'Riepilogo Annuale'};
+    document.getElementById('topbar-title').textContent=titles[b.dataset.page]||'';
+    if(b.dataset.page==='riepilogo')loadRiepilogo();
+    if(b.dataset.page==='ferie')loadRichieste();
+  });
+});
+
+// CALENDARIO
+function initCal(){
+  const dow=document.getElementById('cal-dow');
+  dow.innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const sel=document.getElementById('sel-mese');
+  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===meseSel?' selected':''}>${m} ${ANNO}</option>`).join('');
+  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);loadMese(meseSel)});
+  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;sel.value=meseSel;loadMese(meseSel)}});
+  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;sel.value=meseSel;loadMese(meseSel)}});
+}
+
+async function loadMese(m){
+  const ms=pad(m+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))cache[d.id]=d.data()});
+  renderCal(m);
+}
+
+function renderCal(m){
+  const g=document.getElementById('cal-giorni');g.innerHTML='';
+  const primo=getPrimo(m),giorni=getDays(m);
+  for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
+  for(let day=1;day<=giorni;day++){
+    const ds=dsOf(m,day);
+    const btn=document.createElement('button');
+    btn.className='cal-day'+(isWE(m,day)?' weekend':'')+(hasD(cache[ds])?' has-data':'')+(giornoSel===ds?' selected':'');
+    btn.textContent=day;
+    btn.onclick=()=>selectDay(ds);
+    g.appendChild(btn);
+  }
+}
+
+async function selectDay(ds){
+  giornoSel=ds;renderCal(meseSel);
+  let dati=cache[ds];
+  if(!dati){
+    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).get();
+    dati=snap.exists?snap.data():null;
+    if(dati)cache[ds]=dati;
+  }
+  renderForm(ds,dati||{});
+}
+
+function renderForm(ds,dati){
+  const[y,m,g]=ds.split('-');
+  const label=`${g} ${MESI[parseInt(m)-1]} ${y}`;
+  let html=`<div class="form-header">
+    <div class="form-date">${label}</div>
+    <div class="form-actions">
+      <span class="save-status" id="sv-status"></span>
+      <button class="btn btn-blu btn-sm" onclick="saveDayManual()">💾 Salva</button>
     </div>
-    <div class="griglia-campi">
-  `;
+  </div><div class="fields-grid">`;
   CAMPI.forEach(c=>{
-    const val=dati[c.k]!==undefined?dati[c.k]:'';
+    const v=dati[c.k]!==undefined?dati[c.k]:'';
     if(c.t==='textarea'){
-      html+=`<div class="campo-ore" style="grid-column:1/-1"><label>${c.l}</label><textarea id="campo-${c.k}" rows="3" onchange="aggiornaCampo('${c.k}',this.value)">${val}</textarea></div>`;
-    } else {
-      html+=`<div class="campo-ore"><label>${c.l}</label><input type="${c.t}" id="campo-${c.k}" value="${val}" ${c.t==='number'?'min="0" step="0.5"':''} ${c.placeholder?`placeholder="${c.placeholder}"`:'placeholder="0"'} oninput="aggiornaCampo('${c.k}',this.value)"></div>`;
+      html+=`<div class="field-group full"><label class="field-label">${c.l}</label><textarea class="field-input field-textarea" id="f-${c.k}" oninput="fieldChange('${c.k}',this.value)">${v}</textarea></div>`;
+    }else{
+      html+=`<div class="field-group"><label class="field-label">${c.l}</label><input class="field-input" type="${c.t}" id="f-${c.k}" value="${v}" ${c.t==='number'?'min="0" step="0.5"':''} placeholder="${c.ph||'0'}" oninput="fieldChange('${c.k}',this.value)"></div>`;
     }
   });
   html+='</div>';
   document.getElementById('form-giorno').innerHTML=html;
 }
 
-function aggiornaCampo(k, v){
+function fieldChange(k,v){
   if(!giornoSel)return;
-  if(!giornoCacheData[giornoSel])giornoCacheData[giornoSel]={};
-  giornoCacheData[giornoSel][k]= (CAMPI.find(c=>c.k===k)?.t==='number') ? (v===''?'':parseFloat(v)||0) : v;
+  if(!cache[giornoSel])cache[giornoSel]={};
+  cache[giornoSel][k]=CAMPI.find(c=>c.k===k)?.t==='number'?(v===''?'':parseFloat(v)||0):v;
   if(saveTimer)clearTimeout(saveTimer);
-  document.getElementById('stato-salv').textContent='';
-  saveTimer=setTimeout(()=>salvaGiorno(giornoSel), 1500);
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
 }
 
-async function salvaGiorno(ds){
-  if(!ds||!giornoCacheData[ds])return;
-  const stato=document.getElementById('stato-salv');
-  if(stato)stato.innerHTML='<span class="stato-carica">Salvataggio...</span>';
+async function saveDay(ds){
+  if(!ds||!cache[ds])return;
+  const st=document.getElementById('sv-status');
+  if(st)st.innerHTML='<span class="save-loading">Salvataggio...</span>';
   try{
-    await db.collection('timesheets').doc(String(ANNO))
-      .collection('dipendenti').doc(utente.username)
-      .collection('giorni').doc(ds)
-      .set({...giornoCacheData[ds], username:utente.username, data:ds, updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-    if(stato)stato.innerHTML='<span class="stato-ok">✓ Salvato</span>';
-    renderCalendario(meseSel);
-    setTimeout(()=>{if(stato)stato.innerHTML=''},2500);
-  }catch(e){
-    if(stato)stato.innerHTML='<span class="stato-err">✗ Errore</span>';
-  }
+    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...cache[ds],username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
+    renderCal(meseSel);
+    setTimeout(()=>{if(st)st.innerHTML=''},2500);
+  }catch(e){if(st)st.innerHTML='<span class="save-err">✗ Errore</span>'}
 }
+function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)}
 
-function salvaManualeGiorno(){
-  if(saveTimer)clearTimeout(saveTimer);
-  salvaGiorno(giornoSel);
-}
-
-// ── RIEPILOGO ─────────────────────────────────────────────────
-async function caricaRiepilogo(){
-  const snap=await db.collection('timesheets').doc(String(ANNO))
-    .collection('dipendenti').doc(utente.username)
-    .collection('giorni').get();
-  const tutti={};
-  snap.forEach(d=>{tutti[d.id]=d.data()});
-
-  // Totali annuali per stat grid
-  const statGrid=document.getElementById('stat-grid');
-  const totAnnuali={};
-  CAMPI_NUM.forEach(c=>{
-    totAnnuali[c.k]=Object.values(tutti).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0);
-  });
-  const statShow=[
-    {k:'oreElectriciMD',l:'Ore Elettrici M.D.',icon:'⚡'},
-    {k:'oreMeccaniciMA',l:'Ore Meccanici M.A.',icon:'🔧'},
-    {k:'oreFerie',l:'Ore Ferie',icon:'🏖️'},
-    {k:'kmPercorsi',l:'Km Totali',icon:'🚗'},
-  ];
-  statGrid.innerHTML=statShow.map(s=>`
-    <div class="stat-card">
-      <div style="font-size:24px">${s.icon}</div>
-      <div class="stat-val">${fmtNum(totAnnuali[s.k],s.k)}</div>
-      <div class="stat-label">${s.l}</div>
-    </div>
-  `).join('');
-
-  // Tabella mensile
-  const thead=document.getElementById('thead-riepilogo');
-  thead.innerHTML='<th>Campo</th>'+MESI_BREVI.map(m=>`<th class="td-num">${m}</th>`).join('')+'<th class="td-tot">Tot</th>';
-  const tbody=document.getElementById('tbody-riepilogo');
-  tbody.innerHTML='';
-  CAMPI_NUM.forEach((c,fi)=>{
-    const tr=document.createElement('tr');
+// RIEPILOGO
+async function loadRiepilogo(){
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  const all={};snap.forEach(d=>{all[d.id]=d.data()});
+  const tot={};CN.forEach(c=>{tot[c.k]=Object.values(all).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
+  const highlights=[{k:'oreElectriciMD',l:'Ore Elettrici',icon:'⚡'},{k:'oreMeccaniciMA',l:'Ore Meccanici',icon:'🔧'},{k:'oreFerie',l:'Ore Ferie',icon:'🏖️'},{k:'kmPercorsi',l:'Km Totali',icon:'🚗'}];
+  document.getElementById('stat-row').innerHTML=highlights.map(h=>`<div class="stat-box"><div class="stat-label">${h.icon} ${h.l}</div><div class="stat-val">${tot[h.k]||0}<span class="stat-unit">${h.k==='kmPercorsi'?'km':'h'}</span></div></div>`).join('');
+  const thead=document.getElementById('thead-r');
+  thead.innerHTML='<th>Campo</th>'+MB.map(m=>`<th class="td-r">${m}</th>`).join('')+'<th class="td-r td-bold">Tot</th>';
+  const tbody=document.getElementById('tbody-r');tbody.innerHTML='';
+  CN.forEach((c,fi)=>{
     let html=`<td style="font-weight:500;white-space:nowrap">${c.l}</td>`;
-    let tot=0;
+    let t=0;
     for(let mi=0;mi<12;mi++){
       const ms=pad(mi+1);
-      const val=Object.entries(tutti).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0);
-      html+=`<td class="td-num" style="color:${val>0?'#1f2937':'#e5e7eb'}">${val>0?(val%1===0?val:val.toFixed(1)):'-'}</td>`;
-      tot+=val;
+      const v=Object.entries(all).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0);
+      html+=`<td class="td-r" style="color:${v>0?'var(--ink)':'var(--border)'}">${v>0?(v%1===0?v:v.toFixed(1)):'—'}</td>`;
+      t+=v;
     }
-    html+=`<td class="td-tot">${fmtNum(tot,c.k)}</td>`;
-    tr.innerHTML=html;
-    if(fi%2===1)tr.style.background='#f9fafb';
+    html+=`<td class="td-r td-bold">${fmtN(t,c.k)}</td>`;
+    const tr=document.createElement('tr');tr.innerHTML=html;
+    if(fi%2===1)tr.style.background='var(--paper)';
     tbody.appendChild(tr);
   });
 }
 
-// ── FERIE & PERMESSI ──────────────────────────────────────────
-document.getElementById('btn-nuova-richiesta').addEventListener('click',()=>{
-  const form=document.getElementById('form-richiesta');
-  form.classList.toggle('aperto');
-  document.getElementById('btn-nuova-richiesta').textContent=form.classList.contains('aperto')?'✕ Annulla':'+ Nuova Richiesta';
+// FERIE
+document.getElementById('btn-nuova').addEventListener('click',()=>{
+  document.getElementById('form-rich').classList.add('open');
+  document.getElementById('btn-nuova').style.display='none';
 });
-
-document.getElementById('btn-invia-richiesta').addEventListener('click', inviaRichiesta);
+document.getElementById('btn-annulla-form').addEventListener('click',()=>{
+  document.getElementById('form-rich').classList.remove('open');
+  document.getElementById('btn-nuova').style.display='';
+});
+document.getElementById('btn-invia').addEventListener('click',inviaRichiesta);
 
 async function inviaRichiesta(){
-  const tipo=document.getElementById('tipo-richiesta').value;
-  const inizio=document.getElementById('data-inizio-richiesta').value;
-  const fine=document.getElementById('data-fine-richiesta').value;
-  const note=document.getElementById('note-richiesta').value;
-  const alertDiv=document.getElementById('alert-richiesta');
-  alertDiv.innerHTML='';
-  if(!inizio||!fine){alertDiv.innerHTML='<div class="alert alert-err">Seleziona le date.</div>';return}
-  if(fine<inizio){alertDiv.innerHTML='<div class="alert alert-err">La data fine deve essere uguale o successiva alla data inizio.</div>';return}
-  document.getElementById('btn-invia-richiesta').textContent='Invio...';
+  const tipo=document.getElementById('r-tipo').value;
+  const ini=document.getElementById('r-inizio').value;
+  const fin=document.getElementById('r-fine').value;
+  const nota=document.getElementById('r-note').value;
+  const aDiv=document.getElementById('alert-form');aDiv.innerHTML='';
+  if(!ini||!fin){aDiv.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){aDiv.innerHTML='<div class="alert-box alert-err">La data fine deve essere uguale o successiva alla data inizio.</div>';return}
+  document.getElementById('btn-invia').textContent='Invio...';
   try{
-    await db.collection('richieste_assenza').add({
-      username:utente.username,
-      nomeCompleto:`${utente.nome} ${utente.cognome}`.trim(),
-      tipo,dataInizio:inizio,dataFine:fine,note,
-      stato:'in_attesa',
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById('alert-globale-ferie').innerHTML='<div class="alert alert-ok">Richiesta inviata!</div>';
-    setTimeout(()=>document.getElementById('alert-globale-ferie').innerHTML='',3000);
-    document.getElementById('form-richiesta').classList.remove('aperto');
-    document.getElementById('btn-nuova-richiesta').textContent='+ Nuova Richiesta';
-    document.getElementById('data-inizio-richiesta').value='';
-    document.getElementById('data-fine-richiesta').value='';
-    document.getElementById('note-richiesta').value='';
-    caricaRichieste();
-  }catch(e){alertDiv.innerHTML=`<div class="alert alert-err">Errore: ${e.message}</div>`}
-  finally{document.getElementById('btn-invia-richiesta').textContent='📤 Invia Richiesta'}
+    await db.collection('richieste_assenza').add({username:U.username,nomeCompleto:`${U.nome} ${U.cognome}`.trim(),tipo,dataInizio:ini,dataFine:fin,note:nota,stato:'in_attesa',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    document.getElementById('alert-globale').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Richiesta inviata con successo.</div>';
+    setTimeout(()=>document.getElementById('alert-globale').innerHTML='',3000);
+    document.getElementById('form-rich').classList.remove('open');
+    document.getElementById('btn-nuova').style.display='';
+    document.getElementById('r-inizio').value='';document.getElementById('r-fine').value='';document.getElementById('r-note').value='';
+    loadRichieste();
+  }catch(e){aDiv.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+  finally{document.getElementById('btn-invia').textContent='📤 Invia Richiesta'}
 }
 
-async function caricaRichieste(){
-  const lista=document.getElementById('lista-richieste');
-  lista.innerHTML='<div class="vuoto">Caricamento...</div>';
+async function loadRichieste(){
+  const el=document.getElementById('lista-richieste');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
   try{
-    const snap=await db.collection('richieste_assenza')
-      .where('username','==',utente.username)
-      .orderBy('createdAt','desc').get();
-    if(snap.empty){lista.innerHTML='<div class="card vuoto">Nessuna richiesta presente.</div>';return}
-    lista.innerHTML='<div class="lista-richieste">'+snap.docs.map(d=>{
+    const snap=await db.collection('richieste_assenza').where('username','==',U.username).orderBy('createdAt','desc').get();
+    if(snap.empty){el.innerHTML='<div class="empty-state">Nessuna richiesta presente.<br>Usa il pulsante qui sopra per crearne una.</div>';return}
+    el.innerHTML='<div class="richieste-list">'+snap.docs.map(d=>{
       const r={id:d.id,...d.data()};
-      const badge=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
-      const statoLabel=r.stato==='in_attesa'?'In attesa':r.stato==='approvata'?'Approvata':'Rifiutata';
-      const periodo=r.dataInizio===r.dataFine?fmtData(r.dataInizio):`${fmtData(r.dataInizio)} → ${fmtData(r.dataFine)}`;
-      const notaAdmin=r.notaAdmin?`<div class="richiesta-nota">💬 Admin: ${r.notaAdmin}</div>`:'';
-      const btnElimina=r.stato==='in_attesa'?`<button class="btn-pericolo" onclick="eliminaRichiesta('${r.id}')">🗑 Elimina</button>`:'';
-      return `<div class="richiesta-item">
-        <div class="richiesta-info">
-          <div class="richiesta-tipo">${TIPI_LABEL[r.tipo]||r.tipo} <span class="badge ${badge}">${statoLabel}</span></div>
-          <div class="richiesta-date">${periodo}</div>
-          ${r.note?`<div class="richiesta-nota">${r.note}</div>`:''}
-          ${notaAdmin}
+      const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
+      const bl=r.stato==='in_attesa'?'In attesa':r.stato==='approvata'?'Approvata':'Rifiutata';
+      const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
+      return `<div class="richiesta-row">
+        <div class="r-info">
+          <div class="r-tipo">${TL[r.tipo]||r.tipo}<span class="badge ${bc}">${bl}</span></div>
+          <div class="r-date">${per}</div>
+          ${r.note?`<div class="r-nota">${r.note}</div>`:''}
+          ${r.notaAdmin?`<div class="r-nota" style="color:var(--amber)">💬 ${r.notaAdmin}</div>`:''}
         </div>
-        ${btnElimina}
+        ${r.stato==='in_attesa'?`<button class="btn btn-rosso btn-sm" onclick="delRichiesta('${r.id}')">Elimina</button>`:''}
       </div>`;
     }).join('')+'</div>';
-  }catch(e){lista.innerHTML=`<div class="vuoto">Errore: ${e.message}</div>`}
+  }catch(e){el.innerHTML=`<div class="empty-state">Errore: ${e.message}</div>`}
 }
 
-async function eliminaRichiesta(id){
+async function delRichiesta(id){
   if(!confirm('Eliminare questa richiesta?'))return;
   await db.collection('richieste_assenza').doc(id).delete();
-  caricaRichieste();
+  loadRichieste();
 }
 </script>
 </body>
