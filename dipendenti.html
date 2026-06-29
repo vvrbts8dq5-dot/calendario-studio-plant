@@ -911,41 +911,65 @@ async function loadRiepilogoMese(mese){
   const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
   const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
   const giorni=Object.keys(all).sort();
+  const tariffe=profilo.tariffe||{};
 
   // KPI
   const totMensili={};CN.forEach(c=>{totMensili[c.k]=giorni.reduce((s,d)=>s+(parseFloat(all[d][c.k])||0),0)});
   const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totMensili[c.k],0);
+  const totCosto=CN.reduce((s,c)=>{const v=totMensili[c.k]||0;const t=tariffe[c.k]||0;return s+v*t},0)+(totMensili.speseExtra||0);
   const highlights=[
-    {l:'Ore Totali Mese',v:totOre+'h',u:''},
-    {l:'Ore Elettrici M.D.',v:(totMensili.oreElectriciMD||0)+'h',u:''},
-    {l:'Ore Meccanici M.A.',v:(totMensili.oreMeccaniciMA||0)+'h',u:''},
-    {l:'Km Percorsi',v:(totMensili.kmPercorsi||0)+' km',u:''},
+    {l:'Ore Totali Mese',v:totOre+'h'},
+    {l:'Ore Elettrici M.D.',v:(totMensili.oreElectriciMD||0)+'h'},
+    {l:'Ore Meccanici M.A.',v:(totMensili.oreMeccaniciMA||0)+'h'},
+    {l:'Km Percorsi',v:(totMensili.kmPercorsi||0)+' km'},
   ];
+  if(totCosto>0)highlights.push({l:'Costo Totale Mese',v:'€'+totCosto.toFixed(2)});
   document.getElementById('stat-row-riepilogo').innerHTML=highlights.map(h=>`<div class="stat-box"><div class="stat-label">${h.l}</div><div class="stat-val">${h.v}</div></div>`).join('');
 
   // Tabella giornaliera
   const thead=document.getElementById('thead-r');
-  thead.innerHTML='<th>Data</th>'+CN.map(c=>`<th class="td-r">${c.l}</th>`).join('')+'<th class="td-r">Totale Ore</th>';
+  thead.innerHTML='<th>Data</th>'+CN.map(c=>`<th class="td-r">${c.l}</th>`).join('')+'<th class="td-r">Tot.Ore</th>'+(totCosto>0?'<th class="td-r">Costo €</th>':'');
   const tbody=document.getElementById('tbody-r');tbody.innerHTML='';
   giorni.forEach(ds=>{
     const d=all[ds];const[y,m,g]=ds.split('-');
     const tot=totaleGiorno(d);
+    const costo=CN.reduce((s,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return s+v*t},0)+(parseFloat(d.speseExtra)||0);
     let html=`<td style="font-family:'DM Mono',monospace;font-size:11px">${g}/${m}</td>`;
     CN.forEach(c=>{const v=parseFloat(d[c.k])||0;html+=`<td class="td-r" style="color:${v>0?'var(--ink)':'var(--border)'}">${v>0?fmtN(v,c.k):'—'}</td>`});
     html+=`<td class="td-r td-bold">${tot>0?tot+'h':'—'}</td>`;
+    if(totCosto>0)html+=`<td class="td-r" style="color:var(--verde);font-weight:500">${costo>0?'€'+costo.toFixed(2):'—'}</td>`;
     const tr=document.createElement('tr');tr.innerHTML=html;tbody.appendChild(tr);
   });
 
-  // Tabella totali per tipologia
+  // Tabella totali per tipologia con costi
   const tbody2=document.getElementById('tbody-totali');tbody2.innerHTML='';
+  document.querySelector('#tab-totali thead tr').innerHTML='<th>Tipologia</th><th class="td-r">Quantità</th><th class="td-r">Tariffa</th><th class="td-r">Costo €</th>';
+  let grandTotCosto=0;
   CN.forEach(c=>{
     if(totMensili[c.k]>0){
+      const v=totMensili[c.k];
+      const tariffa=tariffe[c.k]||0;
+      const costo=v*tariffa;
+      grandTotCosto+=costo;
+      const unit=c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h';
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td style="font-weight:500">${c.l}</td><td class="td-r td-bold">${fmtN(totMensili[c.k],c.k)}</td>`;
+      tr.innerHTML=`<td style="font-weight:500">${c.l}</td><td class="td-r">${v%1===0?v:v.toFixed(1)}${unit}</td><td class="td-r" style="color:var(--ink4)">${tariffa>0?'€/'+( c.k==='kmPercorsi'?'km':'h')+' '+tariffa.toFixed(2):'—'}</td><td class="td-r td-bold" style="color:var(--verde)">${tariffa>0?'€'+costo.toFixed(2):'—'}</td>`;
       tbody2.appendChild(tr);
     }
   });
-  if(!tbody2.innerHTML)tbody2.innerHTML='<tr><td colspan="2" class="empty-state">Nessun dato per questo mese.</td></tr>';
+  if(totMensili.speseExtra>0){
+    grandTotCosto+=totMensili.speseExtra;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="font-weight:500">Spese Extra</td><td class="td-r">€${totMensili.speseExtra.toFixed(2)}</td><td class="td-r" style="color:var(--ink4)">—</td><td class="td-r td-bold" style="color:var(--verde)">€${totMensili.speseExtra.toFixed(2)}</td>`;
+    tbody2.appendChild(tr);
+  }
+  if(!tbody2.innerHTML){tbody2.innerHTML='<tr><td colspan="4" class="empty-state">Nessun dato per questo mese.</td></tr>';}
+  else if(grandTotCosto>0){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td colspan="3" style="font-family:'Syne',sans-serif;font-weight:700;text-align:right;padding-right:16px">TOTALE COSTO MESE</td><td class="td-r" style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--verde)">€${grandTotCosto.toFixed(2)}</td>`;
+    tr.style.background='var(--verde-light)';
+    tbody2.appendChild(tr);
+  }
 }
 
 // EXPORT EXCEL

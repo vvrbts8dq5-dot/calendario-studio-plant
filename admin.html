@@ -152,7 +152,7 @@ tbody tr:hover{background:var(--paper)}
 .cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
 .cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
-.tot-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
+.tot-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
 .tot-row:last-child{border-bottom:none}
 .tot-key{color:var(--ink4);font-family:'DM Mono',monospace;font-size:11px}
 .tot-val{font-weight:500}
@@ -410,10 +410,11 @@ tbody tr:hover{background:var(--paper)}
     <div id="modal-nota-dip" style="background:var(--paper);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none"></div>
     <label class="fl" style="margin-bottom:6px">Nota per il dipendente (opzionale)</label>
     <textarea class="fi" id="modal-nota-admin" rows="3" placeholder="Aggiungi una nota..." style="resize:vertical;margin-bottom:0;width:100%"></textarea>
-    <div class="modal-actions">
-      <button class="btn" onclick="chiudiModal()">Annulla</button>
-      <button class="btn btn-rosso" onclick="decidi('rifiutata')">✕ Rifiuta</button>
-      <button class="btn btn-verde" onclick="decidi('approvata')">✓ Approva</button>
+    <div class="modal-actions" id="modal-ferie-actions">
+      <button class="btn" onclick="chiudiModal()">Chiudi</button>
+      <button class="btn btn-rosso" id="modal-btn-rifiuta" onclick="decidi('rifiutata')">✕ Rifiuta</button>
+      <button class="btn btn-amber" id="modal-btn-annulla-appr" onclick="decidi('in_attesa')" style="display:none">↩ Rimetti in attesa</button>
+      <button class="btn btn-verde" id="modal-btn-approva" onclick="decidi('approvata')">✓ Approva</button>
     </div>
   </div>
 </div>
@@ -437,6 +438,21 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
       <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
+    </div>
+    <div style="height:.5px;background:var(--border);margin:14px 0"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Tariffe Economiche (€)</div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div><label class="fl">€/h Elettrici M.D.</label><input class="fi" id="t-oreElectriciMD" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Straord. Elettrici</label><input class="fi" id="t-oreStraordinariElettrico" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Meccanici M.A.</label><input class="fi" id="t-oreMeccaniciMA" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Straord. Meccanici</label><input class="fi" id="t-oreStraordinariMeccanico" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Attività Generali</label><input class="fi" id="t-oreAttivitaGenerali" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Ferie</label><input class="fi" id="t-oreFerie" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Permesso</label><input class="fi" id="t-orePermesso" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Festività/Malattia</label><input class="fi" id="t-oreFestivitaMalattia" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Recupero Elettrici</label><input class="fi" id="t-oreRecuperoElettrico" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Recupero Meccanici</label><input class="fi" id="t-oreRecuperoMeccanico" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/km Percorsi</label><input class="fi" id="t-kmPercorsi" type="number" step="0.001" placeholder="0.000"></div>
     </div>
     <div id="alert-edit-dip"></div>
     <div class="modal-actions">
@@ -744,15 +760,41 @@ function renderDetCal(){
 function renderDetTotali(){
   const ms=pad(detMese+1);
   const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0)});
-  const totOre=totGiorno(totals)||CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
+  const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
+  const emp=dipList.find(e=>e.username===detUser)||{};
+  const tariffe=emp.tariffe||{};
   const el=document.getElementById('det-totali-mese');
   el.innerHTML=`<div class="section-title" style="margin-bottom:10px">Totali ${MESI[detMese]}</div>`;
   const hasAny=CN.some(c=>totals[c.k]>0);
   if(!hasAny){el.innerHTML+='<div style="font-size:12px;color:var(--ink4)">Nessun dato per questo mese.</div>';return}
+  let totaleCosto=0;
   CN.filter(c=>totals[c.k]>0).forEach(c=>{
-    el.innerHTML+=`<div class="tot-row"><span class="tot-key">${c.l}</span><span class="tot-val">${fmtN(totals[c.k],c.k)}</span></div>`;
+    const qta=totals[c.k];
+    const tariffa=tariffe[c.k]||0;
+    const costo=qta*tariffa;
+    totaleCosto+=costo;
+    const unit=c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h';
+    el.innerHTML+=`<div class="tot-row" style="grid-template-columns:1fr auto auto">
+      <span class="tot-key">${c.l}</span>
+      <span class="tot-val" style="margin-right:8px">${qta%1===0?qta:qta.toFixed(1)}${unit}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:${tariffa>0?'var(--verde)':'var(--ink4)'}">${tariffa>0?'€'+(costo.toFixed(2)):'—'}</span>
+    </div>`;
   });
-  el.innerHTML+=`<div style="margin-top:10px;background:var(--blu-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${totOre}h</span></div>`;
+  // Spese extra
+  if(totals.speseExtra>0){
+    totaleCosto+=totals.speseExtra;
+    el.innerHTML+=`<div class="tot-row"><span class="tot-key">Spese Extra</span><span class="tot-val">€${totals.speseExtra.toFixed(2)}</span><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">€${totals.speseExtra.toFixed(2)}</span></div>`;
+  }
+  el.innerHTML+=`<div style="margin-top:10px;background:var(--blu-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span>
+    <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${totOre}h</span>
+  </div>`;
+  if(totaleCosto>0){
+    el.innerHTML+=`<div style="margin-top:6px;background:var(--verde-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">TOTALE COSTO</span>
+      <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${totaleCosto.toFixed(2)}</span>
+    </div>`;
+  }
 }
 
 function renderDetListaGiorni(){
@@ -778,13 +820,28 @@ function renderDetGiorno(){
   const[y,m,g]=detGiorno.split('-');
   const dd=detDays[detGiorno];
   if(!dd){card.innerHTML=`<div><div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div style="font-size:13px;color:var(--ink4)">Nessun dato inserito per questo giorno.</div></div>`;return}
+  const emp=dipList.find(e=>e.username===detUser)||{};
+  const tariffe=emp.tariffe||{};
   const assenza=dd['_assenza'];
   const ore=totGiorno(dd);
   let html=`<div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:4px">${g} ${MESI[parseInt(m)-1]} ${y}</div>`;
   if(assenza)html+=`<div style="margin-bottom:10px">${{ferie:'<span class="badge badge-approvata">🏖️ Ferie approvate</span>',permesso:'<span class="badge badge-approvata">🕐 Permesso approvato</span>',rol:'<span class="badge badge-approvata">🔄 ROL approvato</span>',malattia:'<span class="badge badge-malattia">🤒 Malattia</span>'}[assenza]||''}</div>`;
-  const righe=CAMPI.filter(c=>{const v=dd[c.k];return v!==undefined&&v!==''&&v!==0}).map(c=>`<div class="det-day-row"><span class="det-key">${c.l}</span><span style="font-weight:500">${dd[c.k]}${c.t==='n'?(c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'):''}</span></div>`).join('');
+  let totaleCostoGiorno=0;
+  const righe=CAMPI.filter(c=>{const v=dd[c.k];return v!==undefined&&v!==''&&v!==0}).map(c=>{
+    const v=parseFloat(dd[c.k])||0;
+    const tariffa=tariffe[c.k]||0;
+    const costo=v*tariffa;
+    if(c.t==='n'&&tariffa>0)totaleCostoGiorno+=costo;
+    const unit=c.t==='n'?(c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'):'';
+    return `<div class="det-day-row">
+      <span class="det-key">${c.l}</span>
+      <span style="font-weight:500">${dd[c.k]}${unit}</span>
+      ${tariffa>0?`<span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">€${costo.toFixed(2)}</span>`:''}
+    </div>`;
+  }).join('');
   html+=righe||'<div style="font-size:13px;color:var(--ink4)">Nessuna voce compilata.</div>';
   if(ore>0)html+=`<div class="totale-giorno-bar"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${ore}h</span></div>`;
+  if(totaleCostoGiorno>0)html+=`<div style="margin-top:6px;background:var(--verde-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">COSTO GIORNATA</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${totaleCostoGiorno.toFixed(2)}</span></div>`;
   card.innerHTML=html;
 }
 
@@ -850,7 +907,7 @@ function renderFerie(){
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
       <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
-      <td>${r.stato==='in_attesa'?`<button class="btn btn-blu btn-sm" onclick="apriModal('${r.id}')">Gestisci</button>`:`<span style="font-size:11px;color:var(--ink4)">${r.notaAdmin||'—'}</span>`}</td>
+      <td><button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button></td>
     </tr>`;
   }).join('');
 }
@@ -858,11 +915,18 @@ function renderFerie(){
 function apriModal(id){
   modalRichiestaId=id;
   const r=tutteR.find(r=>r.id===id);
-  document.getElementById('modal-title').textContent='Gestisci Richiesta — '+( TL[r.tipo]||r.tipo);
+  document.getElementById('modal-title').textContent='Gestisci Richiesta — '+(TL[r.tipo]||r.tipo);
   document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine} · ${r.oreRichieste||0}h`;
   const nd=document.getElementById('modal-nota-dip');
   if(r.note){nd.style.display='block';nd.textContent='💬 Nota dipendente: '+r.note}else{nd.style.display='none'}
-  document.getElementById('modal-nota-admin').value='';
+  document.getElementById('modal-nota-admin').value=r.notaAdmin||'';
+  // Mostra pulsanti in base allo stato attuale
+  const isAttesa=r.stato==='in_attesa';
+  const isAppr=r.stato==='approvata';
+  const isRif=r.stato==='rifiutata';
+  document.getElementById('modal-btn-approva').style.display=isAppr?'none':'';
+  document.getElementById('modal-btn-rifiuta').style.display=isRif?'none':'';
+  document.getElementById('modal-btn-annulla-appr').style.display=(!isAttesa)?'':'none';
   document.getElementById('modal-ferie').classList.add('open');
 }
 function chiudiModal(){document.getElementById('modal-ferie').classList.remove('open');modalRichiestaId=null}
@@ -936,6 +1000,14 @@ function apriModificaDip(username){
   document.getElementById('edit-ferie').value=emp.monteFerie||0;
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
   document.getElementById('edit-rol').value=emp.monteRol||0;
+  // Tariffe
+  const t=emp.tariffe||{};
+  ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
+   'oreAttivitaGenerali','oreFerie','orePermesso','oreFestivitaMalattia',
+   'oreRecuperoElettrico','oreRecuperoMeccanico','kmPercorsi'].forEach(k=>{
+    const el=document.getElementById('t-'+k);
+    if(el)el.value=t[k]||'';
+  });
   document.getElementById('alert-edit-dip').innerHTML='';
   document.getElementById('modal-dip').classList.add('open');
 }
@@ -944,6 +1016,13 @@ async function salvaDipendente(){
   if(!editUsername)return;
   const ad=document.getElementById('alert-edit-dip');
   try{
+    const tariffe={};
+    ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
+     'oreAttivitaGenerali','oreFerie','orePermesso','oreFestivitaMalattia',
+     'oreRecuperoElettrico','oreRecuperoMeccanico','kmPercorsi'].forEach(k=>{
+      const v=parseFloat(document.getElementById('t-'+k)?.value)||0;
+      if(v>0)tariffe[k]=v;
+    });
     await db.collection('dipendenti').doc(editUsername).update({
       nome:document.getElementById('edit-nome').value.trim(),
       cognome:document.getElementById('edit-cognome').value.trim(),
@@ -952,6 +1031,7 @@ async function salvaDipendente(){
       monteFerie:parseFloat(document.getElementById('edit-ferie').value)||0,
       montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
       monteRol:parseFloat(document.getElementById('edit-rol').value)||0,
+      tariffe,
     });
     document.getElementById('modal-dip').classList.remove('open');
     editUsername=null;
@@ -992,21 +1072,41 @@ async function esportaTuttiExcel(){
   XLSX.writeFile(wb,`Timesheets_Tutti_${ANNO}.xlsx`);
 }
 
-// EXPORT EXCEL DETTAGLIO
+// EXPORT EXCEL DETTAGLIO - usa cache per velocità
 async function esportaDetExcel(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
+  const tariffe=emp.tariffe||{};
+  // Carica tutti i giorni dell'anno in una sola query
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
+  const allDays={};snap.forEach(d=>{allDays[d.id]=d.data()});
   const wb=XLSX.utils.book_new();
+  // Foglio riepilogo annuale
+  const hdr=['Campo',...MB,'TOTALE','Tariffa €','Costo Totale €'];
+  const righeRiep=CN.map(c=>{
+    const r=[c.l];let tot=0;
+    for(let m=0;m<12;m++){const ms=pad(m+1);const v=Object.entries(allDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0);r.push(v||0);tot+=v}
+    const tariffa=tariffe[c.k]||0;
+    r.push(tot,tariffa>0?tariffa:'—',tariffa>0?(tot*tariffa).toFixed(2):'—');
+    return r;
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hdr,...righeRiep]),'Riepilogo Annuale');
   // Un foglio per mese
   for(let m=0;m<12;m++){
     const ms=pad(m+1);
-    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
-    const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+    const all={};Object.entries(allDays).forEach(([k,v])=>{if(k.startsWith(`${ANNO}-${ms}`))all[k]=v});
     const giorni=Object.keys(all).sort();
-    const hh=['Data',...CN.map(c=>c.l),'Totale Ore'];
-    const rr=giorni.map(ds=>{const d=all[ds];const[y,mo,g]=ds.split('-');return[`${g}/${mo}/${y}`,...CN.map(c=>parseFloat(d[c.k])||0),totGiorno(d)]});
-    const tot=['TOTALE',...CN.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0)];
-    rr.push(tot);
+    if(!giorni.length)continue;
+    const hh=['Data',...CN.map(c=>c.l),'Totale Ore','Costo €'];
+    const rr=giorni.map(ds=>{
+      const d=all[ds];const[y,mo,g]=ds.split('-');
+      const ore=totGiorno(d);
+      const costo=CN.reduce((s,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return s+v*t},0)+(parseFloat(d.speseExtra)||0);
+      return[`${g}/${mo}/${y}`,...CN.map(c=>parseFloat(d[c.k])||0),ore,costo>0?costo.toFixed(2):''];
+    });
+    const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
+    const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
+    rr.push(['TOTALE',...CN.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre,totCosto>0?totCosto.toFixed(2):'']);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[m]);
   }
   XLSX.writeFile(wb,`Timesheet_${nome.replace(/\s+/g,'_')}_${ANNO}.xlsx`);
@@ -1016,6 +1116,7 @@ async function esportaDetExcel(){
 async function esportaDetPDF(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
+  const tariffe=emp.tariffe||{};
   const ms=pad(detMese+1);
   const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
   const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
@@ -1045,7 +1146,9 @@ async function esportaDetPDF(){
   });
   y+=6;doc.setFont('helvetica','bold');doc.setFontSize(9);
   const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
+  const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
   doc.text(`Totale ore ${MESI[detMese]}: ${totOre}h`,14,y);
+  if(totCosto>0){y+=6;doc.text(`Totale costo ${MESI[detMese]}: €${totCosto.toFixed(2)}`,14,y);}
   doc.save(`${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
 }
 
