@@ -239,7 +239,7 @@ tbody tr:last-child{border-bottom:none}
     <div class="sidebar-logo">
       <div class="logo-tag">Studio di Ingegneria</div>
       <div class="logo-name">Calendario Ore</div>
-      <div class="logo-sub">Portale Dipendenti · 2026</div>
+      <div class="logo-sub" id="dip-logo-sub">Portale Dipendenti · 2026</div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-lbl">Menu</div>
@@ -251,6 +251,9 @@ tbody tr:last-child{border-bottom:none}
       </button>
       <button class="nav-item" data-page="riepilogo">
         <span class="nav-icon">📊</span> Riepilogo Mensile
+      </button>
+      <button class="nav-item" data-page="archivio">
+        <span class="nav-icon">🗂️</span> Archivio Anni
       </button>
     </div>
     <!-- SALDI SIDEBAR -->
@@ -415,6 +418,15 @@ tbody tr:last-child{border-bottom:none}
         </div>
       </div>
 
+      <!-- ARCHIVIO -->
+      <div class="page" id="page-archivio">
+        <div class="page-header">
+          <div class="page-title">🗂️ Archivio Anni Precedenti</div>
+          <select class="f-select" id="arch-anno-dip" style="width:auto;padding:7px 12px;font-size:13px" onchange="loadArchivioDip()"></select>
+        </div>
+        <div id="archivio-dip-content"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
       <!-- RIEPILOGO -->
       <div class="page" id="page-riepilogo">
         <div class="page-header">
@@ -451,7 +463,7 @@ const FC={apiKey:"AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",authDomain:"calendari
 firebase.initializeApp(FC);
 const db=firebase.firestore();
 
-const ANNO=2026;
+const ANNO=new Date().getFullYear();
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
@@ -584,6 +596,8 @@ function startApp(){
   document.getElementById('app').classList.add('visible');
   const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
   document.getElementById('sidebar-nome').textContent=nome;
+  const dlsub=document.getElementById('dip-logo-sub');
+  if(dlsub)dlsub.textContent=`Portale Dipendenti · ${ANNO}`;
   const orario=profilo.tipoOrario==='ridotto'?'Orario ridotto (6h)':'Orario pieno (8h)';
   document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
   initCal();
@@ -613,6 +627,7 @@ document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
     document.getElementById('topbar-title').textContent=titles[b.dataset.page]||'';
     if(b.dataset.page==='assenze'){loadTutteAssenze()}
     if(b.dataset.page==='riepilogo'){loadRiepilogoMese(parseInt(document.getElementById('sel-mese-riepilogo').value))}
+    if(b.dataset.page==='archivio'){initArchivioDip()}
   });
 });
 
@@ -1032,6 +1047,52 @@ async function esportaExcel(){
   rr.push(tot);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[mese]);
   XLSX.writeFile(wb,`${nome}_${MESI[mese]}_${ANNO}.xlsx`);
+}
+
+// ARCHIVIO ANNI DIPENDENTE
+async function initArchivioDip(){
+  const sel=document.getElementById('arch-anno-dip');
+  sel.innerHTML='';
+  for(let y=ANNO-1;y>=2024;y--){const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o)}
+  loadArchivioDip();
+}
+
+async function loadArchivioDip(){
+  const anno=parseInt(document.getElementById('arch-anno-dip')?.value)||ANNO-1;
+  const el=document.getElementById('archivio-dip-content');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  // Controlla se modificabile (solo anno precedente e solo in gennaio)
+  const oggi=new Date();
+  const solaLettura=!(anno===ANNO-1&&oggi.getMonth()===0);
+  if(solaLettura){
+    el.innerHTML=`<div class="alert-box" style="background:var(--amber-light);color:var(--amber);margin-bottom:16px;border-radius:6px;padding:10px 14px;font-size:12px">📅 Anno ${anno} — Archivio in sola lettura</div>`;
+  } else {
+    el.innerHTML=`<div class="alert-box alert-ok" style="margin-bottom:16px;border-radius:6px;padding:10px 14px;font-size:12px">✏️ Anno ${anno} — Modificabile fino al 31 gennaio ${ANNO}</div>`;
+  }
+  const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(U.username).collection('giorni').get();
+  const all={};snap.forEach(d=>{all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+  if(!giorni.length){el.innerHTML+='<div class="empty-state">Nessun dato per l'anno '+anno+'.</div>';return}
+  // Riepilogo per mese
+  let html='';
+  const MESI_LOCAL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  for(let mi=0;mi<12;mi++){
+    const ms=String(mi+1).padStart(2,'0');
+    const gg=giorni.filter(d=>d.startsWith(`${anno}-${ms}`));
+    if(!gg.length)continue;
+    const tots={};CAMPI.filter(c=>c.t==='number').forEach(c=>{tots[c.k]=gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)});
+    const totOre=CAMPI.filter(c=>c.t==='number'&&c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+tots[c.k],0);
+    html+=`<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700">${MESI_LOCAL[mi]} ${anno}</div>
+        <span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--blu-light);color:var(--blu);padding:3px 10px;border-radius:6px">${totOre}h · ${gg.length} giorni</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+        ${CAMPI.filter(c=>c.t==='number'&&tots[c.k]>0).map(c=>`<div style="background:var(--paper);border-radius:6px;padding:8px 10px"><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">${c.l}</div><div style="font-weight:600;font-size:13px;margin-top:2px">${tots[c.k]%1===0?tots[c.k]:tots[c.k].toFixed(1)}${c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'}</div></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  el.innerHTML+=html;
 }
 
 // EXPORT PDF
