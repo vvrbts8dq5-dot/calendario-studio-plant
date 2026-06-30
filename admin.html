@@ -234,6 +234,10 @@ tbody tr:hover{background:var(--paper)}
       <button class="nav-item" data-page="dipendenti" onclick="goPage('dipendenti',this)">
         <span class="nav-icon">👥</span> Dipendenti
       </button>
+      <button class="nav-item" data-page="straordinari" onclick="goPage('straordinari',this)">
+        <span class="nav-icon">⚡</span> Straordinari
+        <span class="nav-badge" id="badge-straord">0</span>
+      </button>
       <button class="nav-item" data-page="costi" onclick="goPage('costi',this)">
         <span class="nav-icon">💶</span> Costi Mensili
       </button>
@@ -264,7 +268,10 @@ tbody tr:hover{background:var(--paper)}
       <div class="page active" id="page-dashboard">
         <div class="page-header">
           <div class="page-title" id="dash-title">Dashboard 2026</div>
-          <button class="btn btn-verde" onclick="esportaTuttiExcel()">📥 Esporta tutti Excel</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-verde" onclick="esportaTuttiExcel()">📥 Esporta tutti Excel</button>
+            <button class="btn btn-ink" onclick="eseguiBackup()">💾 Backup Completo</button>
+          </div>
         </div>
         <div class="kpi-row" id="kpi-row"></div>
         <div class="section-title">Saldi Ferie & Assenze per Dipendente</div>
@@ -401,6 +408,35 @@ tbody tr:hover{background:var(--paper)}
           <table>
             <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Orario</th><th class="td-r">Ferie</th><th class="td-r">Permessi</th><th class="td-r">ROL</th><th>Stato</th><th>Azioni</th></tr></thead>
             <tbody id="tbody-dip"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- STRAORDINARI -->
+      <div class="page" id="page-straordinari">
+        <div class="page-header">
+          <div class="page-title">⚡ Straordinari da Convalidare</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="straord-dip-filter" style="font-size:12px" onchange="renderStraordinari()"><option value="">Tutti i dipendenti</option></select>
+            <button class="btn btn-verde btn-sm" onclick="esportaStraordExcel()">📥 Excel</button>
+          </div>
+        </div>
+        <div class="filtri">
+          <button class="btn-filtro active" onclick="setFiltroStraord(this,'da_convalidare')">⏳ Da convalidare <span id="cnt-straord-pend">0</span></button>
+          <button class="btn-filtro" onclick="setFiltroStraord(this,'autorizzati')">✓ Autorizzati <span id="cnt-straord-auth">0</span></button>
+          <button class="btn-filtro" onclick="setFiltroStraord(this,'non_autorizzati')">✕ Non autorizzati <span id="cnt-straord-no">0</span></button>
+          <button class="btn-filtro" onclick="setFiltroStraord(this,'tutti')">Tutti <span id="cnt-straord-all">0</span></button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Dipendente</th><th>Data</th>
+              <th class="td-r">H Straord. Elettrici</th>
+              <th class="td-r">H Straord. Meccanici</th>
+              <th class="td-r">Totale Straord.</th>
+              <th>N° Commessa</th><th>Note</th><th>Stato</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="tbody-straord"></tbody>
           </table>
         </div>
       </div>
@@ -611,6 +647,8 @@ function startApp(){
       badge.textContent=cnt;
       badge.className='nav-badge'+(cnt>0?' alert':'');
     });
+  // Notifiche real-time straordinari da convalidare
+  aggiornaBadgeStraord();
   // Controlla se è 1 gennaio → mostra modal gestione ferie
   const oggi=new Date();
   if(oggi.getMonth()===0&&oggi.getDate()===1){
@@ -682,6 +720,7 @@ function goPage(pid,btn){
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
   if(pid==='dipendenti')loadDipendenti();
+  if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
 }
@@ -1081,6 +1120,7 @@ async function loadDipendenti(){
   dipList=snap.docs.map(d=>({username:d.id,...d.data()}));
   const tbody=document.getElementById('tbody-dip');
   if(!dipList.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Nessun dipendente.</td></tr>';return}
+  if(!dipList.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessun dipendente.</td></tr>';return}
   tbody.innerHTML=dipList.map(d=>{
     const bloccato=d.bloccatoInattivita===true;
     const statoLabel=bloccato?'🔴 Bloccato':d.abilitato?'Attivo':'Disabilitato';
@@ -1570,6 +1610,114 @@ async function stampFoglio(){
   doc.text('Firma Responsabile: _______________________________',110,y);
   y+=10;doc.text(`Data: _____ / _____ / _____`,14,y);
   doc.save(`FoglioFirma_${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
+}
+
+// ── STRAORDINARI ──────────────────────────────────────────────────────
+let tuttiStraord=[];
+let filtroStraord='da_convalidare';
+
+async function aggiornaBadgeStraord(){
+  try{
+    if(!dipList.length)return;
+    let cnt=0;
+    await Promise.all(dipList.map(async emp=>{
+      const s=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+      s.forEach(g=>{const d=g.data();if((parseFloat(d.oreStraordinariElettrico)||0)+(parseFloat(d.oreStraordinariMeccanico)||0)>0&&(!d.statoStraordinari||d.statoStraordinari==='da_convalidare'))cnt++;});
+    }));
+    const badge=document.getElementById('badge-straord');
+    if(badge){badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'');}
+  }catch(e){console.log('Badge straord:',e.message)}
+}
+
+async function loadStraordinari(){
+  tuttiStraord=[];
+  if(!dipList.length){const snap=await db.collection('dipendenti').get();dipList=snap.docs.map(d=>({username:d.id,...d.data()}))}
+  const df=document.getElementById('straord-dip-filter');
+  if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=`${d.nome||''} ${d.cognome||''}`.trim();df.appendChild(o)});
+  await Promise.all(dipList.map(async emp=>{
+    try{
+      const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+      snap.forEach(d=>{
+        const dati=d.data();
+        const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
+        const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
+        if(straEl>0||straMec>0)tuttiStraord.push({id:d.id,username:emp.username,nomeCompleto:`${emp.nome||''} ${emp.cognome||''}`.trim(),data:dati.data||d.id,straEl,straMec,totale:straEl+straMec,commessa:dati.commessa||'',note:dati.note||'',stato:dati.statoStraordinari||'da_convalidare'});
+      });
+    }catch(e){}
+  }));
+  tuttiStraord.sort((a,b)=>b.data.localeCompare(a.data));
+  document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
+  document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
+  document.getElementById('cnt-straord-no').textContent=tuttiStraord.filter(s=>s.stato==='non_autorizzati').length;
+  document.getElementById('cnt-straord-all').textContent=tuttiStraord.length;
+  renderStraordinari();aggiornaBadgeStraord();
+}
+
+function setFiltroStraord(btn,f){
+  filtroStraord=f;
+  document.querySelectorAll('#page-straordinari .btn-filtro').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderStraordinari();
+}
+
+function renderStraordinari(){
+  const dipF=document.getElementById('straord-dip-filter')?.value||'';
+  let lista=filtroStraord==='tutti'?tuttiStraord:tuttiStraord.filter(s=>s.stato===filtroStraord);
+  if(dipF)lista=lista.filter(s=>s.username===dipF);
+  const tbody=document.getElementById('tbody-straord');
+  if(!lista.length){tbody.innerHTML='<tr><td colspan="9" class="empty-state">Nessun straordinario trovato.</td></tr>';return}
+  tbody.innerHTML=lista.map(s=>{
+    const[y,m,g]=s.data.split('-');
+    const sc=s.stato==='autorizzati'?'badge-approvata':s.stato==='non_autorizzati'?'badge-rifiutata':'badge-attesa';
+    const sl=s.stato==='autorizzati'?'Autorizzati':s.stato==='non_autorizzati'?'Non autorizzati':'Da convalidare';
+    return `<tr><td style="font-weight:500">${s.nomeCompleto}</td><td style="font-family:'DM Mono',monospace;font-size:11px">${g} ${MESI[parseInt(m)-1]} ${y}</td><td class="td-r">${s.straEl>0?s.straEl+'h':'—'}</td><td class="td-r">${s.straMec>0?s.straMec+'h':'—'}</td><td class="td-r" style="font-weight:600">${s.totale}h</td><td style="font-size:12px;color:var(--ink4)">${s.commessa||'—'}</td><td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td><td><span class="badge ${sc}">${sl}</span></td><td><div style="display:flex;gap:4px">${s.stato!=='autorizzati'?`<button class="btn btn-verde btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','autorizzati')">✓</button>`:''} ${s.stato!=='non_autorizzati'?`<button class="btn btn-rosso btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','non_autorizzati')">✕</button>`:''} ${s.stato!=='da_convalidare'?`<button class="btn btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','da_convalidare')">↩</button>`:''}</div></td></tr>`;
+  }).join('');
+}
+
+async function convalidaStraord(username,docId,stato){
+  try{
+    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(username).collection('giorni').doc(docId).update({statoStraordinari:stato,hasStraordinari:true,convalidatoIl:new Date().toISOString(),convalidatoDa:ADM.username});
+    const item=tuttiStraord.find(s=>s.username===username&&s.id===docId);
+    if(item)item.stato=stato;
+    renderStraordinari();
+    document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
+    document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
+    document.getElementById('cnt-straord-no').textContent=tuttiStraord.filter(s=>s.stato==='non_autorizzati').length;
+    aggiornaBadgeStraord();
+  }catch(e){alert('Errore: '+e.message)}
+}
+
+async function esportaStraordExcel(){
+  const wb=XLSX.utils.book_new();
+  const hh=['Dipendente','Data','H Straord. Elettrici','H Straord. Meccanici','Totale','Commessa','Note','Stato'];
+  const rows=tuttiStraord.map(s=>[s.nomeCompleto,s.data,s.straEl||0,s.straMec||0,s.totale,s.commessa||'',s.note||'',s.stato==='autorizzati'?'Autorizzati':s.stato==='non_autorizzati'?'Non autorizzati':'Da convalidare']);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rows]),'Straordinari '+ANNO);
+  XLSX.writeFile(wb,'Straordinari_'+ANNO+'.xlsx');
+}
+
+// ── BACKUP COMPLETO ────────────────────────────────────────────────────
+async function eseguiBackup(){
+  const btn=event.target;btn.textContent='Backup...';btn.disabled=true;
+  try{
+    const backup={dataBackup:new Date().toISOString(),anno:ANNO,dipendenti:[],richieste_assenza:[],malattie:[],timesheets:{}};
+    (await db.collection('dipendenti').get()).forEach(d=>backup.dipendenti.push({id:d.id,...d.data()}));
+    (await db.collection('richieste_assenza').get()).forEach(d=>backup.richieste_assenza.push({id:d.id,...d.data()}));
+    (await db.collection('malattie').get()).forEach(d=>backup.malattie.push({id:d.id,...d.data()}));
+    for(const emp of backup.dipendenti){
+      const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.id).collection('giorni').get();
+      if(!snap.empty){backup.timesheets[emp.id]={};snap.forEach(d=>{backup.timesheets[emp.id][d.id]=d.data()})}
+    }
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;
+    a.download='Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Username','Nome','Cognome','Orario','Monte Ferie','Monte Permessi','Monte ROL','Assunzione','Contratto','Note'],...backup.dipendenti.map(d=>[d.id,d.nome||'',d.cognome||'',d.tipoOrario||'',d.monteFerie||0,d.montePermesso||0,d.monteRol||0,d.dataAssunzione||'',d.tipoContratto||'',d.noteInterne||''])]),'Dipendenti');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Tipo','Inizio','Fine','Ore','Stato','Note'],...backup.richieste_assenza.map(r=>[r.nomeCompleto||r.username,r.tipo,r.dataInizio,r.dataFine,r.oreRichieste||0,r.stato,r.note||''])]),'Richieste');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Inizio','Fine','Giorni Lav.','Note'],...backup.malattie.map(m=>[m.nomeCompleto||m.username,m.dataInizio,m.dataFine,m.giorniLavorativi||0,m.note||''])]),'Malattie');
+    XLSX.writeFile(wb,'Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.xlsx');
+    alert('Backup completato!\n- '+backup.dipendenti.length+' dipendenti\n- '+backup.richieste_assenza.length+' richieste\n- '+backup.malattie.length+' malattie\nFile scaricati: JSON + Excel');
+  }catch(e){alert('Errore backup: '+e.message)}
+  finally{btn.textContent='Backup Completo';btn.disabled=false}
 }
 
 // ── EXPORT FERIE EXCEL

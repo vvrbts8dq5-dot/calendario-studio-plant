@@ -824,6 +824,15 @@ function renderForm(ds,dati){
   if(totOre>0){
     html+=`<div class="totale-giorno"><span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${totOre}h</span></div>`;
   }
+  // Mostra stato straordinari se presenti
+  const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
+  const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
+  if(straEl>0||straMec>0){
+    const stato=dati.statoStraordinari||'da_convalidare';
+    const statoMap={da_convalidare:{label:'⏳ In attesa di convalida',bg:'var(--amber-light)',color:'var(--amber)'},autorizzati:{label:'✓ Straordinari autorizzati',bg:'var(--verde-light)',color:'var(--verde)'},non_autorizzati:{label:'✕ Straordinari non autorizzati',bg:'var(--rosso-light)',color:'var(--rosso)'}};
+    const s=statoMap[stato]||statoMap.da_convalidare;
+    html+=`<div style="margin-top:8px;background:${s.bg};border-radius:6px;padding:8px 12px;font-size:12px;color:${s.color};font-weight:500">⚡ ${s.label}</div>`;
+  }
   document.getElementById('form-giorno').innerHTML=html;
 }
 
@@ -852,6 +861,10 @@ async function saveDay(ds){
   try{
     const toSave={};
     Object.entries(cache[ds]).forEach(([k,v])=>{if(!k.startsWith('_'))toSave[k]=v});
+    // Flag hasStraordinari per permettere all'admin di trovarli facilmente
+    const straEl=parseFloat(toSave.oreStraordinariElettrico)||0;
+    const straMec=parseFloat(toSave.oreStraordinariMeccanico)||0;
+    toSave.hasStraordinari=(straEl>0||straMec>0);
     await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
     renderCal(meseSel);
