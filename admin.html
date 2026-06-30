@@ -220,7 +220,7 @@ tbody tr:hover{background:var(--paper)}
     <div class="sidebar-logo">
       <div class="logo-tag">Studio di Ingegneria</div>
       <div class="logo-name">Admin Panel</div>
-      <div class="logo-sub">Calendario Ore 2026</div>
+      <div class="logo-sub">Calendario Ore <span id="logo-anno">2026</span></div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-lbl">Gestione</div>
@@ -233,6 +233,12 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="dipendenti" onclick="goPage('dipendenti',this)">
         <span class="nav-icon">👥</span> Dipendenti
+      </button>
+      <button class="nav-item" data-page="costi" onclick="goPage('costi',this)">
+        <span class="nav-icon">💶</span> Costi Mensili
+      </button>
+      <button class="nav-item" data-page="archivio" onclick="goPage('archivio',this)">
+        <span class="nav-icon">🗂️</span> Archivio Anni
       </button>
     </div>
     <div class="sidebar-divider"></div>
@@ -257,7 +263,7 @@ tbody tr:hover{background:var(--paper)}
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
         <div class="page-header">
-          <div class="page-title">Dashboard 2026</div>
+          <div class="page-title" id="dash-title">Dashboard 2026</div>
           <button class="btn btn-verde" onclick="esportaTuttiExcel()">📥 Esporta tutti Excel</button>
         </div>
         <div class="kpi-row" id="kpi-row"></div>
@@ -294,6 +300,7 @@ tbody tr:hover{background:var(--paper)}
           <div style="display:flex;gap:8px">
             <button class="btn btn-verde btn-sm" onclick="esportaDetExcel()">📥 Excel</button>
             <button class="btn btn-rosso btn-sm" onclick="esportaDetPDF()">📄 PDF</button>
+            <button class="btn btn-sm" onclick="stampFoglio()">📋 Foglio Firma</button>
           </div>
         </div>
 
@@ -398,6 +405,43 @@ tbody tr:hover{background:var(--paper)}
         </div>
       </div>
 
+      <!-- COSTI MENSILI -->
+      <div class="page" id="page-costi">
+        <div class="page-header">
+          <div class="page-title">💶 Costi Mensili</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="costi-anno" style="font-size:12px" onchange="loadCostiMensili()"></select>
+            <button class="btn btn-verde btn-sm" onclick="esportaCostiExcel()">📥 Excel Costi</button>
+          </div>
+        </div>
+        <div id="costi-content"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- ARCHIVIO ANNI -->
+      <div class="page" id="page-archivio">
+        <div class="page-header">
+          <div class="page-title">🗂️ Archivio Anni Precedenti</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="arch-anno" style="font-size:12px" onchange="loadArchivio()"></select>
+            <select class="f-select" id="arch-dip" style="font-size:12px" onchange="loadArchivio()"><option value="">Tutti i dipendenti</option></select>
+          </div>
+        </div>
+        <div id="archivio-content"><div class="empty-state">Seleziona un anno.</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GESTIONE ANNO NUOVO -->
+<div class="modal-overlay" id="modal-anno-nuovo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">🎉 Nuovo Anno — Gestione Ferie Residue</div>
+    <div class="modal-sub" id="modal-anno-sub"></div>
+    <div id="modal-anno-content"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-anno-nuovo').classList.remove('open')">Dopo</button>
+      <button class="btn btn-ink" onclick="salvaDecisioneAnno()">✓ Conferma e Salva</button>
     </div>
   </div>
 </div>
@@ -454,6 +498,16 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">€/h Recupero Meccanici</label><input class="fi" id="t-oreRecuperoMeccanico" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/km Percorsi</label><input class="fi" id="t-kmPercorsi" type="number" step="0.001" placeholder="0.000"></div>
     </div>
+    <div style="height:.5px;background:var(--border);margin:14px 0"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Note Interne</div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div><label class="fl">Data Assunzione</label><input class="fi" id="edit-data-assunzione" type="date"></div>
+      <div><label class="fl">Tipo Contratto</label><input class="fi" id="edit-contratto" type="text" placeholder="es. Tempo indeterminato"></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="fl">Note Aggiuntive</label>
+      <textarea class="fi" id="edit-note-interne" rows="3" placeholder="es. Scadenza preavviso, CCNL, note varie..." style="resize:vertical;width:100%"></textarea>
+    </div>
     <div id="alert-edit-dip"></div>
     <div class="modal-actions">
       <button class="btn" onclick="document.getElementById('modal-dip').classList.remove('open')">Annulla</button>
@@ -467,7 +521,6 @@ const FC={apiKey:"AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",authDomain:"calendari
 firebase.initializeApp(FC);
 const db=firebase.firestore();
 
-const ANNO=2026;
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 const FESTIVITA=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
@@ -534,12 +587,38 @@ function showErr(m){const e=document.getElementById('login-error');e.textContent
 const sess=sessionStorage.getItem('adm_sess');
 if(sess){try{ADM=JSON.parse(sess);startApp()}catch(e){sessionStorage.removeItem('adm_sess')}}
 
+const ANNO_CORRENTE=new Date().getFullYear();
+// Determina anno attivo: se siamo a gennaio, l'anno attivo è quello corrente ma è ancora modificabile l'anno precedente
+const ANNO=ANNO_CORRENTE;
+const ANNO_PREC=ANNO_CORRENTE-1;
+// L'anno precedente è modificabile fino al 31 gennaio
+const oggi_check=new Date();
+const ANNO_PREC_MODIFICABILE=(oggi_check.getMonth()===0); // gennaio=0
+
 function startApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
   document.getElementById('sidebar-nome').textContent=ADM.nome||ADM.username;
+  // Aggiorna anno nel logo
+  document.getElementById('logo-anno').textContent=ANNO;
+  document.getElementById('dash-title').textContent='Dashboard '+ANNO;
   checkInattivita().then(()=>loadDashboard());
-  loadRichiesteCount();
+  // Notifiche real-time richieste ferie
+  db.collection('richieste_assenza').where('stato','==','in_attesa')
+    .onSnapshot(snap=>{
+      const cnt=snap.size;
+      const badge=document.getElementById('badge-ferie');
+      badge.textContent=cnt;
+      badge.className='nav-badge'+(cnt>0?' alert':'');
+    });
+  // Controlla se è 1 gennaio → mostra modal gestione ferie
+  const oggi=new Date();
+  if(oggi.getMonth()===0&&oggi.getDate()===1){
+    setTimeout(()=>mostraModalAnnoNuovo(),1500);
+  }
+  // Init selettori costi/archivio
+  const costiAnno=document.getElementById('costi-anno');
+  for(let y=ANNO;y>=2026;y--){const o=document.createElement('option');o.value=y;o.textContent=y;costiAnno.appendChild(o);}
 }
 
 const FESTIVITA_CHECK=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
@@ -598,11 +677,13 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
   if(pid==='dipendenti')loadDipendenti();
+  if(pid==='costi')loadCostiMensili();
+  if(pid==='archivio')initArchivio();
 }
 
 // DASHBOARD
@@ -752,10 +833,12 @@ async function caricaDetSaldi(emp){
       <div class="progress-bar"><div class="progress-fill fill-${cls(rolRes,monteRol)}" style="width:${monteRol>0?Math.max(0,Math.round(rolRes/monteRol*100)):0}%"></div></div>
       <div class="saldo-res ${cls(rolRes,monteRol)}" style="margin-top:6px">${rolRes}h</div><div style="font-size:11px;color:var(--ink4)">residuo</div>
     </div>
-    <div class="saldo-card"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati 2026</div>
+    <div class="saldo-card"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati ${ANNO}</div>
       <div class="saldo-res" style="color:var(--viola);margin-top:14px">${giorniMal}</div><div style="font-size:11px;color:var(--ink4)">giorni lavorativi</div>
     </div>
-  `;
+    ${(emp.dataAssunzione||emp.tipoContratto||emp.noteInterne)?`<div class="saldo-card" style="grid-column:1/-1"><div class="saldo-tipo">📋 Note Interne</div>${emp.dataAssunzione?`<div style="font-size:12px;margin-top:4px;color:var(--ink4)">Assunto il: <strong style="color:var(--ink)">${new Date(emp.dataAssunzione).toLocaleDateString('it-IT')}</strong></div>`:''}${emp.tipoContratto?`<div style="font-size:12px;margin-top:2px;color:var(--ink4)">Contratto: <strong style="color:var(--ink)">${emp.tipoContratto}</strong></div>`:''}${emp.noteInterne?`<div style="font-size:12px;margin-top:4px;color:var(--ink3);font-style:italic">${emp.noteInterne}</div>`:''}
+    </div>`:''}
+  \`;
 }
 
 async function loadDetMese(){
@@ -1063,6 +1146,10 @@ function apriModificaDip(username){
     const el=document.getElementById('t-'+k);
     if(el)el.value=t[k]||'';
   });
+  // Note interne
+  document.getElementById('edit-data-assunzione').value=emp.dataAssunzione||'';
+  document.getElementById('edit-contratto').value=emp.tipoContratto||'';
+  document.getElementById('edit-note-interne').value=emp.noteInterne||'';
   document.getElementById('alert-edit-dip').innerHTML='';
   document.getElementById('modal-dip').classList.add('open');
 }
@@ -1087,6 +1174,9 @@ async function salvaDipendente(){
       montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
       monteRol:parseFloat(document.getElementById('edit-rol').value)||0,
       tariffe,
+      dataAssunzione:document.getElementById('edit-data-assunzione').value||'',
+      tipoContratto:document.getElementById('edit-contratto').value.trim()||'',
+      noteInterne:document.getElementById('edit-note-interne').value.trim()||'',
     });
     document.getElementById('modal-dip').classList.remove('open');
     editUsername=null;
@@ -1217,7 +1307,272 @@ async function esportaDetPDF(){
   doc.save(`${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
 }
 
-// EXPORT FERIE EXCEL
+// ── MODAL ANNO NUOVO ──────────────────────────────────────────────────
+async function mostraModalAnnoNuovo(){
+  const snap=await db.collection('dipendenti').get();
+  const dipArr=snap.docs.map(d=>({username:d.id,...d.data()}));
+  document.getElementById('modal-anno-sub').textContent=`Inizio anno ${ANNO} — Decidi cosa fare con le ferie residue dell'anno ${ANNO_PREC} per ogni dipendente.`;
+  let html='<div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto">';
+  dipArr.forEach(d=>{
+    html+=`<div style="background:var(--paper);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div><div style="font-weight:600;font-size:13px">${d.nome||''} ${d.cognome||''}</div><div style="font-size:11px;color:var(--ink4)">Ferie residue: ${d.monteFerie||0}h</div></div>
+      <select class="fi" id="anno-choice-${d.username}" style="width:auto;font-size:12px">
+        <option value="mantieni">Mantieni residuo</option>
+        <option value="azzera">Azzera a 0</option>
+        <option value="riporta">Riporta sul nuovo monte</option>
+      </select>
+    </div>`;
+  });
+  html+='</div>';
+  document.getElementById('modal-anno-content').innerHTML=html;
+  document.getElementById('modal-anno-nuovo').classList.add('open');
+}
+
+async function salvaDecisioneAnno(){
+  const snap=await db.collection('dipendenti').get();
+  const promises=[];
+  snap.forEach(docSnap=>{
+    const d=docSnap.data();
+    const scelta=document.getElementById('anno-choice-'+docSnap.id)?.value;
+    if(!scelta)return;
+    // Salva storico anno precedente
+    const archivioData={anno:ANNO_PREC,monteFerie:d.monteFerie||0,montePermesso:d.montePermesso||0,monteRol:d.monteRol||0,salvatoIl:new Date().toISOString()};
+    promises.push(db.collection('dipendenti').doc(docSnap.id).collection('archivio').doc(String(ANNO_PREC)).set(archivioData));
+    // Applica scelta
+    if(scelta==='azzera'){
+      promises.push(db.collection('dipendenti').doc(docSnap.id).update({monteFerie:0}));
+    }
+    // 'mantieni' non fa nulla, 'riporta' lascia invariato il monte
+  });
+  await Promise.all(promises);
+  document.getElementById('modal-anno-nuovo').classList.remove('open');
+  loadDashboard();
+}
+
+// ── COSTI MENSILI ─────────────────────────────────────────────────────
+async function loadCostiMensili(){
+  const anno=parseInt(document.getElementById('costi-anno')?.value)||ANNO;
+  const el=document.getElementById('costi-content');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  if(!dipList.length){await loadDashboard();}
+  // Carica tutti i giorni per tutti i dipendenti
+  const tuttiDati=await Promise.all(dipList.map(async emp=>{
+    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+    const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    return{...emp,days};
+  }));
+  // Crea tabella per mese
+  let html='<div style="overflow-x:auto">';
+  html+=`<table style="width:100%;border-collapse:collapse;font-size:12px;background:white;border-radius:10px;overflow:hidden;border:.5px solid var(--border)">`;
+  html+=`<thead><tr style="background:var(--paper);border-bottom:.5px solid var(--border)">
+    <th style="padding:10px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">DIPENDENTE</th>
+    ${MESI.map(m=>`<th style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">${m.substring(0,3).toUpperCase()}</th>`).join('')}
+    <th style="padding:10px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--blu)">TOTALE</th>
+  </tr></thead><tbody>`;
+  let grandTotal=0;
+  const totaliMensili=Array(12).fill(0);
+  tuttiDati.forEach((emp,idx)=>{
+    const tariffe=emp.tariffe||{};
+    let totAnno=0;
+    const costiMese=MESI.map((_,mi)=>{
+      const ms=pad(mi+1);
+      const giorni=Object.entries(emp.days||{}).filter(([d])=>d.startsWith(`${anno}-${ms}`));
+      const costo=giorni.reduce((s,[,d])=>{
+        return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0);
+      },0);
+      totaliMensili[mi]+=costo;
+      totAnno+=costo;
+      return costo;
+    });
+    grandTotal+=totAnno;
+    html+=`<tr style="border-bottom:.5px solid var(--paper2);${idx%2===1?'background:var(--paper)':''}">
+      <td style="padding:9px 14px;font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
+      ${costiMese.map(c=>`<td style="padding:9px 8px;text-align:right;color:${c>0?'var(--ink)':'var(--border)'}">${c>0?'€'+c.toFixed(0):'—'}</td>`).join('')}
+      <td style="padding:9px 14px;text-align:right;font-weight:700;color:var(--verde)">${totAnno>0?'€'+totAnno.toFixed(2):'—'}</td>
+    </tr>`;
+  });
+  // Riga totali
+  html+=`<tr style="background:var(--blu-light);border-top:.5px solid var(--border)">
+    <td style="padding:10px 14px;font-family:'Syne',sans-serif;font-weight:700">TOTALE MENSILE</td>
+    ${totaliMensili.map(c=>`<td style="padding:10px 8px;text-align:right;font-weight:700;color:var(--blu)">${c>0?'€'+c.toFixed(0):'—'}</td>`).join('')}
+    <td style="padding:10px 14px;text-align:right;font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${grandTotal.toFixed(2)}</td>
+  </tr>`;
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+async function esportaCostiExcel(){
+  const anno=parseInt(document.getElementById('costi-anno')?.value)||ANNO;
+  if(!dipList.length){await loadDashboard();}
+  const tuttiDati=await Promise.all(dipList.map(async emp=>{
+    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+    const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    return{...emp,days};
+  }));
+  const wb=XLSX.utils.book_new();
+  // Foglio riepilogo costi
+  const hh=['Dipendente',...MESI,'TOTALE ANNO'];
+  const rows=tuttiDati.map(emp=>{
+    const tariffe=emp.tariffe||{};
+    let tot=0;
+    const r=[`${emp.nome||''} ${emp.cognome||''}`.trim()];
+    MESI.forEach((_,mi)=>{
+      const ms=pad(mi+1);
+      const giorni=Object.entries(emp.days||{}).filter(([d])=>d.startsWith(`${anno}-${ms}`));
+      const costo=giorni.reduce((s,[,d])=>s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0),0);
+      r.push(parseFloat(costo.toFixed(2)));
+      tot+=costo;
+    });
+    r.push(parseFloat(tot.toFixed(2)));
+    return r;
+  });
+  // Riga totali
+  const totRow=['TOTALE MENSILE'];
+  for(let mi=0;mi<=12;mi++){totRow.push(rows.reduce((s,r)=>s+(r[mi+1]||0),0).toFixed(2))}
+  rows.push(totRow);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rows]),'Costi '+anno);
+  // Un foglio per mese con dettaglio dipendente
+  MESI.forEach((mese,mi)=>{
+    const ms=pad(mi+1);
+    const mhh=['Dipendente',...CN.map(c=>c.l),'Ore Tot.','Costo €'];
+    const mrows=tuttiDati.map(emp=>{
+      const tariffe=emp.tariffe||{};
+      const giorni=Object.entries(emp.days||{}).filter(([d])=>d.startsWith(`${anno}-${ms}`));
+      const totaliC={};CN.forEach(c=>{totaliC[c.k]=giorni.reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0)});
+      const oreT=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totaliC[c.k],0);
+      const costoT=CN.reduce((s,c)=>(s+totaliC[c.k]*(tariffe[c.k]||0)),0)+(totaliC.speseExtra||0);
+      return[`${emp.nome||''} ${emp.cognome||''}`.trim(),...CN.map(c=>totaliC[c.k]||0),oreT,costoT>0?parseFloat(costoT.toFixed(2)):0];
+    });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([mhh,...mrows]),mese);
+  });
+  XLSX.writeFile(wb,`Costi_${anno}.xlsx`);
+}
+
+// ── ARCHIVIO ANNI ─────────────────────────────────────────────────────
+async function initArchivio(){
+  const archDip=document.getElementById('arch-dip');
+  archDip.innerHTML='<option value="">Tutti i dipendenti</option>';
+  if(!dipList.length){const snap=await db.collection('dipendenti').get();dipList=snap.docs.map(d=>({username:d.id,...d.data()}))}
+  dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=`${d.nome||''} ${d.cognome||''}`.trim();archDip.appendChild(o)});
+  // Popola anni (anni precedenti a quello corrente)
+  const archAnno=document.getElementById('arch-anno');
+  archAnno.innerHTML='';
+  for(let y=ANNO-1;y>=2024;y--){const o=document.createElement('option');o.value=y;o.textContent=y;archAnno.appendChild(o)}
+  loadArchivio();
+}
+
+async function loadArchivio(){
+  const anno=parseInt(document.getElementById('arch-anno')?.value)||ANNO-1;
+  const dipSel=document.getElementById('arch-dip')?.value||'';
+  const el=document.getElementById('archivio-content');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  // Controlla se anno precedente è ancora modificabile (gennaio)
+  const solaLettura=!ANNO_PREC_MODIFICABILE||(anno<ANNO_PREC);
+  if(solaLettura){
+    el.innerHTML=`<div class="alert-box" style="background:var(--amber-light);color:var(--amber);margin-bottom:16px">📅 Anno ${anno} — Sola lettura${ANNO_PREC_MODIFICABILE&&anno===ANNO_PREC?' (modificabile fino al 31 gennaio)':''}</div>`;
+  }
+  // Carica dati
+  const dipDaVisualizzare=dipSel?[dipList.find(d=>d.username===dipSel)].filter(Boolean):dipList;
+  for(const emp of dipDaVisualizzare){
+    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+    const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    const tariffe=emp.tariffe||{};
+    const totals={};CN.forEach(c=>{totals[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
+    const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
+    const totCosto=CN.reduce((s,c)=>s+totals[c.k]*(tariffe[c.k]||0),0)+(totals.speseExtra||0);
+    const nome=`${emp.nome||''} ${emp.cognome||''}`.trim();
+    el.innerHTML+=`<div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${nome}</div>
+        <div style="display:flex;gap:6px">
+          <span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--blu-light);color:var(--blu);padding:3px 10px;border-radius:6px">${totOre}h</span>
+          ${totCosto>0?`<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--verde-light);color:var(--verde);padding:3px 10px;border-radius:6px">€${totCosto.toFixed(2)}</span>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
+        ${CN.filter(c=>totals[c.k]>0).map(c=>`<div style="background:var(--paper);border-radius:6px;padding:8px 10px"><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">${c.l}</div><div style="font-weight:600;font-size:14px;margin-top:2px">${totals[c.k]%1===0?totals[c.k]:totals[c.k].toFixed(1)}${c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'}</div></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  if(!dipDaVisualizzare.length)el.innerHTML='<div class="empty-state">Nessun dipendente trovato.</div>';
+}
+
+// ── FOGLIO FIRMA PDF ──────────────────────────────────────────────────
+async function stampFoglio(){
+  const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
+  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
+  const ms=pad(detMese+1);
+  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const giorni=Object.keys(all).sort();
+  const tariffe=emp.tariffe||{};
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  // Intestazione
+  doc.setFont('helvetica','bold');doc.setFontSize(16);
+  doc.text('FOGLIO PRESENZE MENSILE',105,20,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(`Studio di Ingegneria`,105,28,{align:'center'});
+  doc.setLineWidth(0.5);doc.line(14,32,196,32);
+  doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text(`Dipendente: ${nome}`,14,40);
+  doc.setFont('helvetica','normal');
+  doc.text(`Periodo: ${MESI[detMese]} ${ANNO}`,14,47);
+  doc.text(`Orario: ${emp.tipoOrario==='ridotto'?'Ridotto (6h/giorno)':'Pieno (8h/giorno)'}`,14,54);
+  if(emp.tipoContratto)doc.text(`Contratto: ${emp.tipoContratto}`,120,47);
+  doc.line(14,58,196,58);
+  // Tabella giorni
+  let y=65;
+  const colDate=22,colOre=28,colStraord=28,colKm=18,colNote=40,colFirma=26;
+  doc.setFont('helvetica','bold');doc.setFontSize(8);
+  doc.setFillColor(26,86,219);doc.rect(14,y,182,6,'F');
+  doc.setTextColor(255,255,255);
+  doc.text('DATA',15,y+4);
+  doc.text('ORE LAV.',15+colDate,y+4);
+  doc.text('STRAORD.',15+colDate+colOre,y+4);
+  doc.text('KM',15+colDate+colOre+colStraord,y+4);
+  doc.text('NOTE',15+colDate+colOre+colStraord+colKm,y+4);
+  doc.text('FIRMA DIP.',15+colDate+colOre+colStraord+colKm+colNote,y+4);
+  doc.setTextColor(0,0,0);doc.setFont('helvetica','normal');
+  y+=6;
+  const MESI_IT=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  giorni.forEach((ds,idx)=>{
+    if(y>265){doc.addPage();y=20}
+    const d=all[ds];const[yr,m,g]=ds.split('-');
+    const oreBase=(parseFloat(d.oreElectriciMD)||0)+(parseFloat(d.oreMeccaniciMA)||0)+(parseFloat(d.oreAttivitaGenerali)||0);
+    const straord=(parseFloat(d.oreStraordinariElettrico)||0)+(parseFloat(d.oreStraordinariMeccanico)||0);
+    if(idx%2===0)doc.setFillColor(249,250,251);else doc.setFillColor(255,255,255);
+    doc.rect(14,y,182,5.5,'F');
+    doc.setFontSize(8);
+    doc.text(`${g} ${MESI_IT[parseInt(m)-1]}`,15,y+4);
+    doc.text(oreBase>0?`${oreBase}h`:'',15+colDate,y+4);
+    doc.text(straord>0?`${straord}h`:'',15+colDate+colOre,y+4);
+    doc.text(d.kmPercorsi>0?`${d.kmPercorsi}km`:'',15+colDate+colOre+colStraord,y+4);
+    if(d.note)doc.text(String(d.note).substring(0,20),15+colDate+colOre+colStraord+colKm,y+4);
+    // Riga firma
+    doc.line(15+colDate+colOre+colStraord+colKm+colNote,y+5,14+colDate+colOre+colStraord+colKm+colNote+colFirma+182-182+182,y+5);
+    y+=5.5;
+  });
+  // Totali
+  y+=6;doc.setLineWidth(0.3);doc.line(14,y,196,y);y+=6;
+  const totOre=giorni.reduce((s,ds)=>{const d=all[ds];return s+(parseFloat(d.oreElectriciMD)||0)+(parseFloat(d.oreMeccaniciMA)||0)+(parseFloat(d.oreAttivitaGenerali)||0)},0);
+  const totStraord=giorni.reduce((s,ds)=>{const d=all[ds];return s+(parseFloat(d.oreStraordinariElettrico)||0)+(parseFloat(d.oreStraordinariMeccanico)||0)},0);
+  const totKm=giorni.reduce((s,ds)=>s+(parseFloat(all[ds].kmPercorsi)||0),0);
+  const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
+  doc.setFont('helvetica','bold');doc.setFontSize(9);
+  doc.text(`TOTALE ORE LAVORO: ${totOre}h`,14,y);
+  doc.text(`STRAORDINARI: ${totStraord}h`,80,y);
+  doc.text(`KM TOTALI: ${totKm}`,140,y);
+  if(totCosto>0){y+=7;doc.text(`COSTO TOTALE MESE: €${totCosto.toFixed(2)}`,14,y);}
+  // Firme
+  y+=16;doc.setFont('helvetica','normal');doc.setFontSize(9);
+  doc.text('Firma Dipendente: _______________________________',14,y);
+  doc.text('Firma Responsabile: _______________________________',110,y);
+  y+=10;doc.text(`Data: _____ / _____ / _____`,14,y);
+  doc.save(`FoglioFirma_${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
+}
+
+// ── EXPORT FERIE EXCEL
 async function esportaFerieExcel(){
   const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL',malattia:'Malattia'};
   const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Ore/Giorni','Stato','Note','Nota Admin'];
