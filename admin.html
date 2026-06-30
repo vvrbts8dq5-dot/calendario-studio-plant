@@ -277,7 +277,7 @@ tbody tr:hover{background:var(--paper)}
           <table>
             <thead><tr>
               <th>Dipendente</th><th class="td-r">Ore Lavoro</th><th class="td-r">Straord.</th>
-              <th class="td-r">Km</th><th class="td-r">Spese €</th>
+              <th class="td-r">Km</th><th class="td-r">Spese €</th><th class="td-r">Ultimo Accesso</th>
             </tr></thead>
             <tbody id="tbody-dash"></tbody>
           </table>
@@ -392,7 +392,7 @@ tbody tr:hover{background:var(--paper)}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Orario</th><th>Monte Ferie</th><th>Stato</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Orario</th><th class="td-r">Ferie</th><th class="td-r">Permessi</th><th class="td-r">ROL</th><th>Stato</th><th>Azioni</th></tr></thead>
             <tbody id="tbody-dip"></tbody>
           </table>
         </div>
@@ -538,8 +538,52 @@ function startApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
   document.getElementById('sidebar-nome').textContent=ADM.nome||ADM.username;
-  loadDashboard();
+  checkInattivita().then(()=>loadDashboard());
   loadRichiesteCount();
+}
+
+const FESTIVITA_CHECK=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
+
+async function checkInattivita(){
+  try{
+    const snap=await db.collection('dipendenti').get();
+    const oggi=new Date();
+    oggi.setHours(0,0,0,0);
+    const promises=[];
+    snap.forEach(docSnap=>{
+      const d=docSnap.data();
+      // Salta già bloccati o disabilitati manualmente
+      if(d.bloccatoInattivita||!d.abilitato)return;
+      // Se non ha mai fatto login, usa la data di creazione
+      const riferimento=d.ultimoAccesso||d.createdAt;
+      if(!riferimento)return;
+      const ultimo=new Date(riferimento);
+      ultimo.setHours(0,0,0,0);
+      // Conta giorni lavorativi dall'ultimo accesso ad oggi (escluso oggi)
+      let ggLav=0;
+      const cur=new Date(ultimo);
+      cur.setDate(cur.getDate()+1);
+      while(cur<oggi){
+        const dow=cur.getDay();
+        const ds=cur.toISOString().split('T')[0];
+        if(dow!==0&&dow!==6&&!FESTIVITA_CHECK.includes(ds))ggLav++;
+        cur.setDate(cur.getDate()+1);
+      }
+      if(ggLav>=2){
+        promises.push(
+          db.collection('dipendenti').doc(docSnap.id).update({
+            bloccatoInattivita:true,
+            abilitato:false,
+            bloccatoIl:new Date().toISOString(),
+          })
+        );
+      }
+    });
+    if(promises.length>0){
+      await Promise.all(promises);
+      console.log(`Bloccati ${promises.length} dipendenti per inattività`);
+    }
+  }catch(e){console.log('Check inattività errore:',e.message)}
 }
 
 document.getElementById('btn-logout').addEventListener('click',()=>{
@@ -590,12 +634,14 @@ async function loadDashboard(){
   const totOreAll=dipList.reduce((s,e)=>s+oreLav(dipDataCache[e.username]?.totals||{}),0);
   const totFerieAll=dipList.reduce((s,e)=>s+(dipDataCache[e.username]?.totals?.oreFerie||0),0);
   const totKmAll=dipList.reduce((s,e)=>s+(dipDataCache[e.username]?.totals?.kmPercorsi||0),0);
+  const totBloccati=dipList.filter(e=>e.bloccatoInattivita===true).length;
   document.getElementById('kpi-row').innerHTML=[
-    {l:'Dipendenti',v:dipList.length,u:''},
-    {l:'Ore Lavoro Totali',v:totOreAll,u:'h'},
-    {l:'Ore Ferie Erogate',v:totFerieAll,u:'h'},
-    {l:'Km Totali',v:totKmAll,u:' km'},
-  ].map(k=>`<div class="kpi"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}<span class="kpi-unit">${k.u}</span></div></div>`).join('');
+    {l:'Dipendenti',v:dipList.length,u:'',color:''},
+    {l:'Ore Lavoro Totali',v:totOreAll,u:'h',color:''},
+    {l:'Ore Ferie Erogate',v:totFerieAll,u:'h',color:''},
+    {l:'Km Totali',v:totKmAll,u:' km',color:''},
+    ...(totBloccati>0?[{l:'⚠️ Bloccati Inattività',v:totBloccati,u:'',color:'color:var(--rosso)'}]:[]),
+  ].map(k=>`<div class="kpi" style="${k.color?'border-color:var(--rosso);':''}" ><div class="kpi-label">${k.l}</div><div class="kpi-val" style="${k.color}">${k.v}<span class="kpi-unit">${k.u}</span></div></div>`).join('');
 
   // Carica saldi per tutti
   const richSnap=await db.collection('richieste_assenza').get();
@@ -635,12 +681,15 @@ async function loadDashboard(){
   // Tabella ore lavoro
   document.getElementById('tbody-dash').innerHTML=dipList.map(emp=>{
     const t=dipDataCache[emp.username]?.totals||{};
-    return `<tr style="cursor:pointer" onclick="apriDettaglio('${emp.username}')">
-      <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
+    const bloccato=emp.bloccatoInattivita===true;
+    const ultimoAccesso=emp.ultimoAccesso?new Date(emp.ultimoAccesso).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'Mai';
+    return `<tr style="cursor:pointer;${bloccato?'background:var(--rosso-light)':''}" onclick="apriDettaglio('${emp.username}')">
+      <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''} ${bloccato?'<span class="badge badge-rifiutata" style="margin-left:4px">Bloccato</span>':''}</td>
       <td class="td-r">${oreLav(t)}h</td>
       <td class="td-r">${(t.oreStraordinariElettrico||0)+(t.oreStraordinariMeccanico||0)}h</td>
       <td class="td-r">${t.kmPercorsi||0} km</td>
       <td class="td-r">${t.speseExtra>0?'€'+(t.speseExtra||0).toFixed(2):'—'}</td>
+      <td class="td-r" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${ultimoAccesso}</td>
     </tr>`;
   }).join('');
 }
@@ -949,22 +998,28 @@ async function loadDipendenti(){
   dipList=snap.docs.map(d=>({username:d.id,...d.data()}));
   const tbody=document.getElementById('tbody-dip');
   if(!dipList.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Nessun dipendente.</td></tr>';return}
-  tbody.innerHTML=dipList.map(d=>`<tr style="cursor:default">
-    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
-    <td style="font-weight:500">${d.nome||''}</td>
-    <td>${d.cognome||''}</td>
-    <td style="font-family:'DM Mono',monospace;font-size:12px">${d.password||''}</td>
-    <td style="font-size:12px">${d.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</td>
-    <td class="td-r">${d.monteFerie||0}h</td>
-    <td><span class="badge ${d.abilitato?'badge-attivo':'badge-disab'}">${d.abilitato?'Attivo':'Disabilitato'}</span></td>
-    <td>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-sm" onclick="apriModificaDip('${d.username}')">✏️ Modifica</button>
-        <button class="btn btn-sm" onclick="toggleDip('${d.username}',${d.abilitato})" style="${!d.abilitato?'color:var(--verde)':''}">${d.abilitato?'🔒':'🔓'}</button>
-        <button class="btn btn-rosso btn-sm" onclick="eliminaDip('${d.username}','${d.nome} ${d.cognome}')">🗑</button>
-      </div>
-    </td>
-  </tr>`).join('');
+  tbody.innerHTML=dipList.map(d=>{
+    const bloccato=d.bloccatoInattivita===true;
+    const statoLabel=bloccato?'🔴 Bloccato':d.abilitato?'Attivo':'Disabilitato';
+    const statoClass=bloccato?'badge-rifiutata':d.abilitato?'badge-attivo':'badge-disab';
+    return `<tr style="cursor:default;${bloccato?'background:var(--rosso-light)':''}">
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
+      <td style="font-weight:500">${d.nome||''} ${d.cognome||''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${d.password||''}</td>
+      <td style="font-size:12px">${d.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</td>
+      <td class="td-r">${d.monteFerie||0}h</td>
+      <td class="td-r">${d.montePermesso||0}h</td>
+      <td class="td-r">${d.monteRol||0}h</td>
+      <td><span class="badge ${statoClass}">${statoLabel}</span></td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="apriModificaDip('${d.username}')">✏️ Modifica</button>
+          ${bloccato?`<button class="btn btn-verde btn-sm" onclick="sbloccaDip('${d.username}')">🔓 Sblocca</button>`:`<button class="btn btn-sm" onclick="toggleDip('${d.username}',${d.abilitato})" style="${!d.abilitato?'color:var(--verde)':''}">${d.abilitato?'🔒 Disabilita':'🔓 Abilita'}</button>`}
+          <button class="btn btn-rosso btn-sm" onclick="eliminaDip('${d.username}','${d.nome} ${d.cognome}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 async function creaDipendente(){
@@ -1044,6 +1099,16 @@ async function salvaDipendente(){
 async function toggleDip(username,attuale){
   await db.collection('dipendenti').doc(username).update({abilitato:!attuale});
   loadDipendenti();
+}
+async function sbloccaDip(username){
+  await db.collection('dipendenti').doc(username).update({
+    abilitato:true,
+    bloccatoInattivita:false,
+    ultimoAccesso:new Date().toISOString()
+  });
+  document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente sbloccato.</div>';
+  setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
+  loadDipendenti();loadDashboard();
 }
 async function eliminaDip(username,nome){
   if(!confirm('Eliminare il profilo di "'+nome+'"?'))return;

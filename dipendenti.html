@@ -516,7 +516,13 @@ async function doLogin(){
     const d=snap.data();
     if(!d.abilitato){showLoginErr('Account non abilitato. Contatta l\'amministratore.');return}
     if(d.password!==p){showLoginErr('Password errata.');return}
+    // Controlla blocco per inattività
+    if(d.bloccatoInattivita===true){
+      showLoginErr('Account sospeso per inattività. Contatta l'amministratore per essere riattivato.');return
+    }
     U={username:u};profilo=d;
+    // Salva ultimo accesso
+    await db.collection('dipendenti').doc(u).update({ultimoAccesso:new Date().toISOString()});
     sessionStorage.setItem('dip_sess',JSON.stringify({username:u}));
     startApp();
   }catch(e){showLoginErr('Errore: '+e.message)}
@@ -528,12 +534,50 @@ const sess=sessionStorage.getItem('dip_sess');
 if(sess){
   try{
     const s=JSON.parse(sess);
-    db.collection('dipendenti').doc(s.username).get().then(snap=>{
-      if(snap.exists&&snap.data().abilitato){U={username:s.username};profilo=snap.data();startApp()}
-      else{sessionStorage.removeItem('dip_sess')}
+    db.collection('dipendenti').doc(s.username).get().then(async snap=>{
+      if(snap.exists&&snap.data().abilitato&&!snap.data().bloccatoInattivita){
+        U={username:s.username};profilo=snap.data();
+        // Aggiorna ultimo accesso
+        await db.collection('dipendenti').doc(s.username).update({ultimoAccesso:new Date().toISOString()});
+        startApp();
+      }else{
+        sessionStorage.removeItem('dip_sess');
+      }
     });
   }catch(e){sessionStorage.removeItem('dip_sess')}
 }
+
+// Controllo auto-blocco: eseguito al caricamento della pagina
+// Controlla tutti i dipendenti e blocca quelli inattivi da 2 giorni lavorativi
+async function checkInattivita(){
+  try{
+    const snap=await db.collection('dipendenti').get();
+    const oggi=new Date();
+    snap.forEach(async docSnap=>{
+      const d=docSnap.data();
+      if(!d.abilitato||d.bloccatoInattivita)return;
+      if(!d.ultimoAccesso)return;
+      const ultimo=new Date(d.ultimoAccesso);
+      // Conta giorni lavorativi dall'ultimo accesso
+      let ggLav=0;
+      const cur=new Date(ultimo);
+      cur.setDate(cur.getDate()+1); // Inizia dal giorno dopo l'ultimo accesso
+      while(cur<oggi){
+        const dow=cur.getDay();
+        const ds=cur.toISOString().split('T')[0];
+        if(dow!==0&&dow!==6&&!['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'].includes(ds)){
+          ggLav++;
+        }
+        cur.setDate(cur.getDate()+1);
+      }
+      if(ggLav>=2){
+        await db.collection('dipendenti').doc(docSnap.id).update({bloccatoInattivita:true,abilitato:false});
+      }
+    });
+  }catch(e){console.log('Check inattività:',e.message)}
+}
+// Esegui il check solo se l'utente è loggato come admin (non nel portale dipendenti)
+// Il controllo viene eseguito dal portale admin al caricamento
 
 function startApp(){
   document.getElementById('login-screen').style.display='none';
