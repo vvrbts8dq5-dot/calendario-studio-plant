@@ -875,9 +875,16 @@ async function caricaDetSaldi(emp){
     <div class="saldo-card"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati ${ANNO}</div>
       <div class="saldo-res" style="color:var(--viola);margin-top:14px">${giorniMal}</div><div style="font-size:11px;color:var(--ink4)">giorni lavorativi</div>
     </div>
-    ${(emp.dataAssunzione||emp.tipoContratto||emp.noteInterne)?`<div class="saldo-card" style="grid-column:1/-1"><div class="saldo-tipo">📋 Note Interne</div>${emp.dataAssunzione?`<div style="font-size:12px;margin-top:4px;color:var(--ink4)">Assunto il: <strong style="color:var(--ink)">${new Date(emp.dataAssunzione).toLocaleDateString('it-IT')}</strong></div>`:''}${emp.tipoContratto?`<div style="font-size:12px;margin-top:2px;color:var(--ink4)">Contratto: <strong style="color:var(--ink)">${emp.tipoContratto}</strong></div>`:''}${emp.noteInterne?`<div style="font-size:12px;margin-top:4px;color:var(--ink3);font-style:italic">${emp.noteInterne}</div>`:''}
-    </div>`:''}
-  \`;
+  `;
+  // Aggiungi note interne se presenti
+  if(emp.dataAssunzione||emp.tipoContratto||emp.noteInterne){
+    let noteHtml='<div class="saldo-card" style="grid-column:1/-1"><div class="saldo-tipo">📋 Note Interne</div>';
+    if(emp.dataAssunzione)noteHtml+=`<div style="font-size:12px;margin-top:4px;color:var(--ink4)">Assunto il: <strong style="color:var(--ink)">${new Date(emp.dataAssunzione).toLocaleDateString('it-IT')}</strong></div>`;
+    if(emp.tipoContratto)noteHtml+=`<div style="font-size:12px;margin-top:2px;color:var(--ink4)">Contratto: <strong style="color:var(--ink)">${emp.tipoContratto}</strong></div>`;
+    if(emp.noteInterne)noteHtml+=`<div style="font-size:12px;margin-top:4px;color:var(--ink3);font-style:italic">${emp.noteInterne}</div>`;
+    noteHtml+='</div>';
+    document.getElementById('det-saldi').innerHTML+=noteHtml;
+  }
 }
 
 async function loadDetMese(){
