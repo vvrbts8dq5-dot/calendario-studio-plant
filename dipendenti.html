@@ -530,7 +530,7 @@ async function doLogin(){
     if(d.password!==p){showLoginErr('Password errata.');return}
     // Controlla blocco per inattività
     if(d.bloccatoInattivita===true){
-      showLoginErr('Account sospeso per inattività. Contatta l'amministratore per essere riattivato.');return
+      showLoginErr('Account sospeso per inattività. Contatta l\'amministratore per essere riattivato.');return
     }
     U={username:u};profilo=d;
     // Salva ultimo accesso
@@ -1085,7 +1085,7 @@ async function loadArchivioDip(){
   const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(U.username).collection('giorni').get();
   const all={};snap.forEach(d=>{all[d.id]=d.data()});
   const giorni=Object.keys(all).sort();
-  if(!giorni.length){el.innerHTML+='<div class="empty-state">Nessun dato per l'anno '+anno+'.</div>';return}
+  if(!giorni.length){el.innerHTML+='<div class="empty-state">Nessun dato per l\'anno '+anno+'.</div>';return}
   // Riepilogo per mese
   let html='';
   const MESI_LOCAL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
