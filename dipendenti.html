@@ -492,6 +492,11 @@ const CN=CAMPI.filter(c=>c.t==='number');
 let U=null,profilo=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
 let assenzeProprie=[];
 let assTab='ferie';
+// Cache centralizzata — caricata UNA VOLTA all'avvio, aggiornata localmente dopo ogni operazione
+let ALL_GIORNI={};  // {data_string: {campi...}} — tutti i giorni dell'anno
+let ALL_ASSENZE=[]; // [{id,tipo,stato,dataInizio,...}] — tutte le richieste assenza
+let ALL_MALATTIE=[]; // [{id,dataInizio,dataFine,...}] — tutte le malattie
+let DATI_CARICATI=false;
 
 function pad(n){return String(n).padStart(2,'0')}
 function dsOf(m,g){return `${ANNO}-${pad(m+1)}-${pad(g)}`}
@@ -592,7 +597,27 @@ async function checkInattivita(){
 // Esegui il check solo se l'utente è loggato come admin (non nel portale dipendenti)
 // Il controllo viene eseguito dal portale admin al caricamento
 
-function startApp(){
+// CARICAMENTO DATI CENTRALIZZATO — una sola volta all'avvio
+async function caricaTuttiDati(){
+  try{
+    const [giorniSnap, assenzeSnap, malattieSnap] = await Promise.all([
+      db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get(),
+      db.collection('richieste_assenza').where('username','==',U.username).get(),
+      db.collection('malattie').where('username','==',U.username).get()
+    ]);
+    ALL_GIORNI={};
+    giorniSnap.forEach(d=>{ALL_GIORNI[d.id]=d.data()});
+    ALL_ASSENZE=assenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
+    ALL_MALATTIE=malattieSnap.docs.map(d=>({id:d.id,...d.data()}));
+    DATI_CARICATI=true;
+    console.log('Dati caricati:',Object.keys(ALL_GIORNI).length,'giorni,',ALL_ASSENZE.length,'assenze,',ALL_MALATTIE.length,'malattie');
+  }catch(e){
+    console.error('Errore caricamento dati iniziale:',e);
+    DATI_CARICATI=false;
+  }
+}
+
+async function startApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
   const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
@@ -602,6 +627,7 @@ function startApp(){
   const orario=profilo.tipoOrario==='ridotto'?'Orario ridotto (6h)':'Orario pieno (8h)';
   document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
   initCal();
+  await caricaTuttiDati();
   loadMese(meseSel);
   aggiornaRiepilogoSaldi();
   // init select riepilogo mesi
@@ -655,7 +681,7 @@ function chiudiForm(tipo){
 }
 
 // SALDI
-async function aggiornaRiepilogoSaldi(){
+function aggiornaRiepilogoSaldi(){
   if(!profilo)return;
   try{
   const monteFerie=profilo.monteFerie||0;
@@ -663,11 +689,9 @@ async function aggiornaRiepilogoSaldi(){
   const monteRol=profilo.monteRol||0;
   const oreGiorno=profilo.tipoOrario==='ridotto'?6:8;
 
-  // Calcola ore usate da richieste approvate
+  // Calcola ore usate da cache locale — ZERO query Firestore
   let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMalattia=0;
-  const snap=await db.collection('richieste_assenza').where('username','==',U.username).get();
-  snap.forEach(d=>{
-    const r=d.data();
+  ALL_ASSENZE.forEach(r=>{
     if(r.stato==='approvata'){
       if(r.tipo==='ferie'){const gg=giorniLavorativi(r.dataInizio,r.dataFine);ferieUsate+=gg*oreGiorno}
       if(r.tipo==='permesso'){permessiUsati+=parseFloat(r.oreRichieste)||0}
@@ -675,9 +699,7 @@ async function aggiornaRiepilogoSaldi(){
     }
   });
   // Malattie
-  const mSnap=await db.collection('malattie').where('username','==',U.username).get();
-  mSnap.forEach(d=>{
-    const r=d.data();
+  ALL_MALATTIE.forEach(r=>{
     giorniMalattia+=giorniLavorativi(r.dataInizio,r.dataFine);
   });
 
@@ -733,42 +755,33 @@ function initCal(){
   document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
 }
 
-async function loadMese(m){
+function loadMese(m){
   const ms=pad(m+1);
-  // Svuota cache del mese precedente per evitare dati residui
   cache={};
-  try{
-    // Carica solo i giorni del mese corrente (non tutto l'anno)
-    const prefix=ANNO+'-'+ms+'-';
-    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-    snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))cache[d.id]=d.data()});
-    // Carica assenze approvate per colorare il calendario
-    const aSnap=await db.collection('richieste_assenza').where('username','==',U.username).get();
-    aSnap.forEach(d=>{
-      const r=d.data();
-      if(r.stato==='approvata'){
-        const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
-        const cur=new Date(inizio);
-        while(cur<=fine){
-          const ds=cur.toISOString().split('T')[0];
-          if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
-          cur.setDate(cur.getDate()+1);
-        }
-      }
-    });
-    // Malattie
-    const mSnap=await db.collection('malattie').where('username','==',U.username).get();
-    mSnap.forEach(d=>{
-      const r=d.data();
-      const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
-      const cur=new Date(inizio);
-      while(cur<=fine){
-        const ds=cur.toISOString().split('T')[0];
-        if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
-        cur.setDate(cur.getDate()+1);
-      }
-    });
-  }catch(e){console.error('Errore caricamento mese:',e)}
+  // Legge dalla cache locale — ZERO query Firestore
+  Object.entries(ALL_GIORNI).forEach(([id,data])=>{
+    if(id.startsWith(ANNO+'-'+ms))cache[id]={...data};
+  });
+  // Assenze approvate per colorare il calendario
+  ALL_ASSENZE.filter(r=>r.stato==='approvata').forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(ANNO+'-'+ms)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  // Malattie
+  ALL_MALATTIE.forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(ANNO+'-'+ms)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
   renderCal(m);
 }
 
@@ -795,17 +808,10 @@ function renderCal(m){
   }
 }
 
-async function selectDay(ds){
+function selectDay(ds){
   giornoSel=ds;renderCal(meseSel);
-  try{
-  let dati=cache[ds];
-  if(!dati){
-    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).get();
-    dati=snap.exists?snap.data():null;
-    if(dati)cache[ds]=dati;
-  }
+  let dati=cache[ds]||ALL_GIORNI[ds]||null;
   renderForm(ds,dati||{});
-  }catch(e){console.error('Errore selezione giorno:',e);document.getElementById('form-giorno').innerHTML='<div class="empty-state" style="color:var(--rosso)">Errore: '+e.message+'</div>'}
 }
 
 function renderForm(ds,dati){
@@ -878,6 +884,8 @@ async function saveDay(ds){
     toSave.hasStraordinari=(straEl>0||straMec>0);
     await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     segnalaAttivita('ore');
+    // Aggiorna cache locale immediatamente
+    ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
     if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
     renderCal(meseSel);
     setTimeout(()=>{if(st)st.innerHTML=''},2500);
@@ -915,8 +923,10 @@ async function inviaRichiesta(tipo){
       createdAt:new Date().toISOString(),
     });
     segnalaAttivita('richiesta');
+    // Aggiorna cache locale con la nuova richiesta
+    ALL_ASSENZE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),tipo,dataInizio:ini,dataFine:fin,note,oreRichieste:oreTotali,giorniLavorativi:gg,stato:'in_attesa',createdAt:new Date().toISOString()});
     chiudiForm(tipo);
-    await loadTutteAssenze();
+    loadTutteAssenze();
     aggiornaRiepilogoSaldi();
     document.getElementById(`f-inizio-${tipo}`).value='';
     document.getElementById(`f-fine-${tipo}`).value='';
@@ -925,22 +935,14 @@ async function inviaRichiesta(tipo){
   }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
 }
 
-async function loadTutteAssenze(){
-  try{
-    const snap=await db.collection('richieste_assenza').where('username','==',U.username).get();
-    assenzeProprie=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-    ['ferie','permesso','rol'].forEach(tipo=>{
-      const lista=assenzeProprie.filter(r=>r.tipo===tipo);
-      renderListaAssenze(tipo,lista);
-    });
-    aggiornaRiepilogoSaldi();
-  }catch(e){
-    console.error('Errore caricamento richieste assenza:',e);
-    ['ferie','permesso','rol'].forEach(tipo=>{
-      const el=document.getElementById('lista-'+tipo);
-      if(el)el.innerHTML='<div class="empty-state" style="color:var(--rosso)">Errore di caricamento: '+e.message+'</div>';
-    });
-  }
+function loadTutteAssenze(){
+  // Legge dalla cache locale — ZERO query Firestore
+  assenzeProprie=[...ALL_ASSENZE].sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  ['ferie','permesso','rol'].forEach(tipo=>{
+    const lista=assenzeProprie.filter(r=>r.tipo===tipo);
+    renderListaAssenze(tipo,lista);
+  });
+  aggiornaRiepilogoSaldi();
 }
 
 function renderListaAssenze(tipo,lista){
@@ -965,6 +967,8 @@ function renderListaAssenze(tipo,lista){
 async function eliminaRichiesta(id){
   if(!confirm('Eliminare questa richiesta?'))return;
   await db.collection('richieste_assenza').doc(id).delete();
+  // Rimuovere dalla cache locale
+  ALL_ASSENZE=ALL_ASSENZE.filter(r=>r.id!==id);
   loadTutteAssenze();
 }
 
@@ -980,6 +984,8 @@ async function inserisciMalattia(){
   try{
     await db.collection('malattie').add({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
     segnalaAttivita('malattia');
+    // Aggiorna cache locale con la nuova malattia
+    ALL_MALATTIE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
     document.getElementById('mal-inizio').value='';document.getElementById('mal-fine').value='';document.getElementById('mal-note').value='';
     ad.innerHTML='<div class="alert-box alert-ok">Malattia registrata ('+gg+' giorni lavorativi).</div>';
     setTimeout(()=>ad.innerHTML='',3000);
@@ -987,34 +993,29 @@ async function inserisciMalattia(){
   }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
 }
 
-async function loadMalattie(){
+function loadMalattie(){
   const el=document.getElementById('lista-malattia');
-  try{
-    const snap=await db.collection('malattie').where('username','==',U.username).get();
-    const lista=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-    if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna malattia registrata.</div>';return}
-    el.innerHTML=lista.map(r=>`
-      <div class="mal-item">
-        <div>
-          <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
-          <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
-          ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
-        </div>
-        <span class="badge badge-malattia">Malattia</span>
+  const lista=[...ALL_MALATTIE].sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna malattia registrata.</div>';return}
+  el.innerHTML=lista.map(r=>`
+    <div class="mal-item">
+      <div>
+        <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
+        <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
+        ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
       </div>
-    `).join('');
-  }catch(e){
-    console.error('Errore caricamento malattie:',e);
-    el.innerHTML='<div class="empty-state" style="color:var(--rosso)">Errore di caricamento: '+e.message+'</div>';
-  }
+      <span class="badge badge-malattia">Malattia</span>
+    </div>
+  `).join('');
 }
 
+
 // RIEPILOGO MENSILE
-async function loadRiepilogoMese(mese){
+function loadRiepilogoMese(mese){
   try{
   const ms=pad(mese+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  // Legge dalla cache locale — ZERO query Firestore
+  const all={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{if(id.startsWith(ANNO+'-'+ms))all[id]=data});
   const giorni=Object.keys(all).sort();
 
   // KPI (solo ore/km, nessun dato economico: i costi sono riservati all'amministrazione)
@@ -1058,11 +1059,10 @@ async function loadRiepilogoMese(mese){
 }
 
 // EXPORT EXCEL
-async function esportaExcel(){
+function esportaExcel(){
   const mese=parseInt(document.getElementById('sel-mese-riepilogo').value);
   const ms=pad(mese+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const all={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{if(id.startsWith(ANNO+'-'+ms))all[id]=data});
   const giorni=Object.keys(all).sort();
   const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
   const wb=XLSX.utils.book_new();
@@ -1127,11 +1127,10 @@ async function loadArchivioDip(){
 }
 
 // EXPORT PDF
-async function esportaPDF(){
+function esportaPDF(){
   const mese=parseInt(document.getElementById('sel-mese-riepilogo').value);
   const ms=pad(mese+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const all={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{if(id.startsWith(ANNO+'-'+ms))all[id]=data});
   const giorni=Object.keys(all).sort();
   const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
   const {jsPDF}=window.jspdf;
