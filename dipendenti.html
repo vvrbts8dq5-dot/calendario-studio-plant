@@ -657,6 +657,7 @@ function chiudiForm(tipo){
 // SALDI
 async function aggiornaRiepilogoSaldi(){
   if(!profilo)return;
+  try{
   const monteFerie=profilo.monteFerie||0;
   const montePermesso=profilo.montePermesso||0;
   const monteRol=profilo.monteRol||0;
@@ -719,6 +720,7 @@ async function aggiornaRiepilogoSaldi(){
     </div>
   `;
   document.getElementById('saldi-cards').innerHTML=html;
+  }catch(e){console.error('Errore aggiornamento saldi:',e)}
 }
 
 // CALENDARIO
@@ -726,41 +728,47 @@ function initCal(){
   document.getElementById('cal-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
   const sel=document.getElementById('sel-mese');
   MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m+' '+ANNO;if(i===meseSel)o.selected=true;sel.appendChild(o)});
-  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);cache={};loadMese(meseSel)});
-  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;document.getElementById('sel-mese').value=meseSel;cache={};loadMese(meseSel)}});
-  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;document.getElementById('sel-mese').value=meseSel;cache={};loadMese(meseSel)}});
+  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);loadMese(meseSel)});
+  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
+  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
 }
 
 async function loadMese(m){
   const ms=pad(m+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
-  snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))cache[d.id]=d.data()});
-  // Carica assenze approvate per colorare il calendario
-  const aSnap=await db.collection('richieste_assenza').where('username','==',U.username).get();
-  aSnap.forEach(d=>{
-    const r=d.data();
-    if(r.stato==='approvata'){
+  // Svuota cache del mese precedente per evitare dati residui
+  cache={};
+  try{
+    // Carica solo i giorni del mese corrente (non tutto l'anno)
+    const prefix=ANNO+'-'+ms+'-';
+    const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
+    snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))cache[d.id]=d.data()});
+    // Carica assenze approvate per colorare il calendario
+    const aSnap=await db.collection('richieste_assenza').where('username','==',U.username).get();
+    aSnap.forEach(d=>{
+      const r=d.data();
+      if(r.stato==='approvata'){
+        const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+        const cur=new Date(inizio);
+        while(cur<=fine){
+          const ds=cur.toISOString().split('T')[0];
+          if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+          cur.setDate(cur.getDate()+1);
+        }
+      }
+    });
+    // Malattie
+    const mSnap=await db.collection('malattie').where('username','==',U.username).get();
+    mSnap.forEach(d=>{
+      const r=d.data();
       const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
       const cur=new Date(inizio);
       while(cur<=fine){
         const ds=cur.toISOString().split('T')[0];
-        if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+        if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
         cur.setDate(cur.getDate()+1);
       }
-    }
-  });
-  // Malattie
-  const mSnap=await db.collection('malattie').where('username','==',U.username).get();
-  mSnap.forEach(d=>{
-    const r=d.data();
-    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
-    const cur=new Date(inizio);
-    while(cur<=fine){
-      const ds=cur.toISOString().split('T')[0];
-      if(ds.startsWith(`${ANNO}-${ms}`)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
-      cur.setDate(cur.getDate()+1);
-    }
-  });
+    });
+  }catch(e){console.error('Errore caricamento mese:',e)}
   renderCal(m);
 }
 
@@ -789,6 +797,7 @@ function renderCal(m){
 
 async function selectDay(ds){
   giornoSel=ds;renderCal(meseSel);
+  try{
   let dati=cache[ds];
   if(!dati){
     const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).get();
@@ -796,6 +805,7 @@ async function selectDay(ds){
     if(dati)cache[ds]=dati;
   }
   renderForm(ds,dati||{});
+  }catch(e){console.error('Errore selezione giorno:',e);document.getElementById('form-giorno').innerHTML='<div class="empty-state" style="color:var(--rosso)">Errore: '+e.message+'</div>'}
 }
 
 function renderForm(ds,dati){
@@ -918,7 +928,7 @@ async function inviaRichiesta(tipo){
 async function loadTutteAssenze(){
   try{
     const snap=await db.collection('richieste_assenza').where('username','==',U.username).get();
-    assenzeProprie=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    assenzeProprie=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
     ['ferie','permesso','rol'].forEach(tipo=>{
       const lista=assenzeProprie.filter(r=>r.tipo===tipo);
       renderListaAssenze(tipo,lista);
@@ -981,7 +991,7 @@ async function loadMalattie(){
   const el=document.getElementById('lista-malattia');
   try{
     const snap=await db.collection('malattie').where('username','==',U.username).get();
-    const lista=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    const lista=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
     if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna malattia registrata.</div>';return}
     el.innerHTML=lista.map(r=>`
       <div class="mal-item">
@@ -1001,6 +1011,7 @@ async function loadMalattie(){
 
 // RIEPILOGO MENSILE
 async function loadRiepilogoMese(mese){
+  try{
   const ms=pad(mese+1);
   const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get();
   const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
@@ -1043,6 +1054,7 @@ async function loadRiepilogoMese(mese){
     }
   });
   if(!tbody2.innerHTML){tbody2.innerHTML='<tr><td colspan="2" class="empty-state">Nessun dato per questo mese.</td></tr>';}
+  }catch(e){console.error('Errore riepilogo mensile:',e)}
 }
 
 // EXPORT EXCEL

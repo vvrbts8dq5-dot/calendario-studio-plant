@@ -1088,15 +1088,17 @@ async function loadRichiesteCount(){
 }
 
 async function loadRichieste(){
+  try{
   const snap=await db.collection('richieste_assenza').get();
-  tutteR=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  tutteR=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
   const mSnap=await db.collection('malattie').get();
-  tutteMalattie=mSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  tutteMalattie=mSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
   document.getElementById('cnt-attesa').textContent=tutteR.filter(r=>r.stato==='in_attesa').length;
   document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
   document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
   document.getElementById('cnt-tutte').textContent=tutteR.length;
   renderFerie();
+  }catch(e){console.error('Errore caricamento richieste:',e)}
 }
 
 function setFiltro(btn,f){
@@ -1707,7 +1709,7 @@ async function loadStraordinari(){
       });
     }catch(e){}
   }));
-  tuttiStraord.sort((a,b)=>b.data.localeCompare(a.data));
+  tuttiStraord.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
   document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
   document.getElementById('cnt-straord-no').textContent=tuttiStraord.filter(s=>s.stato==='non_autorizzati').length;
