@@ -4,32 +4,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Admin — Calendario Ore</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{
-  --ink:#0F0F0F;--ink2:#2A2A2A;--ink3:#555;--ink4:#888;
-  --paper:#F7F5F0;--paper2:#EDEBE4;--white:#FFF;--border:#D8D4CB;
-  --blu:#1A56DB;--blu-dark:#1245b5;--blu-light:#E3EEFA;
-  --verde:#1A7A4A;--verde-light:#E3F5EC;
-  --amber:#C47B00;--amber-light:#FDF3DC;
-  --rosso:#C81E1E;--rosso-light:#FAE8E8;
-  --viola:#6B3FA0;--viola-light:#F0E8FA;
+  --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
+  --paper:#FAFBFA;--paper2:#F1F6F3;--white:#FFF;--border:#E5E7EB;
+  --blu:#7A9E8E;--blu-dark:#5E7F70;--blu-light:#EAF2ED;
+  --verde:#4F8A5B;--verde-light:#E3F0E6;
+  --amber:#F59E0B;--amber-light:#FEF3E2;
+  --rosso:#DC2626;--rosso-light:#FDECEC;
+  --viola:#C05621;--viola-light:#F5E6DC;
+  --festivo:#A855F7;--festivo-light:#F5EDFC;
   --sidebar-w:260px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
-button{cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
-input,select,textarea{font-family:'DM Sans',sans-serif}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;border:none;font-family:'Inter',sans-serif}
+input,select,textarea{font-family:'Inter',sans-serif}
 
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
 .login-box{background:var(--white);border-radius:16px;padding:40px 44px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.4)}
-.login-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
-.login-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
+.login-tag{font-family:'Inter',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
+.login-title{font-family:'Inter',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
 .login-sub{font-size:13px;color:var(--ink4);margin-bottom:28px}
 .f-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
 .f-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
@@ -46,16 +47,16 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 /* SIDEBAR */
 .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;height:100vh;overflow-y:auto;flex-shrink:0}
 .sidebar-logo{padding:20px 20px 16px;border-bottom:.5px solid #222}
-.logo-tag{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:4px}
-.logo-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
+.logo-tag{font-family:'Inter',monospace;font-size:9px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:4px}
+.logo-name{font-family:'Inter',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
 .logo-sub{font-size:11px;color:#555;margin-top:3px}
 .sidebar-section{padding:14px 12px 6px}
-.sidebar-lbl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
+.sidebar-lbl{font-family:'Inter',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#888;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:#1a1a1a;color:#ccc}
 .nav-item.active{background:var(--blu);color:#fff}
 .nav-icon{font-size:14px;min-width:18px}
-.nav-badge{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:10px;font-family:'DM Mono',monospace;background:#2a2a2a;color:#555}
+.nav-badge{margin-left:auto;font-size:10px;padding:1px 6px;border-radius:10px;font-family:'Inter',monospace;background:#2a2a2a;color:#555}
 .nav-item.active .nav-badge{background:rgba(255,255,255,.2);color:#fff}
 .nav-badge.alert{background:var(--rosso);color:#fff}
 .sidebar-divider{height:.5px;background:#222;margin:6px 12px}
@@ -66,20 +67,20 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 .sidebar-footer{padding:14px 20px;border-top:.5px solid #1e1e1e;margin-top:auto}
 .user-name{font-size:13px;font-weight:500;color:#ccc}
 .user-role{font-size:11px;color:#555;margin-bottom:8px}
-.logout-btn{font-size:11px;color:#555;cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;padding:0;transition:color .15s}
+.logout-btn{font-size:11px;color:#555;cursor:pointer;border:none;background:none;font-family:'Inter',sans-serif;padding:0;transition:color .15s}
 .logout-btn:hover{color:var(--rosso)}
 
 /* MAIN */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
 .topbar{height:52px;background:var(--white);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
-.topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;flex:1}
+.topbar-title{font-family:'Inter',sans-serif;font-size:15px;font-weight:700;flex:1}
 .topbar-actions{display:flex;gap:8px;align-items:center}
 .content{flex:1;overflow-y:auto;padding:24px;background:var(--paper)}
 .page{display:none}
 .page.active{display:block}
 
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--white);color:var(--ink2);transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--white);color:var(--ink2);transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap}
 .btn:hover{background:var(--paper2)}
 .btn-ink{background:var(--ink);color:#fff;border-color:var(--ink2)}
 .btn-ink:hover{background:var(--ink2)}
@@ -95,11 +96,11 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 
 /* LAYOUT COMUNI */
 .card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px}
-.section-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
+.section-title{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
 .section-title::after{content:'';flex:1;height:.5px;background:var(--border)}
 .page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
-.page-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.page-title{font-family:'Inter',sans-serif;font-size:18px;font-weight:700}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'Inter',monospace;font-size:10px;font-weight:500}
 .badge-attesa{background:var(--amber-light);color:var(--amber)}
 .badge-approvata{background:var(--verde-light);color:var(--verde)}
 .badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
@@ -116,7 +117,7 @@ input,select,textarea{font-family:'DM Sans',sans-serif}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{padding:9px 14px;text-align:left}
 thead tr{border-bottom:.5px solid var(--border);background:var(--paper)}
-thead th{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;font-weight:400}
+thead th{font-family:'Inter',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;font-weight:400}
 tbody tr{border-bottom:.5px solid var(--paper2);transition:background .1s}
 tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:var(--paper)}
@@ -126,13 +127,13 @@ tbody tr:hover{background:var(--paper)}
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-bottom:24px}
 .kpi{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
-.kpi-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.kpi-val{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;line-height:1}
+.kpi-label{font-family:'Inter',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-family:'Inter',sans-serif;font-size:24px;font-weight:700;line-height:1}
 .kpi-unit{font-size:12px;font-weight:400;color:var(--ink4);margin-left:2px}
 
 /* FILTRI */
 .filtri{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
-.btn-filtro{padding:5px 12px;border-radius:10px;font-size:12px;font-weight:500;background:var(--white);color:var(--ink4);border:.5px solid var(--border);cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s}
+.btn-filtro{padding:5px 12px;border-radius:10px;font-size:12px;font-weight:500;background:var(--white);color:var(--ink4);border:.5px solid var(--border);cursor:pointer;font-family:'Inter',monospace;transition:all .15s}
 .btn-filtro.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
 /* DETTAGLIO DIPENDENTE */
@@ -142,19 +143,19 @@ tbody tr:hover{background:var(--paper)}
 .btn-mese:hover{background:var(--paper2)}
 .sel-mese-det{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--white);outline:none}
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
-.cal-dow{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);padding:3px 0}
+.cal-dow{text-align:center;font-family:'Inter',monospace;font-size:10px;color:var(--ink4);padding:3px 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s;position:relative}
 .cal-day:hover{background:var(--paper2)}
 .cal-day.weekend{color:var(--ink4)}
-.cal-day.festivo{color:var(--amber);font-weight:600}
-.cal-day.has-data{background:var(--blu-light);color:var(--blu)}
+.cal-day.festivo{color:var(--festivo);font-weight:600}
+.cal-day.has-data{background:var(--verde-light);color:var(--verde)}
 .cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
 .cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
 .tot-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
 .tot-row:last-child{border-bottom:none}
-.tot-key{color:var(--ink4);font-family:'DM Mono',monospace;font-size:11px}
+.tot-key{color:var(--ink4);font-family:'Inter',monospace;font-size:11px}
 .tot-val{font-weight:500}
 .det-day-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:.5px solid var(--paper2)}
 .det-day-row:last-child{border-bottom:none}
@@ -168,9 +169,9 @@ tbody tr:hover{background:var(--paper)}
 /* SALDI DIPENDENTE */
 .saldi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
 .saldo-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:14px 16px}
-.saldo-tipo{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:2px}
+.saldo-tipo{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;margin-bottom:2px}
 .saldo-dettaglio{font-size:11px;color:var(--ink4);margin-bottom:8px}
-.saldo-res{font-family:'DM Mono',monospace;font-size:18px;font-weight:700}
+.saldo-res{font-family:'Inter',monospace;font-size:18px;font-weight:700}
 .saldo-res.ok{color:var(--verde)}
 .saldo-res.warn{color:var(--amber)}
 .saldo-res.danger{color:var(--rosso)}
@@ -184,7 +185,7 @@ tbody tr:hover{background:var(--paper)}
 .form-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
 .form-box.open{display:block}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-.fl{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
+.fl{font-family:'Inter',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;margin-bottom:5px;display:block}
 .fi{width:100%;padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none}
 .fi:focus{border-color:var(--blu);background:var(--white)}
 
@@ -192,7 +193,7 @@ tbody tr:hover{background:var(--paper)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:24px}
 .modal-overlay.open{display:flex}
 .modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2)}
-.modal-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
+.modal-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
 .modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 </style>
@@ -261,6 +262,10 @@ tbody tr:hover{background:var(--paper)}
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Dashboard</div>
       <div class="topbar-actions" id="topbar-actions"></div>
+      <button class="btn" id="btn-refresh-global" onclick="aggiornaGlobale()" style="margin-left:8px">
+        <span id="refresh-dot" style="width:8px;height:8px;border-radius:50%;background:var(--verde);display:inline-block;flex-shrink:0;transition:background .2s"></span>
+        <span id="refresh-label">Aggiorna</span>
+      </button>
     </div>
     <div class="content">
 
@@ -327,7 +332,7 @@ tbody tr:hover{background:var(--paper)}
             <div class="card" style="padding:14px">
               <div class="cal-dow-row" id="det-dow"></div>
               <div class="cal-grid" id="det-cal"></div>
-              <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4);display:flex;gap:10px;flex-wrap:wrap">
+              <div style="margin-top:8px;font-family:'Inter',monospace;font-size:10px;color:var(--ink4);display:flex;gap:10px;flex-wrap:wrap">
                 <span>🔵 ore lavoro</span><span>🟢 ferie</span><span>🟣 malattia</span>
               </div>
             </div>
@@ -520,7 +525,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
     </div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
-    <div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Tariffe Economiche (€)</div>
+    <div style="font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Tariffe Economiche (€)</div>
     <div class="form-grid" style="margin-bottom:14px">
       <div><label class="fl">€/h Elettrici M.D.</label><input class="fi" id="t-oreElectriciMD" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/h Straord. Elettrici</label><input class="fi" id="t-oreStraordinariElettrico" type="number" step="0.01" placeholder="0.00"></div>
@@ -535,7 +540,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">€/km Percorsi</label><input class="fi" id="t-kmPercorsi" type="number" step="0.001" placeholder="0.000"></div>
     </div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
-    <div style="font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Note Interne</div>
+    <div style="font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Note Interne</div>
     <div class="form-grid" style="margin-bottom:14px">
       <div><label class="fl">Data Assunzione</label><input class="fi" id="edit-data-assunzione" type="date"></div>
       <div><label class="fl">Tipo Contratto</label><input class="fi" id="edit-contratto" type="text" placeholder="es. Tempo indeterminato"></div>
@@ -639,6 +644,7 @@ function startApp(){
   document.getElementById('logo-anno').textContent=ANNO;
   document.getElementById('dash-title').textContent='Dashboard '+ANNO;
   checkInattivita().then(()=>loadDashboard());
+  attivaListenerAttivita();
   // Notifiche real-time richieste ferie
   db.collection('richieste_assenza').where('stato','==','in_attesa')
     .onSnapshot(snap=>{
@@ -701,6 +707,55 @@ async function checkInattivita(){
       console.log(`Bloccati ${promises.length} dipendenti per inattività`);
     }
   }catch(e){console.log('Check inattività errore:',e.message)}
+}
+
+// AGGIORNAMENTO GLOBALE (pulsante topbar con indicatore verde/rosso)
+let admLastSeenTs=null,admFirstSnapshotAttivita=true,admAttivitaUnsub=null;
+function setRefreshStatus(stato){
+  const dot=document.getElementById('refresh-dot');
+  if(dot)dot.style.background=stato==='red'?'var(--rosso)':'var(--verde)';
+}
+function attivaListenerAttivita(){
+  if(admAttivitaUnsub)return;
+  admAttivitaUnsub=db.collection('meta').doc('lastActivity').onSnapshot(snap=>{
+    if(!snap.exists)return;
+    const data=snap.data();
+    const ts=data.timestamp&&data.timestamp.toMillis?data.timestamp.toMillis():Date.now();
+    if(admFirstSnapshotAttivita){
+      admFirstSnapshotAttivita=false;
+      admLastSeenTs=ts;
+      setRefreshStatus('green');
+      return;
+    }
+    if(admLastSeenTs===null||ts>admLastSeenTs)setRefreshStatus('red');
+  },e=>console.log('Listener attività errore:',e.message));
+}
+async function aggiornaGlobale(){
+  const btn=document.getElementById('btn-refresh-global');
+  const label=document.getElementById('refresh-label');
+  if(btn)btn.disabled=true;
+  if(label)label.textContent='Aggiornamento...';
+  try{
+    const activePage=document.querySelector('.page.active');
+    const pid=activePage?activePage.id.replace('page-',''):'dashboard';
+    if(pid==='dashboard')await loadDashboard();
+    else if(pid==='dettaglio'&&detUser)await loadDetMese();
+    else if(pid==='ferie')await loadRichieste();
+    else if(pid==='dipendenti')await loadDipendenti();
+    else if(pid==='straordinari')await loadStraordinari();
+    else if(pid==='costi')await loadCostiMensili();
+    else if(pid==='archivio')await loadArchivio();
+    await loadRichiesteCount();
+    try{
+      const snap=await db.collection('meta').doc('lastActivity').get();
+      admLastSeenTs=snap.exists&&snap.data().timestamp&&snap.data().timestamp.toMillis?snap.data().timestamp.toMillis():Date.now();
+    }catch(e){admLastSeenTs=Date.now()}
+    setRefreshStatus('green');
+  }catch(e){console.log('Errore aggiornamento:',e.message)}
+  finally{
+    if(btn)btn.disabled=false;
+    if(label)label.textContent='Aggiorna';
+  }
 }
 
 document.getElementById('btn-logout').addEventListener('click',()=>{
@@ -809,7 +864,7 @@ async function loadDashboard(){
       <td class="td-r">${(t.oreStraordinariElettrico||0)+(t.oreStraordinariMeccanico||0)}h</td>
       <td class="td-r">${t.kmPercorsi||0} km</td>
       <td class="td-r">${t.speseExtra>0?'€'+(t.speseExtra||0).toFixed(2):'—'}</td>
-      <td class="td-r" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${ultimoAccesso}</td>
+      <td class="td-r" style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${ultimoAccesso}</td>
     </tr>`;
   }).join('');
 }
@@ -955,22 +1010,22 @@ function renderDetTotali(){
     el.innerHTML+=`<div class="tot-row" style="grid-template-columns:1fr auto auto">
       <span class="tot-key">${c.l}</span>
       <span class="tot-val" style="margin-right:8px">${qta%1===0?qta:qta.toFixed(1)}${unit}</span>
-      <span style="font-family:'DM Mono',monospace;font-size:11px;color:${tariffa>0?'var(--verde)':'var(--ink4)'}">${tariffa>0?'€'+(costo.toFixed(2)):'—'}</span>
+      <span style="font-family:'Inter',monospace;font-size:11px;color:${tariffa>0?'var(--verde)':'var(--ink4)'}">${tariffa>0?'€'+(costo.toFixed(2)):'—'}</span>
     </div>`;
   });
   // Spese extra
   if(totals.speseExtra>0){
     totaleCosto+=totals.speseExtra;
-    el.innerHTML+=`<div class="tot-row"><span class="tot-key">Spese Extra</span><span class="tot-val">€${totals.speseExtra.toFixed(2)}</span><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">€${totals.speseExtra.toFixed(2)}</span></div>`;
+    el.innerHTML+=`<div class="tot-row"><span class="tot-key">Spese Extra</span><span class="tot-val">€${totals.speseExtra.toFixed(2)}</span><span style="font-family:'Inter',monospace;font-size:11px;color:var(--verde)">€${totals.speseExtra.toFixed(2)}</span></div>`;
   }
   el.innerHTML+=`<div style="margin-top:10px;background:var(--blu-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
-    <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span>
-    <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${totOre}h</span>
+    <span style="font-family:'Inter',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span>
+    <span style="font-family:'Inter',sans-serif;font-weight:700;color:var(--blu)">${totOre}h</span>
   </div>`;
   if(totaleCosto>0){
     el.innerHTML+=`<div style="margin-top:6px;background:var(--verde-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">TOTALE COSTO</span>
-      <span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${totaleCosto.toFixed(2)}</span>
+      <span style="font-family:'Inter',monospace;font-size:11px;color:var(--verde)">TOTALE COSTO</span>
+      <span style="font-family:'Inter',sans-serif;font-weight:700;color:var(--verde)">€${totaleCosto.toFixed(2)}</span>
     </div>`;
   }
 }
@@ -986,7 +1041,7 @@ function renderDetListaGiorni(){
       const ore=totGiorno(dd);
       const assenza=dd['_assenza'];
       return `<div class="giorno-item${detGiorno===ds?' sel':''}" onclick="detGiorno='${ds}';renderDetCal();renderDetGiorno()">
-        <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:500">${g}/${m}</span>
+        <span style="font-family:'Inter',monospace;font-size:11px;font-weight:500">${g}/${m}</span>
         <span style="color:var(--ink4);font-size:11px">${assenza?TL[assenza]:''} ${dd.commessa?'#'+dd.commessa:''} ${ore>0?ore+'h':''} ${dd.kmPercorsi>0?dd.kmPercorsi+'km':''}</span>
       </div>`;
     }).join('')+'</div></div>';
@@ -997,12 +1052,12 @@ function renderDetGiorno(){
   if(!detGiorno){card.innerHTML='<div class="empty-state">Clicca su un giorno per vedere il dettaglio</div>';return}
   const[y,m,g]=detGiorno.split('-');
   const dd=detDays[detGiorno];
-  if(!dd){card.innerHTML=`<div><div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:10px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div style="font-size:13px;color:var(--ink4)">Nessun dato inserito per questo giorno.</div></div>`;return}
+  if(!dd){card.innerHTML=`<div><div style="font-family:'Inter',sans-serif;font-weight:700;margin-bottom:10px">${g} ${MESI[parseInt(m)-1]} ${y}</div><div style="font-size:13px;color:var(--ink4)">Nessun dato inserito per questo giorno.</div></div>`;return}
   const emp=dipList.find(e=>e.username===detUser)||{};
   const tariffe=emp.tariffe||{};
   const assenza=dd['_assenza'];
   const ore=totGiorno(dd);
-  let html=`<div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:4px">${g} ${MESI[parseInt(m)-1]} ${y}</div>`;
+  let html=`<div style="font-family:'Inter',sans-serif;font-weight:700;margin-bottom:4px">${g} ${MESI[parseInt(m)-1]} ${y}</div>`;
   if(assenza)html+=`<div style="margin-bottom:10px">${{ferie:'<span class="badge badge-approvata">🏖️ Ferie approvate</span>',permesso:'<span class="badge badge-approvata">🕐 Permesso approvato</span>',rol:'<span class="badge badge-approvata">🔄 ROL approvato</span>',malattia:'<span class="badge badge-malattia">🤒 Malattia</span>'}[assenza]||''}</div>`;
   let totaleCostoGiorno=0;
   const righe=CAMPI.filter(c=>{const v=dd[c.k];return v!==undefined&&v!==''&&v!==0}).map(c=>{
@@ -1014,12 +1069,12 @@ function renderDetGiorno(){
     return `<div class="det-day-row">
       <span class="det-key">${c.l}</span>
       <span style="font-weight:500">${dd[c.k]}${unit}</span>
-      ${tariffa>0?`<span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">€${costo.toFixed(2)}</span>`:''}
+      ${tariffa>0?`<span style="font-family:'Inter',monospace;font-size:11px;color:var(--verde)">€${costo.toFixed(2)}</span>`:''}
     </div>`;
   }).join('');
   html+=righe||'<div style="font-size:13px;color:var(--ink4)">Nessuna voce compilata.</div>';
-  if(ore>0)html+=`<div class="totale-giorno-bar"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blu)">${ore}h</span></div>`;
-  if(totaleCostoGiorno>0)html+=`<div style="margin-top:6px;background:var(--verde-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between"><span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--verde)">COSTO GIORNATA</span><span style="font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${totaleCostoGiorno.toFixed(2)}</span></div>`;
+  if(ore>0)html+=`<div class="totale-giorno-bar"><span style="font-family:'Inter',monospace;font-size:11px;color:var(--blu-dark)">TOTALE ORE</span><span style="font-family:'Inter',sans-serif;font-weight:700;color:var(--blu)">${ore}h</span></div>`;
+  if(totaleCostoGiorno>0)html+=`<div style="margin-top:6px;background:var(--verde-light);border-radius:6px;padding:8px 12px;display:flex;justify-content:space-between"><span style="font-family:'Inter',monospace;font-size:11px;color:var(--verde)">COSTO GIORNATA</span><span style="font-family:'Inter',sans-serif;font-weight:700;color:var(--verde)">€${totaleCostoGiorno.toFixed(2)}</span></div>`;
   card.innerHTML=html;
 }
 
@@ -1061,7 +1116,7 @@ function renderFerie(){
     tbody.innerHTML=tutteMalattie.map(r=>`<tr style="cursor:default">
       <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
       <td><span class="badge badge-malattia">🤒 Malattia</span></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`}</td>
+      <td style="font-family:'Inter',monospace;font-size:11px">${r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`}</td>
       <td class="td-r">${r.giorniLavorativi||0} gg lav.</td>
       <td><span class="badge badge-malattia">Registrata</span></td>
       <td style="font-size:12px;color:var(--ink4)">${r.note||'—'}</td>
@@ -1081,7 +1136,7 @@ function renderFerie(){
     return `<tr style="cursor:default">
       <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
       <td>${TL[r.tipo]||r.tipo}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px">${per}</td>
+      <td style="font-family:'Inter',monospace;font-size:11px">${per}</td>
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
       <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
@@ -1133,9 +1188,9 @@ async function loadDipendenti(){
     const statoLabel=bloccato?'🔴 Bloccato':d.abilitato?'Attivo':'Disabilitato';
     const statoClass=bloccato?'badge-rifiutata':d.abilitato?'badge-attivo':'badge-disab';
     return `<tr style="cursor:default;${bloccato?'background:var(--rosso-light)':''}">
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
+      <td style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
       <td style="font-weight:500">${d.nome||''} ${d.cognome||''}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${d.password||''}</td>
+      <td style="font-family:'Inter',monospace;font-size:12px">${d.password||''}</td>
       <td style="font-size:12px">${d.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</td>
       <td class="td-r">${d.monteFerie||0}h</td>
       <td class="td-r">${d.montePermesso||0}h</td>
@@ -1412,9 +1467,9 @@ async function loadCostiMensili(){
   let html='<div style="overflow-x:auto">';
   html+=`<table style="width:100%;border-collapse:collapse;font-size:12px;background:white;border-radius:10px;overflow:hidden;border:.5px solid var(--border)">`;
   html+=`<thead><tr style="background:var(--paper);border-bottom:.5px solid var(--border)">
-    <th style="padding:10px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">DIPENDENTE</th>
-    ${MESI.map(m=>`<th style="padding:10px 8px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">${m.substring(0,3).toUpperCase()}</th>`).join('')}
-    <th style="padding:10px 14px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--blu)">TOTALE</th>
+    <th style="padding:10px 14px;text-align:left;font-family:'Inter',monospace;font-size:10px;color:var(--ink4)">DIPENDENTE</th>
+    ${MESI.map(m=>`<th style="padding:10px 8px;text-align:right;font-family:'Inter',monospace;font-size:10px;color:var(--ink4)">${m.substring(0,3).toUpperCase()}</th>`).join('')}
+    <th style="padding:10px 14px;text-align:right;font-family:'Inter',monospace;font-size:10px;color:var(--blu)">TOTALE</th>
   </tr></thead><tbody>`;
   let grandTotal=0;
   const totaliMensili=Array(12).fill(0);
@@ -1440,9 +1495,9 @@ async function loadCostiMensili(){
   });
   // Riga totali
   html+=`<tr style="background:var(--blu-light);border-top:.5px solid var(--border)">
-    <td style="padding:10px 14px;font-family:'Syne',sans-serif;font-weight:700">TOTALE MENSILE</td>
+    <td style="padding:10px 14px;font-family:'Inter',sans-serif;font-weight:700">TOTALE MENSILE</td>
     ${totaliMensili.map(c=>`<td style="padding:10px 8px;text-align:right;font-weight:700;color:var(--blu)">${c>0?'€'+c.toFixed(0):'—'}</td>`).join('')}
-    <td style="padding:10px 14px;text-align:right;font-family:'Syne',sans-serif;font-weight:700;color:var(--verde)">€${grandTotal.toFixed(2)}</td>
+    <td style="padding:10px 14px;text-align:right;font-family:'Inter',sans-serif;font-weight:700;color:var(--verde)">€${grandTotal.toFixed(2)}</td>
   </tr>`;
   html+='</tbody></table></div>';
   el.innerHTML=html;
@@ -1530,14 +1585,14 @@ async function loadArchivio(){
     const nome=`${emp.nome||''} ${emp.cognome||''}`.trim();
     el.innerHTML+=`<div class="card" style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">${nome}</div>
+        <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:15px">${nome}</div>
         <div style="display:flex;gap:6px">
-          <span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--blu-light);color:var(--blu);padding:3px 10px;border-radius:6px">${totOre}h</span>
-          ${totCosto>0?`<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--verde-light);color:var(--verde);padding:3px 10px;border-radius:6px">€${totCosto.toFixed(2)}</span>`:''}
+          <span style="font-family:'Inter',monospace;font-size:12px;background:var(--blu-light);color:var(--blu);padding:3px 10px;border-radius:6px">${totOre}h</span>
+          ${totCosto>0?`<span style="font-family:'Inter',monospace;font-size:12px;background:var(--verde-light);color:var(--verde);padding:3px 10px;border-radius:6px">€${totCosto.toFixed(2)}</span>`:''}
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
-        ${CN.filter(c=>totals[c.k]>0).map(c=>`<div style="background:var(--paper);border-radius:6px;padding:8px 10px"><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ink4)">${c.l}</div><div style="font-weight:600;font-size:14px;margin-top:2px">${totals[c.k]%1===0?totals[c.k]:totals[c.k].toFixed(1)}${c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'}</div></div>`).join('')}
+        ${CN.filter(c=>totals[c.k]>0).map(c=>`<div style="background:var(--paper);border-radius:6px;padding:8px 10px"><div style="font-family:'Inter',monospace;font-size:10px;color:var(--ink4)">${c.l}</div><div style="font-weight:600;font-size:14px;margin-top:2px">${totals[c.k]%1===0?totals[c.k]:totals[c.k].toFixed(1)}${c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'}</div></div>`).join('')}
       </div>
     </div>`;
   }
@@ -1676,7 +1731,7 @@ function renderStraordinari(){
     const[y,m,g]=s.data.split('-');
     const sc=s.stato==='autorizzati'?'badge-approvata':s.stato==='non_autorizzati'?'badge-rifiutata':'badge-attesa';
     const sl=s.stato==='autorizzati'?'Autorizzati':s.stato==='non_autorizzati'?'Non autorizzati':'Da convalidare';
-    return `<tr><td style="font-weight:500">${s.nomeCompleto}</td><td style="font-family:'DM Mono',monospace;font-size:11px">${g} ${MESI[parseInt(m)-1]} ${y}</td><td class="td-r">${s.straEl>0?s.straEl+'h':'—'}</td><td class="td-r">${s.straMec>0?s.straMec+'h':'—'}</td><td class="td-r" style="font-weight:600">${s.totale}h</td><td style="font-size:12px;color:var(--ink4)">${s.commessa||'—'}</td><td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td><td><span class="badge ${sc}">${sl}</span></td><td><div style="display:flex;gap:4px">${s.stato!=='autorizzati'?`<button class="btn btn-verde btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','autorizzati')">✓</button>`:''} ${s.stato!=='non_autorizzati'?`<button class="btn btn-rosso btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','non_autorizzati')">✕</button>`:''} ${s.stato!=='da_convalidare'?`<button class="btn btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','da_convalidare')">↩</button>`:''}</div></td></tr>`;
+    return `<tr><td style="font-weight:500">${s.nomeCompleto}</td><td style="font-family:'Inter',monospace;font-size:11px">${g} ${MESI[parseInt(m)-1]} ${y}</td><td class="td-r">${s.straEl>0?s.straEl+'h':'—'}</td><td class="td-r">${s.straMec>0?s.straMec+'h':'—'}</td><td class="td-r" style="font-weight:600">${s.totale}h</td><td style="font-size:12px;color:var(--ink4)">${s.commessa||'—'}</td><td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td><td><span class="badge ${sc}">${sl}</span></td><td><div style="display:flex;gap:4px">${s.stato!=='autorizzati'?`<button class="btn btn-verde btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','autorizzati')">✓</button>`:''} ${s.stato!=='non_autorizzati'?`<button class="btn btn-rosso btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','non_autorizzati')">✕</button>`:''} ${s.stato!=='da_convalidare'?`<button class="btn btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','da_convalidare')">↩</button>`:''}</div></td></tr>`;
   }).join('');
 }
 
