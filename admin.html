@@ -585,6 +585,8 @@ const CN=CAMPI.filter(c=>c.t==='n');
 const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia'};
 
 let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa';
+// Cache globale richieste/malattie per utente — riempita da loadDashboard
+let ADM_richPerUser={},ADM_malPerUser={};
 let detUser=null,detMese=new Date().getMonth(),detDays={},detGiorno=null;
 let editUsername=null;
 let modalRichiestaId=null;
@@ -821,9 +823,13 @@ async function loadDashboard(){
   // Carica saldi per tutti
   const richSnap=await db.collection('richieste_assenza').get();
   const malSnap=await db.collection('malattie').get();
-  const richPerUser={},malPerUser={};
-  richSnap.forEach(d=>{const r=d.data();if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
-  malSnap.forEach(d=>{const r=d.data();if(!malPerUser[r.username])malPerUser[r.username]=[];malPerUser[r.username].push(r)});
+  ADM_richPerUser={};ADM_malPerUser={};
+  const richPerUser=ADM_richPerUser,malPerUser=ADM_malPerUser;
+  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
+  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!malPerUser[r.username])malPerUser[r.username]=[];malPerUser[r.username].push(r)});
+  // Salva tutteR e tutteMalattie per la pagina Ferie & Assenze
+  tutteR=richSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  tutteMalattie=malSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
 
   // Tabella saldi
   const tbodySaldi=document.getElementById('tbody-saldi');
@@ -897,21 +903,19 @@ async function apriDettaglio(username){
   await loadDetMese();
 }
 
-async function caricaDetSaldi(emp){
+function caricaDetSaldi(emp){
   const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
   const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
   let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
-  const snap=await db.collection('richieste_assenza').where('username','==',emp.username).get();
-  snap.forEach(d=>{
-    const r=d.data();
+  // Legge dalla cache globale — ZERO query Firestore
+  (ADM_richPerUser[emp.username]||[]).forEach(r=>{
     if(r.stato==='approvata'){
       if(r.tipo==='ferie')ferieUsate+=parseFloat(r.oreRichieste)||0;
       if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
       if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
     }
   });
-  const mSnap=await db.collection('malattie').where('username','==',emp.username).get();
-  mSnap.forEach(d=>{giorniMal+=d.data().giorniLavorativi||0});
+  (ADM_malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
   const ferieRes=monteFerie-ferieUsate,permRes=montePermesso-permessiUsati,rolRes=monteRol-rolUsato;
   function cls(res,tot){return res>tot*0.3?'ok':res>0?'warn':'danger'}
   document.getElementById('det-saldi').innerHTML=`
@@ -942,24 +946,24 @@ async function caricaDetSaldi(emp){
   }
 }
 
-async function loadDetMese(){
+function loadDetMese(){
   const ms=pad(detMese+1);
-  // Timesheets
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
-  detDays={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))detDays[d.id]=d.data()});
-  // Assenze approvate (ferie/permesso/rol)
-  const aSnap=await db.collection('richieste_assenza').where('username','==',detUser).get();
-  aSnap.forEach(d=>{
-    const r=d.data();
+  // Legge dalla cache globale — ZERO query Firestore
+  detDays={};
+  const cachedDays=dipDataCache[detUser]?.days||{};
+  Object.entries(cachedDays).forEach(([id,data])=>{
+    if(id.startsWith(`${ANNO}-${ms}`))detDays[id]={...data};
+  });
+  // Assenze approvate dalla cache
+  (ADM_richPerUser[detUser]||[]).forEach(r=>{
     if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')){
       const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
       while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
     }
   });
-  // Malattie
-  const mSnap=await db.collection('malattie').where('username','==',detUser).get();
-  mSnap.forEach(d=>{
-    const r=d.data();const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
+  // Malattie dalla cache
+  (ADM_malPerUser[detUser]||[]).forEach(r=>{
+    const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
     while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia'}cur.setDate(cur.getDate()+1)}
   });
   renderDetCal();
@@ -1079,20 +1083,16 @@ function renderDetGiorno(){
 }
 
 // FERIE & ASSENZE
-async function loadRichiesteCount(){
-  const snap=await db.collection('richieste_assenza').where('stato','==','in_attesa').get();
-  const cnt=snap.size;
+function loadRichiesteCount(){
+  const cnt=tutteR.filter(r=>r.stato==='in_attesa').length;
   const badge=document.getElementById('badge-ferie');
   badge.textContent=cnt;
   badge.className='nav-badge'+(cnt>0?' alert':'');
 }
 
-async function loadRichieste(){
+function loadRichieste(){
   try{
-  const snap=await db.collection('richieste_assenza').get();
-  tutteR=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-  const mSnap=await db.collection('malattie').get();
-  tutteMalattie=mSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  // Usa cache globale — ZERO query (i dati sono già in tutteR/tutteMalattie da loadDashboard)
   document.getElementById('cnt-attesa').textContent=tutteR.filter(r=>r.stato==='in_attesa').length;
   document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
   document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
@@ -1179,9 +1179,8 @@ document.getElementById('btn-nuovo-dip').addEventListener('click',()=>{
 });
 function chiudiFormDip(){document.getElementById('form-nuovo').classList.remove('open');document.getElementById('btn-nuovo-dip').style.display=''}
 
-async function loadDipendenti(){
-  const snap=await db.collection('dipendenti').get();
-  dipList=snap.docs.map(d=>({username:d.id,...d.data()}));
+function loadDipendenti(){
+  // Usa dipList già in cache — ZERO query
   const tbody=document.getElementById('tbody-dip');
   if(!dipList.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Nessun dipendente.</td></tr>';return}
   if(!dipList.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessun dipendente.</td></tr>';return}
@@ -1311,15 +1310,14 @@ async function eliminaDip(username,nome){
 }
 
 // EXPORT EXCEL DASHBOARD
-async function esportaTuttiExcel(){
+function esportaTuttiExcel(){
   const wb=XLSX.utils.book_new();
   // Riepilogo
   const hh=['Dipendente',...CN.map(c=>c.l)];
   const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0)]});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Riepilogo');
   // Saldo ferie
-  const snap=await db.collection('richieste_assenza').get();
-  const richPerUser={};snap.forEach(d=>{const r=d.data();if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
+  const richPerUser=ADM_richPerUser;
   const sh=[['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato']];
   dipList.forEach(emp=>{
     const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
@@ -1332,13 +1330,12 @@ async function esportaTuttiExcel(){
 }
 
 // EXPORT EXCEL DETTAGLIO - usa cache per velocità
-async function esportaDetExcel(){
+function esportaDetExcel(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
   const tariffe=emp.tariffe||{};
-  // Carica tutti i giorni dell'anno in una sola query
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
-  const allDays={};snap.forEach(d=>{allDays[d.id]=d.data()});
+  // Legge dalla cache — ZERO query
+  const allDays=dipDataCache[detUser]?.days||{};
   const wb=XLSX.utils.book_new();
   // Foglio riepilogo annuale
   const hdr=['Campo',...MB,'TOTALE','Tariffa €','Costo Totale €'];
@@ -1556,7 +1553,6 @@ async function esportaCostiExcel(){
 async function initArchivio(){
   const archDip=document.getElementById('arch-dip');
   archDip.innerHTML='<option value="">Tutti i dipendenti</option>';
-  if(!dipList.length){const snap=await db.collection('dipendenti').get();dipList=snap.docs.map(d=>({username:d.id,...d.data()}))}
   dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=`${d.nome||''} ${d.cognome||''}`.trim();archDip.appendChild(o)});
   // Popola anni (anni precedenti a quello corrente)
   const archAnno=document.getElementById('arch-anno');
@@ -1602,12 +1598,12 @@ async function loadArchivio(){
 }
 
 // ── FOGLIO FIRMA PDF ──────────────────────────────────────────────────
-async function stampFoglio(){
+function stampFoglio(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
   const ms=pad(detMese+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  // Legge dalla cache — ZERO query
+  const all={};Object.entries(dipDataCache[detUser]?.days||{}).forEach(([id,data])=>{if(id.startsWith(`${ANNO}-${ms}`))all[id]=data});
   const giorni=Object.keys(all).sort();
   const tariffe=emp.tariffe||{};
   const {jsPDF}=window.jspdf;
@@ -1693,22 +1689,19 @@ async function aggiornaBadgeStraord(){
   }catch(e){console.log('Badge straord:',e.message)}
 }
 
-async function loadStraordinari(){
+function loadStraordinari(){
   tuttiStraord=[];
-  if(!dipList.length){const snap=await db.collection('dipendenti').get();dipList=snap.docs.map(d=>({username:d.id,...d.data()}))}
   const df=document.getElementById('straord-dip-filter');
   if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=`${d.nome||''} ${d.cognome||''}`.trim();df.appendChild(o)});
-  await Promise.all(dipList.map(async emp=>{
-    try{
-      const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-      snap.forEach(d=>{
-        const dati=d.data();
-        const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
-        const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
-        if(straEl>0||straMec>0)tuttiStraord.push({id:d.id,username:emp.username,nomeCompleto:`${emp.nome||''} ${emp.cognome||''}`.trim(),data:dati.data||d.id,straEl,straMec,totale:straEl+straMec,commessa:dati.commessa||'',note:dati.note||'',stato:dati.statoStraordinari||'da_convalidare'});
-      });
-    }catch(e){}
-  }));
+  // Legge da dipDataCache — ZERO query Firestore
+  dipList.forEach(emp=>{
+    const days=dipDataCache[emp.username]?.days||{};
+    Object.entries(days).forEach(([id,dati])=>{
+      const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
+      const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
+      if(straEl>0||straMec>0)tuttiStraord.push({id,username:emp.username,nomeCompleto:`${emp.nome||''} ${emp.cognome||''}`.trim(),data:dati.data||id,straEl,straMec,totale:straEl+straMec,commessa:dati.commessa||'',note:dati.note||'',stato:dati.statoStraordinari||'da_convalidare'});
+    });
+  });
   tuttiStraord.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
   document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
