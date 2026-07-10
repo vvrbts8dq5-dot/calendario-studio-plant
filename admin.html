@@ -196,6 +196,15 @@ tbody tr:hover{background:var(--paper)}
 .modal-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
 .modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+
+/* REGISTRO TITOLARE */
+.tit-banner{background:var(--amber-light);border:.5px solid var(--amber);border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5200;margin-bottom:14px;display:none}
+.tit-banner.show{display:block}
+.notif-item{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:6px;background:var(--paper);font-size:12px;margin-bottom:6px;border:.5px solid var(--border)}
+.perc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:14px}
+.perc-card{border-radius:8px;padding:12px 14px;border:.5px solid var(--border)}
+.perc-card .p-label{font-size:11px;color:var(--ink2);margin-bottom:8px;line-height:1.35;min-height:42px}
+.perc-card .p-val{font-family:'Inter',sans-serif;font-size:22px;font-weight:800}
 </style>
 </head>
 <body>
@@ -244,6 +253,10 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="archivio" onclick="goPage('archivio',this)">
         <span class="nav-icon">🗂️</span> Archivio Anni
+      </button>
+      <button class="nav-item" data-page="titolare" id="nav-titolare" style="display:none" onclick="goPage('titolare',this)">
+        <span class="nav-icon">📒</span> Registro Titolare
+        <span class="nav-badge" id="badge-titolare">0</span>
       </button>
     </div>
     <div class="sidebar-divider"></div>
@@ -470,6 +483,68 @@ tbody tr:hover{background:var(--paper)}
         <div id="archivio-content"><div class="empty-state">Seleziona un anno.</div></div>
       </div>
 
+      <!-- REGISTRO TITOLARE -->
+      <div class="page" id="page-titolare">
+        <div class="page-header">
+          <div class="page-title" id="tit-title">Registro Titolare</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="tit-sel-titolare" style="display:none;font-size:12px" onchange="cambiaTitolare()"></select>
+            <button class="btn btn-verde btn-sm" onclick="esportaTitExcel()">📥 Excel</button>
+          </div>
+        </div>
+
+        <div class="tit-banner" id="tit-banner-admin">✏️ Stai operando sul registro di <strong id="tit-banner-nome"></strong> — ogni inserimento, modifica o eliminazione verrà segnalata al titolare.</div>
+
+        <div id="tit-notifiche"></div>
+
+        <!-- Riepilogo annuale -->
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title">Riepilogo Gestione del Tempo — <span id="tit-riep-anno"></span></div>
+          <div id="tit-riepilogo"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- Navigazione mese -->
+        <div class="nav-mese" style="margin-bottom:14px;max-width:480px">
+          <button class="btn-mese" id="tit-prec">‹</button>
+          <select class="sel-mese-det" id="tit-sel-mese"></select>
+          <button class="btn-mese" id="tit-succ">›</button>
+          <button class="btn btn-ink" onclick="apriFormTit()" style="margin-left:8px;white-space:nowrap">+ Nuova Attività</button>
+        </div>
+
+        <!-- Form riga attività -->
+        <div class="form-box" id="tit-form">
+          <div class="section-title" id="tit-form-title">Nuova Attività</div>
+          <div id="tit-form-alert"></div>
+          <div class="form-grid">
+            <div style="grid-column:1/-1"><label class="fl">Attività svolta</label><input class="fi" id="tit-descrizione" type="text" placeholder="es. Organizzazione e gestione interna - mail + telefonate"></div>
+            <div><label class="fl">Data</label><input class="fi" id="tit-data" type="date"></div>
+            <div><label class="fl">Rif. Commessa</label><input class="fi" id="tit-commessa" type="text" placeholder="es. 26001"></div>
+            <div><label class="fl">Ore Societarie</label><input class="fi" id="tit-oreSocietarie" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Ore su Commessa</label><input class="fi" id="tit-oreCommessa" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Ore Altre Attività</label><input class="fi" id="tit-oreIndirette" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Ore Offerte/Contratti</label><input class="fi" id="tit-oreOfferte" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Altro (ore)</label><input class="fi" id="tit-oreAltro" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Km A/R</label><input class="fi" id="tit-kmAR" type="number" step="1" min="0"></div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px">
+            <button class="btn btn-ink" onclick="salvaRigaTit()">✓ Salva</button>
+            <button class="btn" onclick="chiudiFormTit()">Annulla</button>
+          </div>
+        </div>
+
+        <!-- Tabella mese -->
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Attività Svolta</th><th>Rif. Commessa</th>
+              <th class="td-r">Societarie</th><th class="td-r">Commessa</th><th class="td-r">Altre Attività</th>
+              <th class="td-r">Offerte</th><th class="td-r">Altro</th><th class="td-r">Km A/R</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="tit-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -619,7 +694,7 @@ async function doLogin(){
     const d=snap.data();
     if(!d.abilitato){showErr('Account non abilitato.');return}
     if(d.password!==p){showErr('Password errata.');return}
-    ADM={username:u,nome:d.nome||u};
+    ADM={username:u,nome:d.nome||u,ruolo:d.ruolo||'admin',orePreviste:d.orePreviste||0};
     sessionStorage.setItem('adm_sess',JSON.stringify(ADM));
     startApp();
   }catch(e){showErr('Errore: '+e.message)}
@@ -645,6 +720,7 @@ function startApp(){
   // Aggiorna anno nel logo
   document.getElementById('logo-anno').textContent=ANNO;
   document.getElementById('dash-title').textContent='Dashboard '+ANNO;
+  initRuoloTitolare();
   checkInattivita().then(()=>loadDashboard());
   attivaListenerAttivita();
   // Notifiche real-time richieste ferie
@@ -747,6 +823,7 @@ async function aggiornaGlobale(){
     else if(pid==='straordinari')await loadStraordinari();
     else if(pid==='costi')await loadCostiMensili();
     else if(pid==='archivio')await loadArchivio();
+    else if(pid==='titolare')await loadTitolarePage(true);
     await loadRichiesteCount();
     try{
       const snap=await db.collection('meta').doc('lastActivity').get();
@@ -772,7 +849,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -780,6 +857,7 @@ function goPage(pid,btn){
   if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
+  if(pid==='titolare')loadTitolarePage();
 }
 
 // DASHBOARD
@@ -1786,6 +1864,361 @@ async function esportaFerieExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Ferie e Assenze');
   XLSX.writeFile(wb,`Ferie_Assenze_${ANNO}.xlsx`);
+}
+
+// ── REGISTRO TITOLARE ─────────────────────────────────────────────────
+// Voci ore (etichette + colori percentuali come nel foglio Excel)
+const TIT_ORE=[
+  {k:'oreSocietarie',l:'Percentuale tempo utilizzato per scopi SOCIETARI',c:'#FDF3C9',ct:'#8a6d00'},
+  {k:'oreCommessa',l:'Percentuale tempo per lavoro diretto su COMMESSE',c:'var(--verde-light)',ct:'var(--verde)'},
+  {k:'oreIndirette',l:'Percentuale tempo per lavoro indiretto (organizzazione interna, riunioni, corsi, formazione)',c:'#FBE3D0',ct:'#b04a17'},
+  {k:'oreOfferte',l:'Percentuale tempo per attività commerciale (Offerte, contratti, ecc.)',c:'#FDF3C9',ct:'#8a6d00'},
+];
+const TIT_CAMPI_N=['oreSocietarie','oreCommessa','oreIndirette','oreOfferte','oreAltro','kmAR'];
+let TIT_target=null;         // username del titolare visualizzato
+let TIT_listaTitolari=[];    // titolari (per admin non titolare)
+let TIT_righe=[];            // cache righe anno corrente del target
+let TIT_loadedFor=null;
+let TIT_mese=new Date().getMonth();
+let TIT_editId=null;
+let TIT_notifUnsub=null,TIT_meseInit=false;
+
+function isTitolare(){return ADM&&ADM.ruolo==='titolare'}
+
+async function initRuoloTitolare(){
+  try{
+    // Ricarica ruolo dal DB (le sessioni salvate potrebbero non averlo)
+    const snap=await db.collection('admins').doc(ADM.username).get();
+    if(snap.exists){
+      const d=snap.data();
+      ADM.ruolo=d.ruolo||'admin';
+      ADM.orePreviste=d.orePreviste||0;
+      sessionStorage.setItem('adm_sess',JSON.stringify(ADM));
+    }
+  }catch(e){console.log('Ruolo errore:',e.message)}
+  const nav=document.getElementById('nav-titolare');
+  if(nav)nav.style.display='';
+  const roleEl=document.querySelector('.user-role');
+  if(roleEl&&isTitolare())roleEl.textContent='Titolare';
+  if(isTitolare())attivaNotificheTit();
+}
+
+// Notifiche in tempo reale per il titolare (modifiche fatte da altri)
+function attivaNotificheTit(){
+  if(TIT_notifUnsub)return;
+  TIT_notifUnsub=db.collection('titolari_notifiche')
+    .where('destinatario','==',ADM.username).where('letta','==',false)
+    .onSnapshot(snap=>{
+      const badge=document.getElementById('badge-titolare');
+      if(badge){badge.textContent=snap.size;badge.className='nav-badge'+(snap.size>0?' alert':'')}
+      renderNotificheTit(snap.docs.map(d=>({id:d.id,...d.data()})));
+    },e=>console.log('Notifiche tit errore:',e.message));
+}
+
+function renderNotificheTit(notifs){
+  const el=document.getElementById('tit-notifiche');
+  if(!el)return;
+  if(!notifs||!notifs.length){el.innerHTML='';return}
+  const items=notifs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(n=>{
+    const quando=n.createdAt?new Date(n.createdAt).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return `<div class="notif-item"><span>🔔 ${n.messaggio||''}</span><span style="color:var(--ink4);font-family:'Inter',monospace;font-size:10px;white-space:nowrap">${quando}</span></div>`;
+  }).join('');
+  el.innerHTML=`<div class="card" style="margin-bottom:18px;border-color:var(--amber)">
+    <div class="section-title">🔔 Avvisi — modifiche al tuo registro</div>${items}
+    <div style="margin-top:10px"><button class="btn btn-sm" onclick="segnaNotificheLette()">✓ Segna tutte come lette</button></div>
+  </div>`;
+}
+
+async function segnaNotificheLette(){
+  try{
+    const snap=await db.collection('titolari_notifiche').where('destinatario','==',ADM.username).where('letta','==',false).get();
+    await Promise.all(snap.docs.map(d=>d.ref.update({letta:true})));
+  }catch(e){alert('Errore: '+e.message)}
+}
+
+// Caricamento pagina
+async function loadTitolarePage(forza){
+  try{
+    if(isTitolare()){
+      // Il titolare vede SOLO il proprio registro
+      TIT_target=ADM.username;
+      document.getElementById('tit-sel-titolare').style.display='none';
+      document.getElementById('tit-banner-admin').classList.remove('show');
+    }else{
+      // Admin non titolare: selettore fra i titolari
+      if(!TIT_listaTitolari.length){
+        const snap=await db.collection('admins').where('ruolo','==','titolare').get();
+        TIT_listaTitolari=snap.docs.map(d=>({username:d.id,...d.data()}));
+        const sel=document.getElementById('tit-sel-titolare');
+        sel.innerHTML=TIT_listaTitolari.map(t=>`<option value="${t.username}">${t.nome||t.username}</option>`).join('');
+      }
+      document.getElementById('tit-sel-titolare').style.display='';
+      if(!TIT_target||!TIT_listaTitolari.some(t=>t.username===TIT_target))TIT_target=TIT_listaTitolari.length?TIT_listaTitolari[0].username:null;
+      if(!TIT_target){
+        document.getElementById('tit-riepilogo').innerHTML='<div class="empty-state">Nessun titolare configurato. Aggiungi il campo ruolo = "titolare" sui documenti admins in Firestore.</div>';
+        document.getElementById('tit-tbody').innerHTML='';
+        return;
+      }
+      document.getElementById('tit-sel-titolare').value=TIT_target;
+      const banner=document.getElementById('tit-banner-admin');
+      banner.classList.add('show');
+      document.getElementById('tit-banner-nome').textContent=nomeTit(TIT_target);
+    }
+    document.getElementById('tit-title').textContent='Registro Titolare — '+nomeTit(TIT_target);
+    document.getElementById('tit-riep-anno').textContent=ANNO;
+    initTitMeseSel();
+    if(forza||TIT_loadedFor!==TIT_target)await caricaRigheTit();
+    renderTitMese();renderTitRiepilogo();
+  }catch(e){console.error('Errore registro titolare:',e)}
+}
+
+async function caricaRigheTit(){
+  const snap=await db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').get();
+  TIT_righe=snap.docs.map(d=>({id:d.id,...d.data()}));
+  TIT_righe.sort((a,b)=>(String(a.data||'')).localeCompare(String(b.data||'')));
+  TIT_loadedFor=TIT_target;
+}
+
+async function cambiaTitolare(){
+  try{
+    TIT_target=document.getElementById('tit-sel-titolare').value;
+    document.getElementById('tit-banner-nome').textContent=nomeTit(TIT_target);
+    document.getElementById('tit-title').textContent='Registro Titolare — '+nomeTit(TIT_target);
+    chiudiFormTit();
+    await caricaRigheTit();
+    renderTitMese();renderTitRiepilogo();
+  }catch(e){console.error('Errore cambio titolare:',e)}
+}
+
+function nomeTit(u){
+  if(ADM&&u===ADM.username)return ADM.nome||u;
+  const t=TIT_listaTitolari.find(x=>x.username===u);
+  return t?(t.nome||u):u;
+}
+
+function initTitMeseSel(){
+  if(TIT_meseInit)return;TIT_meseInit=true;
+  const sel=document.getElementById('tit-sel-mese');
+  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===TIT_mese?' selected':''}>${m} ${ANNO}</option>`).join('');
+  sel.onchange=()=>{TIT_mese=parseInt(sel.value);renderTitMese()};
+  document.getElementById('tit-prec').onclick=()=>{if(TIT_mese>0){TIT_mese--;sel.value=TIT_mese;renderTitMese()}};
+  document.getElementById('tit-succ').onclick=()=>{if(TIT_mese<11){TIT_mese++;sel.value=TIT_mese;renderTitMese()}};
+}
+
+function fmtTitN(v){const n=parseFloat(v)||0;return n>0?(n%1===0?n:n.toFixed(1)):'—'}
+
+// Tabella del mese
+function renderTitMese(){
+  const ms=pad(TIT_mese+1);
+  const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(`${ANNO}-${ms}`));
+  const tbody=document.getElementById('tit-tbody');
+  if(!righe.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessuna attività registrata per questo mese.</td></tr>';return}
+  let html='',lastData='';
+  righe.forEach(r=>{
+    const parts=String(r.data||'').split('-');
+    const g=parts[2]||'',m=parts[1]||'';
+    const nuovoGiorno=r.data!==lastData;lastData=r.data;
+    html+=`<tr${nuovoGiorno?' style="border-top:1.5px solid var(--border)"':''}>
+      <td style="font-family:'Inter',monospace;font-size:11px;white-space:nowrap">${nuovoGiorno?g+'/'+m:''}</td>
+      <td style="font-weight:500">${r.descrizione||''}</td>
+      <td style="font-family:'Inter',monospace;font-size:11px">${r.commessa||'—'}</td>
+      <td class="td-r">${fmtTitN(r.oreSocietarie)}</td>
+      <td class="td-r" style="${(parseFloat(r.oreCommessa)||0)>0?'background:var(--verde-light);color:var(--verde);font-weight:600':''}">${fmtTitN(r.oreCommessa)}</td>
+      <td class="td-r">${fmtTitN(r.oreIndirette)}</td>
+      <td class="td-r">${fmtTitN(r.oreOfferte)}</td>
+      <td class="td-r">${fmtTitN(r.oreAltro)}</td>
+      <td class="td-r">${(parseFloat(r.kmAR)||0)>0?r.kmAR:'—'}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="apriFormTit('${r.id}')">✏️</button>
+        <button class="btn btn-rosso btn-sm" onclick="eliminaRigaTit('${r.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  });
+  const tot=k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+  const totOre=tot('oreSocietarie')+tot('oreCommessa')+tot('oreIndirette')+tot('oreOfferte')+tot('oreAltro');
+  html+=`<tr style="background:var(--blu-light);font-weight:700">
+    <td colspan="3">TOTALE ${MESI[TIT_mese].toUpperCase()}</td>
+    <td class="td-r">${fmtTitN(tot('oreSocietarie'))}</td>
+    <td class="td-r">${fmtTitN(tot('oreCommessa'))}</td>
+    <td class="td-r">${fmtTitN(tot('oreIndirette'))}</td>
+    <td class="td-r">${fmtTitN(tot('oreOfferte'))}</td>
+    <td class="td-r">${fmtTitN(tot('oreAltro'))}</td>
+    <td class="td-r">${tot('kmAR')>0?tot('kmAR')+' km':'—'}</td>
+    <td style="font-size:11px;color:var(--blu);white-space:nowrap">${totOre%1===0?totOre:totOre.toFixed(1)}h tot</td>
+  </tr>`;
+  tbody.innerHTML=html;
+}
+
+// Riepilogo annuale (come il foglio Excel dei titolari)
+function renderTitRiepilogo(){
+  const tot=k=>TIT_righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const somma=soc+com+ind+off;
+  const orePrev=orePrevisteTit();
+  const f=v=>v%1===0?v:v.toFixed(1);
+  const pct=v=>somma>0?Math.round(v/somma*100)+'%':'—';
+  const vals=[soc,com,ind,off];
+  document.getElementById('tit-riepilogo').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+      <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Somma ore spese</div><div class="kpi-val">${f(somma)}<span class="kpi-unit">h</span></div></div>
+      <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Strada percorsa</div><div class="kpi-val">${f(km)}<span class="kpi-unit">km</span></div></div>
+      <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Altro</div><div class="kpi-val">${f(altro)}<span class="kpi-unit">h</span></div></div>
+      <div class="kpi" style="padding:12px 14px">
+        <div class="kpi-label">Ore previste ${ANNO}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input class="fi" id="tit-ore-previste" type="number" min="0" value="${orePrev||''}" placeholder="es. 1928" style="width:90px;padding:5px 8px;font-size:14px;font-weight:700">
+          <button class="btn btn-sm" onclick="salvaOrePreviste()" title="Salva ore previste">💾</button>
+        </div>
+        <div style="font-size:10px;color:var(--ink4);margin-top:4px">${orePrev>0?'Avanzamento: '+Math.round(somma/orePrev*100)+'%':'Imposta le ore annue previste'}</div>
+      </div>
+    </div>
+    <div class="perc-grid">
+      ${TIT_ORE.map((c,i)=>`<div class="perc-card" style="background:${c.c}">
+        <div class="p-label">${c.l}</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <span class="p-val" style="color:${c.ct}">${pct(vals[i])}</span>
+          <span style="font-size:12px;font-weight:600;color:${c.ct}">${f(vals[i])}h</span>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function orePrevisteTit(){
+  if(ADM&&TIT_target===ADM.username)return parseFloat(ADM.orePreviste)||0;
+  const t=TIT_listaTitolari.find(x=>x.username===TIT_target);
+  return t?(parseFloat(t.orePreviste)||0):0;
+}
+
+async function salvaOrePreviste(){
+  const v=parseFloat(document.getElementById('tit-ore-previste').value)||0;
+  try{
+    await db.collection('admins').doc(TIT_target).update({orePreviste:v});
+    if(ADM&&TIT_target===ADM.username){ADM.orePreviste=v;sessionStorage.setItem('adm_sess',JSON.stringify(ADM))}
+    const t=TIT_listaTitolari.find(x=>x.username===TIT_target);if(t)t.orePreviste=v;
+    renderTitRiepilogo();
+  }catch(e){alert('Errore salvataggio ore previste: '+e.message)}
+}
+
+// Form nuova riga / modifica
+function apriFormTit(id){
+  TIT_editId=id||null;
+  document.getElementById('tit-form-title').textContent=id?'Modifica Attività':'Nuova Attività';
+  document.getElementById('tit-form-alert').innerHTML='';
+  const r=id?TIT_righe.find(x=>x.id===id):null;
+  document.getElementById('tit-descrizione').value=r&&r.descrizione?r.descrizione:'';
+  document.getElementById('tit-data').value=r&&r.data?r.data:new Date().toISOString().split('T')[0];
+  document.getElementById('tit-commessa').value=r&&r.commessa?r.commessa:'';
+  TIT_CAMPI_N.forEach(k=>{
+    const val=r?(parseFloat(r[k])||0):0;
+    document.getElementById('tit-'+k).value=val>0?val:'';
+  });
+  document.getElementById('tit-form').classList.add('open');
+  document.getElementById('tit-descrizione').focus();
+}
+function chiudiFormTit(){document.getElementById('tit-form').classList.remove('open');TIT_editId=null}
+
+async function salvaRigaTit(){
+  const al=document.getElementById('tit-form-alert');al.innerHTML='';
+  const dati={
+    descrizione:document.getElementById('tit-descrizione').value.trim(),
+    data:document.getElementById('tit-data').value,
+    commessa:document.getElementById('tit-commessa').value.trim(),
+  };
+  TIT_CAMPI_N.forEach(k=>{dati[k]=parseFloat(document.getElementById('tit-'+k).value)||0});
+  if(!dati.descrizione||!dati.data){al.innerHTML='<div class="alert-box alert-err">Inserisci almeno descrizione e data.</div>';return}
+  if(!dati.data.startsWith(String(ANNO))){al.innerHTML='<div class="alert-box alert-err">La data deve appartenere all’anno '+ANNO+'.</div>';return}
+  try{
+    const coll=db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe');
+    if(TIT_editId){
+      dati.modificatoDa=ADM.username;dati.modificatoIl=new Date().toISOString();
+      await coll.doc(TIT_editId).update(dati);
+      await notificaTit('modificato',dati);
+      const idx=TIT_righe.findIndex(x=>x.id===TIT_editId);
+      if(idx>=0)TIT_righe[idx]={...TIT_righe[idx],...dati};
+    }else{
+      dati.creatoDa=ADM.username;dati.createdAt=new Date().toISOString();
+      const ref=await coll.add(dati);
+      await notificaTit('inserito',dati);
+      TIT_righe.push({id:ref.id,...dati});
+    }
+    TIT_righe.sort((a,b)=>(String(a.data||'')).localeCompare(String(b.data||'')));
+    chiudiFormTit();
+    // Naviga al mese della riga salvata
+    TIT_mese=parseInt(dati.data.split('-')[1])-1;
+    document.getElementById('tit-sel-mese').value=TIT_mese;
+    renderTitMese();renderTitRiepilogo();
+  }catch(e){al.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaRigaTit(id){
+  const r=TIT_righe.find(x=>x.id===id);if(!r)return;
+  if(!confirm('Eliminare la riga "'+(r.descrizione||'')+'" del '+fmtD(r.data)+'?'))return;
+  try{
+    await db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').doc(id).delete();
+    await notificaTit('eliminato',r);
+    TIT_righe=TIT_righe.filter(x=>x.id!==id);
+    renderTitMese();renderTitRiepilogo();
+  }catch(e){alert('Errore: '+e.message)}
+}
+
+// Avviso in app al titolare quando un altro utente tocca il suo registro
+async function notificaTit(azione,riga){
+  if(ADM.username===TIT_target)return; // il titolare che modifica se stesso non genera avvisi
+  try{
+    const parts=String(riga.data||'').split('-');
+    const g=parts[2]||'',m=parts[1]||'';
+    await db.collection('titolari_notifiche').add({
+      destinatario:TIT_target,
+      autore:ADM.username,
+      messaggio:(ADM.nome||ADM.username)+' ha '+azione+' una riga del '+g+'/'+m+': "'+String(riga.descrizione||'').substring(0,60)+'"',
+      letta:false,
+      createdAt:new Date().toISOString(),
+    });
+  }catch(e){console.log('Notifica errore:',e.message)}
+}
+
+// Export Excel registro titolare (replica il foglio dei titolari)
+function esportaTitExcel(){
+  const tot=k=>TIT_righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const somma=soc+com+ind+off;
+  const orePrev=orePrevisteTit();
+  const pct=v=>somma>0?Math.round(v/somma*100)+'%':'';
+  const wb=XLSX.utils.book_new();
+  const riep=[
+    ['RIEPILOGO GESTIONE DEL TEMPO — '+nomeTit(TIT_target)+' — '+ANNO],
+    [],
+    ['Ore utilizzate per scopi SOCIETARI:',soc],
+    ['Ore utilizzate per lavoro diretto su COMMESSE:',com],
+    ['Ore utilizzate per lavoro indiretto (organizzazione interna, riunioni, corsi, formazione):',ind],
+    ['Ore utilizzate per attività commerciale (Offerte, contratti, ecc):',off],
+    ['Altro:',altro],
+    ['Strada percorsa (km):',km],
+    [],
+    ['Somma totale delle ore spese:',somma],
+    [],
+    ['Percentuale tempo utilizzato per scopi SOCIETARI:',pct(soc)],
+    ['Percentuale tempo per lavoro diretto su COMMESSE:',pct(com)],
+    ['Percentuale tempo per lavoro indiretto:',pct(ind)],
+    ['Percentuale tempo per attività commerciale:',pct(off)],
+    [],
+    ['Ore lavorate complessivamente ad oggi:',somma],
+    ['Ore di lavoro complessive previste per l’anno '+ANNO+':',orePrev||''],
+  ];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(riep),'Riepilogo');
+  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R'];
+  for(let m=0;m<12;m++){
+    const ms=pad(m+1);
+    const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(`${ANNO}-${ms}`));
+    if(!righe.length)continue;
+    const rr=righe.map(r=>{
+      const parts=String(r.data||'').split('-');
+      return[parts[2]+'/'+parts[1]+'/'+parts[0],r.descrizione||'',r.commessa||'',parseFloat(r.oreSocietarie)||0,parseFloat(r.oreCommessa)||0,parseFloat(r.oreIndirette)||0,parseFloat(r.oreOfferte)||0,parseFloat(r.oreAltro)||0,parseFloat(r.kmAR)||0];
+    });
+    rr.push(['TOTALE','','',...TIT_CAMPI_N.map(k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0))]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[m]);
+  }
+  XLSX.writeFile(wb,'Registro_'+nomeTit(TIT_target).replace(/\s+/g,'_')+'_'+ANNO+'.xlsx');
 }
 </script>
 </body>
