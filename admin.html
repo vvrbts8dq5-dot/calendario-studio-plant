@@ -440,10 +440,16 @@ tbody tr:hover{background:var(--paper)}
             <div><label class="fl">Cognome</label><input class="fi" id="new-c" placeholder="Rossi" type="text"></div>
             <div><label class="fl">Password</label><input class="fi" id="new-p" placeholder="password" type="text"></div>
             <div>
-              <label class="fl">Tipo Orario</label>
+              <label class="fl">Ore Giornaliere</label>
               <select class="fi" id="new-orario">
-                <option value="pieno">Pieno (8h/giorno)</option>
-                <option value="ridotto">Ridotto (6h/giorno)</option>
+                <option value="2">2h/giorno</option>
+                <option value="3">3h/giorno</option>
+                <option value="4">4h/giorno</option>
+                <option value="5">5h/giorno</option>
+                <option value="6">6h/giorno</option>
+                <option value="7">7h/giorno</option>
+                <option value="8" selected>8h/giorno</option>
+                <option value="9">9h/giorno</option>
               </select>
             </div>
             <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="new-ferie" placeholder="es. 160" type="number"></div>
@@ -622,10 +628,16 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Cognome</label><input class="fi" id="edit-cognome" type="text"></div>
       <div><label class="fl">Password</label><input class="fi" id="edit-password" type="text"></div>
       <div>
-        <label class="fl">Tipo Orario</label>
+        <label class="fl">Ore Giornaliere</label>
         <select class="fi" id="edit-orario">
-          <option value="pieno">Pieno (8h/giorno)</option>
-          <option value="ridotto">Ridotto (6h/giorno)</option>
+          <option value="2">2h/giorno</option>
+          <option value="3">3h/giorno</option>
+          <option value="4">4h/giorno</option>
+          <option value="5">5h/giorno</option>
+          <option value="6">6h/giorno</option>
+          <option value="7">7h/giorno</option>
+          <option value="8">8h/giorno</option>
+          <option value="9">9h/giorno</option>
         </select>
       </div>
       <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
@@ -711,6 +723,16 @@ function totGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k
 function oreLav(t){return(t?.oreElectriciMD||0)+(t?.oreMeccaniciMA||0)+(t?.oreAttivitaGenerali||0)+(t?.oreStraordinariElettrico||0)+(t?.oreStraordinariMeccanico||0)}
 function giorniLav(dal,al){let cnt=0;const d=new Date(dal),fine=new Date(al);while(d<=fine){const dow=d.getDay(),ds=d.toISOString().split('T')[0];if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))cnt++;d.setDate(d.getDate()+1)}return cnt}
 function initials(n,c){return ((n||'?')[0]+(c||'?')[0]).toUpperCase()}
+// Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
+// con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
+function oreGiornoDip(o){
+  if(!o)return 8;
+  const t=o.tipoOrario;
+  if(t===undefined||t===null||t==='')return 8;
+  const n=parseFloat(t);
+  if(!isNaN(n)&&n>0)return n;
+  return t==='ridotto'?6:8;
+}
 
 // LOGIN
 document.getElementById('btn-login').addEventListener('click',doLogin);
@@ -956,7 +978,7 @@ async function loadDashboard(){
   // Tabella saldi
   const tbodySaldi=document.getElementById('tbody-saldi');
   tbodySaldi.innerHTML=dipList.map(emp=>{
-    const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+    const oreGiorno=oreGiornoDip(emp);
     const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
     let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
     (richPerUser[emp.username]||[]).forEach(r=>{
@@ -971,7 +993,7 @@ async function loadDashboard(){
     const cls=ferieRes>monteFerie*0.3?'color:var(--verde)':ferieRes>0?'color:var(--amber)':'color:var(--rosso);font-weight:700';
     return `<tr style="cursor:pointer" onclick="apriDettaglio('${emp.username}')">
       <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
-      <td><span style="font-size:11px;color:var(--ink4)">${emp.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</span></td>
+      <td><span style="font-size:11px;color:var(--ink4)">${oreGiornoDip(emp)}h/giorno</span></td>
       <td class="td-r">${monteFerie}h</td>
       <td class="td-r">${ferieUsate}h</td>
       <td class="td-r" style="${cls}">${ferieRes}h</td>
@@ -1027,7 +1049,7 @@ async function apriDettaglio(username){
 }
 
 function caricaDetSaldi(emp){
-  const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+  const oreGiorno=oreGiornoDip(emp);
   const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
   let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
   // Legge dalla cache globale — ZERO query Firestore
@@ -1315,7 +1337,7 @@ function loadDipendenti(){
       <td style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
       <td style="font-weight:500">${d.nome||''} ${d.cognome||''}</td>
       <td style="font-family:'Inter',monospace;font-size:12px">${d.password||''}</td>
-      <td style="font-size:12px">${d.tipoOrario==='ridotto'?'Ridotto 6h':'Pieno 8h'}</td>
+      <td style="font-size:12px">${oreGiornoDip(d)}h/giorno</td>
       <td class="td-r">${d.monteFerie||0}h</td>
       <td class="td-r">${d.montePermesso||0}h</td>
       <td class="td-r">${d.monteRol||0}h</td>
@@ -1360,7 +1382,7 @@ function apriModificaDip(username){
   document.getElementById('edit-nome').value=emp.nome||'';
   document.getElementById('edit-cognome').value=emp.cognome||'';
   document.getElementById('edit-password').value=emp.password||'';
-  document.getElementById('edit-orario').value=emp.tipoOrario||'pieno';
+  document.getElementById('edit-orario').value=String(oreGiornoDip(emp));
   document.getElementById('edit-ferie').value=emp.monteFerie||0;
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
   document.getElementById('edit-rol').value=emp.monteRol||0;
@@ -1443,7 +1465,7 @@ function esportaTuttiExcel(){
   const richPerUser=ADM_richPerUser;
   const sh=[['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato']];
   dipList.forEach(emp=>{
-    const oreGiorno=emp.tipoOrario==='ridotto'?6:8;
+    const oreGiorno=oreGiornoDip(emp);
     let fu=0,pu=0,ru=0;
     (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')fu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
     sh.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
@@ -1505,7 +1527,7 @@ async function esportaDetPDF(){
   doc.setFont('helvetica','bold');doc.setFontSize(14);
   doc.text(`Riepilogo Ore — ${nome}`,14,16);
   doc.setFont('helvetica','normal');doc.setFontSize(10);
-  doc.text(`${MESI[detMese]} ${ANNO} · Orario ${emp.tipoOrario==='ridotto'?'ridotto (6h)':'pieno (8h)'}`,14,23);
+  doc.text(`${MESI[detMese]} ${ANNO} · Orario ${oreGiornoDip(emp)}h/giorno`,14,23);
   let y=32;
   const cols=['Data',...CN.slice(0,8).map(c=>c.l.substring(0,12)),'Tot.h'];
   const colW=[18,...Array(8).fill(22),14];
@@ -1741,7 +1763,7 @@ function stampFoglio(){
   doc.text(`Dipendente: ${nome}`,14,40);
   doc.setFont('helvetica','normal');
   doc.text(`Periodo: ${MESI[detMese]} ${ANNO}`,14,47);
-  doc.text(`Orario: ${emp.tipoOrario==='ridotto'?'Ridotto (6h/giorno)':'Pieno (8h/giorno)'}`,14,54);
+  doc.text(`Orario: ${oreGiornoDip(emp)}h/giorno`,14,54);
   if(emp.tipoContratto)doc.text(`Contratto: ${emp.tipoContratto}`,120,47);
   doc.line(14,58,196,58);
   // Tabella giorni
@@ -1891,7 +1913,7 @@ async function eseguiBackup(){
     a.download='Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
     const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Username','Nome','Cognome','Orario','Monte Ferie','Monte Permessi','Monte ROL','Assunzione','Contratto','Note'],...backup.dipendenti.map(d=>[d.id,d.nome||'',d.cognome||'',d.tipoOrario||'',d.monteFerie||0,d.montePermesso||0,d.monteRol||0,d.dataAssunzione||'',d.tipoContratto||'',d.noteInterne||''])]),'Dipendenti');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Username','Nome','Cognome','Orario','Monte Ferie','Monte Permessi','Monte ROL','Assunzione','Contratto','Note'],...backup.dipendenti.map(d=>[d.id,d.nome||'',d.cognome||'',oreGiornoDip(d)+'h/giorno',d.monteFerie||0,d.montePermesso||0,d.monteRol||0,d.dataAssunzione||'',d.tipoContratto||'',d.noteInterne||''])]),'Dipendenti');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Tipo','Inizio','Fine','Ore','Stato','Note'],...backup.richieste_assenza.map(r=>[r.nomeCompleto||r.username,r.tipo,r.dataInizio,r.dataFine,r.oreRichieste||0,r.stato,r.note||''])]),'Richieste');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Inizio','Fine','Giorni Lav.','Note'],...backup.malattie.map(m=>[m.nomeCompleto||m.username,m.dataInizio,m.dataFine,m.giorniLavorativi||0,m.note||''])]),'Malattie');
     XLSX.writeFile(wb,'Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.xlsx');

@@ -541,6 +541,16 @@ function giorniLavorativi(dal,al){
   }
   return cnt;
 }
+// Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
+// con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
+function oreGiornoDip(o){
+  if(!o)return 8;
+  const t=o.tipoOrario;
+  if(t===undefined||t===null||t==='')return 8;
+  const n=parseFloat(t);
+  if(!isNaN(n)&&n>0)return n;
+  return t==='ridotto'?6:8;
+}
 
 // LOGIN
 document.getElementById('btn-login').addEventListener('click',doLogin);
@@ -647,7 +657,7 @@ async function startApp(){
   document.getElementById('sidebar-nome').textContent=nome;
   const dlsub=document.getElementById('dip-logo-sub');
   if(dlsub)dlsub.textContent=`Portale Dipendenti · ${ANNO}`;
-  const orario=profilo.tipoOrario==='ridotto'?'Orario ridotto (6h)':'Orario pieno (8h)';
+  const orario=`Orario ${oreGiornoDip(profilo)}h/giorno`;
   document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
   initCal();
   await caricaTuttiDati();
@@ -721,7 +731,7 @@ function aggiornaRiepilogoSaldi(){
   const monteFerie=profilo.monteFerie||0;
   const montePermesso=profilo.montePermesso||0;
   const monteRol=profilo.monteRol||0;
-  const oreGiorno=profilo.tipoOrario==='ridotto'?6:8;
+  const oreGiorno=oreGiornoDip(profilo);
 
   // Calcola ore usate da cache locale — ZERO query Firestore
   let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMalattia=0;
@@ -943,7 +953,7 @@ async function inviaRichiesta(tipo){
   if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
   if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
   if((tipo==='permesso'||tipo==='rol')&&ore<=0){ad.innerHTML='<div class="alert-box alert-err">Inserisci le ore richieste.</div>';return}
-  const oreGiorno=profilo.tipoOrario==='ridotto'?6:8;
+  const oreGiorno=oreGiornoDip(profilo);
   const gg=giorniLavorativi(ini,fin);
   const oreTotali=tipo==='ferie'?gg*oreGiorno:ore;
   try{
