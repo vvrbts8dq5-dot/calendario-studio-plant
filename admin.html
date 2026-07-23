@@ -192,10 +192,29 @@ tbody tr:hover{background:var(--paper)}
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:24px}
 .modal-overlay.open{display:flex}
-.modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2)}
+.modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2);max-height:calc(100vh - 48px);overflow-y:auto}
 .modal-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
 .modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+
+/* CALENDARIO CONDIVISO FERIE */
+.cal-ferie-wrap{border:.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;background:var(--white)}
+.cal-ferie-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.cal-ferie-nav{display:flex;align-items:center;gap:8px}
+.cal-ferie-label{font-family:'Inter',sans-serif;font-weight:700;font-size:13px;min-width:120px;text-align:center;text-transform:capitalize}
+.cal-ferie-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-dow{font-size:10px;color:var(--ink4);text-align:center;font-weight:700;padding:4px 0;text-transform:uppercase}
+.cal-ferie-cell{min-height:60px;border-radius:6px;background:var(--paper);padding:4px;display:flex;flex-direction:column;gap:2px}
+.cal-ferie-cell.cal-ferie-empty{background:none}
+.cal-ferie-cell.cal-ferie-oggi{outline:1.5px solid var(--blu)}
+.cal-ferie-cell.cal-ferie-click{cursor:pointer}
+.cal-ferie-cell.cal-ferie-click:hover{background:var(--blu-light)}
+.cal-ferie-num{font-size:10px;font-weight:600;color:var(--ink3)}
+.cal-ferie-chips{display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.cal-ferie-chip{font-size:9px;padding:1px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ferie-chip-more{font-size:9px;color:var(--ink4)}
+.cal-legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--ink4);flex-wrap:wrap;align-items:center}
+.cal-legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
 
 /* REGISTRO TITOLARE */
 .tit-banner{background:var(--amber-light);border:.5px solid var(--amber);border-radius:8px;padding:10px 14px;font-size:12px;color:#7a5200;margin-bottom:14px;display:none}
@@ -401,6 +420,24 @@ tbody tr:hover{background:var(--paper)}
           <div style="display:flex;gap:8px">
             <select class="f-select" id="ferie-dip-filter" onchange="renderFerie()" style="font-size:12px"><option value="">Tutti i dipendenti</option></select>
             <button class="btn btn-verde btn-sm" onclick="esportaFerieExcel()">📥 Excel</button>
+          </div>
+        </div>
+        <div class="cal-ferie-wrap">
+          <div class="cal-ferie-head">
+            <div class="page-title" style="font-size:14px">📅 Chi è in ferie</div>
+            <div class="cal-ferie-nav">
+              <button class="btn btn-sm" onclick="calFeriePrev()">←</button>
+              <div class="cal-ferie-label" id="cal-ferie-label"></div>
+              <button class="btn btn-sm" onclick="calFerieNext()">→</button>
+            </div>
+          </div>
+          <div class="cal-ferie-grid" id="cal-ferie-grid"></div>
+          <div class="cal-legend">
+            <span><span class="cal-legend-dot" style="background:var(--verde)"></span>Ferie</span>
+            <span><span class="cal-legend-dot" style="background:var(--blu)"></span>Permesso</span>
+            <span><span class="cal-legend-dot" style="background:var(--viola)"></span>ROL</span>
+            <span>👑 Titolare</span>
+            <span id="cal-ferie-hint" style="display:none;color:var(--ink4)">Clicca un giorno per segnare/rimuovere le tue ferie</span>
           </div>
         </div>
         <div class="filtri" id="filtri-stato-ferie">
@@ -622,8 +659,9 @@ tbody tr:hover{background:var(--paper)}
 <div class="modal-overlay" id="modal-dip">
   <div class="modal">
     <div class="modal-title">Modifica Dipendente</div>
-    <div class="modal-sub" id="modal-dip-sub"></div>
-    <div class="form-grid" style="margin-bottom:14px">
+    <div class="modal-sub" id="modal-dip-sub">Modifica anagrafica, orari e tariffe economiche</div>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div><label class="fl">Nome utente</label><input class="fi" id="edit-username" type="text" placeholder="nome.cognome"></div>
       <div><label class="fl">Nome</label><input class="fi" id="edit-nome" type="text"></div>
       <div><label class="fl">Cognome</label><input class="fi" id="edit-cognome" type="text"></div>
       <div><label class="fl">Password</label><input class="fi" id="edit-password" type="text"></div>
@@ -644,6 +682,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
     </div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">⚠️ Cambiare il nome utente sposta tutto lo storico (ore, ferie, malattie) sul nuovo nome — operazione delicata, chiede conferma.</div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
     <div style="font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--ink4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Tariffe Economiche (€)</div>
     <div class="form-grid" style="margin-bottom:14px">
@@ -1248,6 +1287,71 @@ function loadRichiesteCount(){
   badge.className='nav-badge'+(cnt>0?' alert':'');
 }
 
+// ── CALENDARIO CONDIVISO FERIE (dipendenti + titolari, tipo ferie/permesso/rol approvati) ──
+let calFerieMese=new Date();calFerieMese.setDate(1);
+const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
+function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
+function renderCalendarioFerie(){
+  const grid=document.getElementById('cal-ferie-grid');
+  if(!grid)return;
+  const anno=calFerieMese.getFullYear(),mese=calFerieMese.getMonth();
+  document.getElementById('cal-ferie-label').textContent=CAL_FERIE_MESI[mese]+' '+anno;
+  const hint=document.getElementById('cal-ferie-hint');
+  if(hint)hint.style.display=isTitolare()?'':'none';
+  const giorniMese=new Date(anno,mese+1,0).getDate();
+  let offset=new Date(anno,mese,1).getDay();offset=offset===0?6:offset-1; // lunedì=0
+  const perGiorno={};
+  tutteR.filter(r=>r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')).forEach(r=>{
+    if(!r.dataInizio||!r.dataFine)return;
+    let d=new Date(r.dataInizio+'T00:00:00');
+    const fine=new Date(r.dataFine+'T00:00:00');
+    let guard=0;
+    while(d<=fine&&guard<400){
+      if(d.getFullYear()===anno&&d.getMonth()===mese)(perGiorno[d.getDate()]=perGiorno[d.getDate()]||[]).push(r);
+      d.setDate(d.getDate()+1);guard++;
+    }
+  });
+  const COL={ferie:'var(--verde)',permesso:'var(--blu)',rol:'var(--viola)'};
+  const oggi=new Date();
+  let html='';
+  ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
+  for(let i=0;i<offset;i++)html+='<div class="cal-ferie-cell cal-ferie-empty"></div>';
+  for(let g=1;g<=giorniMese;g++){
+    const persone=perGiorno[g]||[];
+    const isOggi=oggi.getFullYear()===anno&&oggi.getMonth()===mese&&oggi.getDate()===g;
+    const clickable=isTitolare();
+    html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}${clickable?' cal-ferie-click':''}"${clickable?` onclick="calClickGiorno(${anno},${mese},${g})"`:''}>
+      <div class="cal-ferie-num">${g}</div>
+      <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
+        const c=COL[r.tipo]||'var(--ink3)';
+        const ic=r.daTitolare?'👑 ':'';
+        const nome=(r.nomeCompleto||r.username||'').split(' ')[0];
+        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c}" title="${r.nomeCompleto||r.username} — ${TL[r.tipo]||r.tipo}">${ic}${nome}</span>`;
+      }).join('')}${persone.length>3?`<span class="cal-ferie-chip-more">+${persone.length-3}</span>`:''}</div>
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+async function calClickGiorno(anno,mese,giorno){
+  if(!isTitolare())return;
+  const dataStr=anno+'-'+String(mese+1).padStart(2,'0')+'-'+String(giorno).padStart(2,'0');
+  const mio=tutteR.find(r=>r.stato==='approvata'&&r.daTitolare&&r.username===ADM.username&&r.dataInizio===dataStr&&r.dataFine===dataStr);
+  try{
+    if(mio){
+      if(!confirm('Rimuovere la ferie del '+dataStr+'?'))return;
+      await db.collection('richieste_assenza').doc(mio.id).delete();
+      tutteR=tutteR.filter(r=>r.id!==mio.id);
+    }else{
+      if(!confirm('Segnare il '+dataStr+' come giorno di ferie?'))return;
+      const rec={username:ADM.username,nomeCompleto:ADM.nome||ADM.username,tipo:'ferie',dataInizio:dataStr,dataFine:dataStr,stato:'approvata',oreRichieste:0,giorniLavorativi:1,daTitolare:true,note:'',createdAt:new Date().toISOString()};
+      const ref=await db.collection('richieste_assenza').add(rec);
+      tutteR.push({id:ref.id,...rec});
+    }
+    renderCalendarioFerie();
+  }catch(e){alert('Errore: '+e.message)}
+}
+
 function loadRichieste(){
   try{
   // Usa cache globale — ZERO query (i dati sono già in tutteR/tutteMalattie da loadDashboard)
@@ -1257,6 +1361,7 @@ function loadRichieste(){
   document.getElementById('cnt-tutte').textContent=tutteR.length;
   const df=document.getElementById('ferie-dip-filter');
   if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=d.nomeCompleto||d.username;df.appendChild(o)});
+  renderCalendarioFerie();
   renderFerie();
   }catch(e){console.error('Errore caricamento richieste:',e)}
 }
@@ -1312,7 +1417,7 @@ function renderFerie(){
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
       <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
-      <td><button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button></td>
+      <td>${r.daTitolare?'<span style="font-size:11px;color:var(--ink4)">👑 auto</span>':`<button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button>`}</td>
     </tr>`;
   }).join('');
 }
@@ -1406,7 +1511,7 @@ function apriModificaDip(username){
   editUsername=username;
   const emp=dipList.find(e=>e.username===username);
   if(!emp)return;
-  document.getElementById('modal-dip-sub').textContent=emp.username;
+  document.getElementById('edit-username').value=emp.username;
   document.getElementById('edit-nome').value=emp.nome||'';
   document.getElementById('edit-cognome').value=emp.cognome||'';
   document.getElementById('edit-password').value=emp.password||'';
@@ -1433,6 +1538,8 @@ function apriModificaDip(username){
 async function salvaDipendente(){
   if(!editUsername)return;
   const ad=document.getElementById('alert-edit-dip');
+  const nuovoUsername=(document.getElementById('edit-username').value||'').trim();
+  if(!nuovoUsername){ad.innerHTML='<div class="alert-box alert-err">Il nome utente non può essere vuoto.</div>';return}
   try{
     const tariffe={};
     ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
@@ -1454,15 +1561,89 @@ async function salvaDipendente(){
       tipoContratto:document.getElementById('edit-contratto').value.trim()||'',
       noteInterne:document.getElementById('edit-note-interne').value.trim()||'',
     };
-    await db.collection('dipendenti').doc(editUsername).update(updates);
-    const emp=dipList.find(e=>e.username===editUsername);
-    if(emp)Object.assign(emp,updates);
+    if(nuovoUsername!==editUsername){
+      if(!confirm('Stai per cambiare il nome utente da "'+editUsername+'" a "'+nuovoUsername+'".\n\nVerrà spostato TUTTO lo storico (ore lavorate, ferie, permessi, malattie degli ultimi 2 anni) sul nuovo nome. L\'operazione richiede qualche secondo e non è reversibile. Il dipendente dovrà accedere con il nuovo nome utente da ora in poi.\n\nProcedere?'))return;
+      ad.innerHTML='<div class="alert-box" style="background:var(--paper2)">⏳ Rinomino in corso, non chiudere la pagina...</div>';
+      await rinominaDipendente(editUsername,nuovoUsername,updates);
+      editUsername=nuovoUsername;
+    }else{
+      await db.collection('dipendenti').doc(editUsername).update(updates);
+      const emp=dipList.find(e=>e.username===editUsername);
+      if(emp)Object.assign(emp,updates);
+    }
     document.getElementById('modal-dip').classList.remove('open');
     editUsername=null;
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente aggiornato.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
+    await loadDashboard();
     loadDipendenti();renderDashboardFromCache();
   }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+// Rinomina un dipendente: sposta il documento dipendenti/{vecchio} → dipendenti/{nuovo} e migra
+// tutte le raccolte collegate (archivio anni, ore giornaliere degli ultimi 2 anni, richieste
+// ferie/permesso/rol, malattie). Copia PRIMA tutto sul nuovo nome, ed elimina i dati vecchi
+// SOLO dopo che tutte le copie sono andate a buon fine, per non perdere dati in caso di errore.
+async function rinominaDipendente(vecchio,nuovo,updatesAnagrafici){
+  if(!/^[a-z0-9._-]+$/i.test(nuovo))throw new Error('Nome utente non valido: usa solo lettere, numeri, punti e trattini.');
+  const [dipEsiste,admEsiste]=await Promise.all([
+    db.collection('dipendenti').doc(nuovo).get(),
+    db.collection('admins').doc(nuovo).get()
+  ]);
+  if(dipEsiste.exists||admEsiste.exists)throw new Error('Il nome utente "'+nuovo+'" è già in uso.');
+
+  const vecchioSnap=await db.collection('dipendenti').doc(vecchio).get();
+  if(!vecchioSnap.exists)throw new Error('Dipendente originale non trovato.');
+  const datiCompleti={...vecchioSnap.data(),...updatesAnagrafici};
+
+  // 1) Crea il nuovo documento dipendente
+  await db.collection('dipendenti').doc(nuovo).set(datiCompleti);
+
+  // 2) Copia archivio anni precedenti
+  const archSnap=await db.collection('dipendenti').doc(vecchio).collection('archivio').get();
+  for(const d of archSnap.docs){
+    await db.collection('dipendenti').doc(nuovo).collection('archivio').doc(d.id).set(d.data());
+  }
+
+  // 3) Copia i giorni di timesheet per l'anno corrente e il precedente
+  for(const anno of [ANNO_PREC,ANNO]){
+    const giorniSnap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(vecchio).collection('giorni').get();
+    let batch=db.batch(),n=0;
+    for(const d of giorniSnap.docs){
+      batch.set(db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(nuovo).collection('giorni').doc(d.id),d.data());
+      if(++n>=400){await batch.commit();batch=db.batch();n=0}
+    }
+    if(n>0)await batch.commit();
+  }
+
+  // 4) Aggiorna username sulle richieste ferie/permesso/rol esistenti
+  const richSnap=await db.collection('richieste_assenza').where('username','==',vecchio).get();
+  {let batch=db.batch(),n=0;
+   for(const d of richSnap.docs){batch.update(d.ref,{username:nuovo});if(++n>=400){await batch.commit();batch=db.batch();n=0}}
+   if(n>0)await batch.commit();}
+
+  // 5) Aggiorna username sulle malattie esistenti
+  const malSnap=await db.collection('malattie').where('username','==',vecchio).get();
+  {let batch=db.batch(),n=0;
+   for(const d of malSnap.docs){batch.update(d.ref,{username:nuovo});if(++n>=400){await batch.commit();batch=db.batch();n=0}}
+   if(n>0)await batch.commit();}
+
+  // 6) Tutto copiato/aggiornato con successo → elimina i vecchi dati
+  for(const anno of [ANNO_PREC,ANNO]){
+    const giorniSnap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(vecchio).collection('giorni').get();
+    let batch=db.batch(),n=0;
+    for(const d of giorniSnap.docs){batch.delete(d.ref);if(++n>=400){await batch.commit();batch=db.batch();n=0}}
+    if(n>0)await batch.commit();
+  }
+  for(const d of archSnap.docs){
+    await db.collection('dipendenti').doc(vecchio).collection('archivio').doc(d.id).delete();
+  }
+  await db.collection('dipendenti').doc(vecchio).delete();
+
+  // 7) Aggiorna le cache locali in memoria
+  const idx=dipList.findIndex(e=>e.username===vecchio);
+  if(idx>-1)dipList[idx]={username:nuovo,...datiCompleti};
+  if(dipDataCache[vecchio]){dipDataCache[nuovo]=dipDataCache[vecchio];delete dipDataCache[vecchio]}
 }
 
 // NB: toggleDip/sbloccaDip/eliminaDip aggiornano SOLO il documento del dipendente interessato
