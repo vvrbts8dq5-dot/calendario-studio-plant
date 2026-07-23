@@ -399,22 +399,22 @@ tbody tr:hover{background:var(--paper)}
         <div class="page-header">
           <div class="page-title">Ferie & Assenze</div>
           <div style="display:flex;gap:8px">
-            <select class="f-select" id="filtro-tipo-ferie" onchange="renderFerie()" style="font-size:12px">
-              <option value="tutte">Tutti i tipi</option>
-              <option value="ferie">Ferie</option>
-              <option value="permesso">Permessi</option>
-              <option value="rol">ROL</option>
-              <option value="malattia">Malattia</option>
-            </select>
+            <select class="f-select" id="ferie-dip-filter" onchange="renderFerie()" style="font-size:12px"><option value="">Tutti i dipendenti</option></select>
             <button class="btn btn-verde btn-sm" onclick="esportaFerieExcel()">📥 Excel</button>
           </div>
         </div>
-        <div class="filtri">
+        <div class="filtri" id="filtri-stato-ferie">
           <button class="btn-filtro active" onclick="setFiltro(this,'in_attesa')">⏳ In attesa <span id="cnt-attesa">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'approvata')">✓ Approvate <span id="cnt-approvata">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'rifiutata')">✕ Rifiutate <span id="cnt-rifiutata">0</span></button>
-          <button class="btn-filtro" onclick="setFiltro(this,'malattia')">🤒 Malattie</button>
           <button class="btn-filtro" onclick="setFiltro(this,'tutte')">Tutte <span id="cnt-tutte">0</span></button>
+        </div>
+        <div class="filtri" id="filtri-tipo-ferie" style="margin-top:8px">
+          <button class="btn-filtro active" onclick="setFiltroTipo(this,'tutti')">Tutti i tipi</button>
+          <button class="btn-filtro" onclick="setFiltroTipo(this,'ferie')">🏖️ Ferie</button>
+          <button class="btn-filtro" onclick="setFiltroTipo(this,'malattia')">🤒 Malattia</button>
+          <button class="btn-filtro" onclick="setFiltroTipo(this,'permesso')">🕐 Permesso</button>
+          <button class="btn-filtro" onclick="setFiltroTipo(this,'rol')">🔄 ROL</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -704,7 +704,7 @@ const CAMPI=[
 const CN=CAMPI.filter(c=>c.t==='n');
 const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia'};
 
-let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa';
+let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa',filtroTipoF='tutti';
 // Cache globale richieste/malattie per utente — riempita da loadDashboard
 let ADM_richPerUser={},ADM_malPerUser={};
 let detUser=null,detMese=new Date().getMonth(),detDays={},detGiorno=null;
@@ -871,11 +871,15 @@ async function aggiornaGlobale(){
   try{
     const activePage=document.querySelector('.page.active');
     const pid=activePage?activePage.id.replace('page-',''):'dashboard';
-    if(pid==='dashboard')await loadDashboard();
-    else if(pid==='dettaglio'&&detUser)await loadDetMese();
-    else if(pid==='ferie')await loadRichieste();
-    else if(pid==='dipendenti')await loadDipendenti();
-    else if(pid==='straordinari')await loadStraordinari();
+    // Rinfresca SEMPRE le cache condivise (dipendenti, ore, richieste ferie, malattie) da Firestore.
+    // Prima "Aggiorna" su Ferie&Assenze/Straordinari ridisegnava solo i dati già in memoria dal
+    // login, quindi le nuove richieste dei dipendenti non comparivano finché non si usciva e
+    // rientrava nell'app: loadDashboard() è l'unica funzione che rifà davvero le query.
+    await loadDashboard();
+    if(pid==='dettaglio'&&detUser)await loadDetMese();
+    else if(pid==='ferie')loadRichieste();
+    else if(pid==='dipendenti')loadDipendenti();
+    else if(pid==='straordinari')loadStraordinari();
     else if(pid==='costi')await loadCostiMensili();
     else if(pid==='archivio')await loadArchivio();
     else if(pid==='titolare')await loadTitolarePage(true);
@@ -1251,25 +1255,36 @@ function loadRichieste(){
   document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
   document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
   document.getElementById('cnt-tutte').textContent=tutteR.length;
+  const df=document.getElementById('ferie-dip-filter');
+  if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=d.nomeCompleto||d.username;df.appendChild(o)});
   renderFerie();
   }catch(e){console.error('Errore caricamento richieste:',e)}
 }
 
 function setFiltro(btn,f){
   filtroF=f;
-  document.querySelectorAll('.btn-filtro').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#filtri-stato-ferie .btn-filtro').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFerie();
+}
+
+function setFiltroTipo(btn,t){
+  filtroTipoF=t;
+  document.querySelectorAll('#filtri-tipo-ferie .btn-filtro').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderFerie();
 }
 
 function renderFerie(){
-  const tipoFiltro=document.getElementById('filtro-tipo-ferie')?.value||'tutte';
+  const dipFiltro=document.getElementById('ferie-dip-filter')?.value||'';
   let lista;
-  if(filtroF==='malattia'){
-    // Mostra malattie
+  if(filtroTipoF==='malattia'){
+    // Mostra malattie — non hanno uno "stato" di approvazione, solo il dipendente le registra
+    let listaM=tutteMalattie;
+    if(dipFiltro)listaM=listaM.filter(r=>r.username===dipFiltro);
     const tbody=document.getElementById('tbody-ferie');
-    if(!tutteMalattie.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna malattia registrata.</td></tr>';return}
-    tbody.innerHTML=tutteMalattie.map(r=>`<tr style="cursor:default">
+    if(!listaM.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna malattia registrata.</td></tr>';return}
+    tbody.innerHTML=listaM.map(r=>`<tr style="cursor:default">
       <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
       <td><span class="badge badge-malattia">🤒 Malattia</span></td>
       <td style="font-family:'Inter',monospace;font-size:11px">${r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`}</td>
@@ -1282,7 +1297,8 @@ function renderFerie(){
   }
   lista=tutteR;
   if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
-  if(tipoFiltro!=='tutte')lista=lista.filter(r=>r.tipo===tipoFiltro);
+  if(filtroTipoF!=='tutti')lista=lista.filter(r=>r.tipo===filtroTipoF);
+  if(dipFiltro)lista=lista.filter(r=>r.username===dipFiltro);
   const tbody=document.getElementById('tbody-ferie');
   if(!lista.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna richiesta.</td></tr>';return}
   tbody.innerHTML=lista.map(r=>{
@@ -1925,7 +1941,11 @@ async function convalidaStraord(username,docId,stato){
     document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
     document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
     document.getElementById('cnt-straord-no').textContent=tuttiStraord.filter(s=>s.stato==='non_autorizzati').length;
-    aggiornaBadgeStraord();
+    // Badge sidebar aggiornato dalla cache locale già aggiornata sopra — NIENTE nuova query
+    // (prima chiamava aggiornaBadgeStraord() che rifaceva una query Firestore per OGNI dipendente
+    // ad ogni click di convalida, stesso identico problema di lentezza del bug Sblocca/Blocca)
+    const badge=document.getElementById('badge-straord');
+    if(badge){const cnt=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'')}
   }catch(e){alert('Errore: '+e.message)}
 }
 
