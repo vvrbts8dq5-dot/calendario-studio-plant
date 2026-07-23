@@ -210,6 +210,23 @@ tbody tr:last-child{border-bottom:none}
 .mal-giorni{font-size:12px;color:var(--ink4)}
 .mal-nota{font-size:12px;color:var(--ink3)}
 
+/* CALENDARIO CONDIVISO FERIE */
+.cal-ferie-wrap{border:.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:20px;background:var(--white)}
+.cal-ferie-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.cal-ferie-nav{display:flex;align-items:center;gap:8px}
+.cal-ferie-label{font-family:'Inter',sans-serif;font-weight:700;font-size:13px;min-width:120px;text-align:center;text-transform:capitalize}
+.cal-ferie-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-dow{font-size:10px;color:var(--ink4);text-align:center;font-weight:700;padding:4px 0;text-transform:uppercase}
+.cal-ferie-cell{min-height:60px;border-radius:6px;background:var(--paper);padding:4px;display:flex;flex-direction:column;gap:2px}
+.cal-ferie-cell.cal-ferie-empty{background:none}
+.cal-ferie-cell.cal-ferie-oggi{outline:1.5px solid var(--blu)}
+.cal-ferie-num{font-size:10px;font-weight:600;color:var(--ink3)}
+.cal-ferie-chips{display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.cal-ferie-chip{font-size:9px;padding:1px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ferie-chip-more{font-size:9px;color:var(--ink4)}
+.cal-legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--ink4);flex-wrap:wrap;align-items:center}
+.cal-legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+
 /* RESPONSIVE */
 .btn-hamburger{display:none;background:none;border:none;color:var(--ink2);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px}
 .btn-hamburger:hover{background:var(--paper2)}
@@ -351,6 +368,25 @@ tbody tr:last-child{border-bottom:none}
 
         <!-- Saldi -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px" id="saldi-cards"></div>
+
+        <!-- Calendario condiviso: chi è in ferie -->
+        <div class="cal-ferie-wrap">
+          <div class="cal-ferie-head">
+            <div style="font-size:14px;font-weight:700">📅 Chi è in ferie</div>
+            <div class="cal-ferie-nav">
+              <button class="btn btn-sm" onclick="calFeriePrev()">←</button>
+              <div class="cal-ferie-label" id="cal-ferie-label"></div>
+              <button class="btn btn-sm" onclick="calFerieNext()">→</button>
+            </div>
+          </div>
+          <div class="cal-ferie-grid" id="cal-ferie-grid"></div>
+          <div class="cal-legend">
+            <span><span class="cal-legend-dot" style="background:var(--verde)"></span>Ferie</span>
+            <span><span class="cal-legend-dot" style="background:var(--blu)"></span>Permesso</span>
+            <span><span class="cal-legend-dot" style="background:var(--viola)"></span>ROL</span>
+            <span>👑 Titolare</span>
+          </div>
+        </div>
 
         <!-- Tabs -->
         <div class="assenze-tabs">
@@ -519,6 +555,7 @@ let assTab='ferie';
 let ALL_GIORNI={};  // {data_string: {campi...}} — tutti i giorni dell'anno
 let ALL_ASSENZE=[]; // [{id,tipo,stato,dataInizio,...}] — tutte le richieste assenza
 let ALL_MALATTIE=[]; // [{id,dataInizio,dataFine,...}] — tutte le malattie
+let ALL_ASSENZE_TUTTI=[]; // ferie/permessi/rol approvati di TUTTI (dipendenti+titolari) — calendario condiviso
 let DATI_CARICATI=false;
 
 function pad(n){return String(n).padStart(2,'0')}
@@ -633,15 +670,18 @@ async function checkInattivita(){
 // CARICAMENTO DATI CENTRALIZZATO — una sola volta all'avvio
 async function caricaTuttiDati(){
   try{
-    const [giorniSnap, assenzeSnap, malattieSnap] = await Promise.all([
+    const [giorniSnap, assenzeSnap, malattieSnap, tutteAssenzeSnap] = await Promise.all([
       db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get(),
       db.collection('richieste_assenza').where('username','==',U.username).get(),
-      db.collection('malattie').where('username','==',U.username).get()
+      db.collection('malattie').where('username','==',U.username).get(),
+      db.collection('richieste_assenza').where('stato','==','approvata').get()
     ]);
     ALL_GIORNI={};
     giorniSnap.forEach(d=>{ALL_GIORNI[d.id]=d.data()});
     ALL_ASSENZE=assenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
     ALL_MALATTIE=malattieSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // Tutte le ferie/permessi/rol approvati di TUTTI (dipendenti + titolari) — per il calendario condiviso
+    ALL_ASSENZE_TUTTI=tutteAssenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
     DATI_CARICATI=true;
     console.log('Dati caricati:',Object.keys(ALL_GIORNI).length,'giorni,',ALL_ASSENZE.length,'assenze,',ALL_MALATTIE.length,'malattie');
   }catch(e){
@@ -663,6 +703,7 @@ async function startApp(){
   await caricaTuttiDati();
   loadMese(meseSel);
   aggiornaRiepilogoSaldi();
+  renderCalendarioFerie();
   // init select riepilogo mesi
   const sr=document.getElementById('sel-mese-riepilogo');
   MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m+' '+ANNO;if(i===meseSel)o.selected=true;sr.appendChild(o)});
@@ -940,6 +981,51 @@ function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)
 // Segnala all'admin (pulsante Aggiorna) che ci sono nuovi dati da vedere
 function segnalaAttivita(tipo){
   db.collection('meta').doc('lastActivity').set({username:U.username,tipo,timestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.log('Segnalazione attività fallita:',e.message));
+}
+
+// ── CALENDARIO CONDIVISO FERIE (sola lettura: chi è in ferie/permesso/rol tra tutti) ──
+let calFerieMese=new Date();calFerieMese.setDate(1);
+const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const CAL_FERIE_LABEL={ferie:'Ferie',permesso:'Permesso',rol:'ROL'};
+function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
+function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
+function renderCalendarioFerie(){
+  const grid=document.getElementById('cal-ferie-grid');
+  if(!grid)return;
+  const anno=calFerieMese.getFullYear(),mese=calFerieMese.getMonth();
+  document.getElementById('cal-ferie-label').textContent=CAL_FERIE_MESI[mese]+' '+anno;
+  const giorniMese=new Date(anno,mese+1,0).getDate();
+  let offset=new Date(anno,mese,1).getDay();offset=offset===0?6:offset-1; // lunedì=0
+  const perGiorno={};
+  ALL_ASSENZE_TUTTI.filter(r=>r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol').forEach(r=>{
+    if(!r.dataInizio||!r.dataFine)return;
+    let d=new Date(r.dataInizio+'T00:00:00');
+    const fine=new Date(r.dataFine+'T00:00:00');
+    let guard=0;
+    while(d<=fine&&guard<400){
+      if(d.getFullYear()===anno&&d.getMonth()===mese)(perGiorno[d.getDate()]=perGiorno[d.getDate()]||[]).push(r);
+      d.setDate(d.getDate()+1);guard++;
+    }
+  });
+  const COL={ferie:'var(--verde)',permesso:'var(--blu)',rol:'var(--viola)'};
+  const oggi=new Date();
+  let html='';
+  ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
+  for(let i=0;i<offset;i++)html+='<div class="cal-ferie-cell cal-ferie-empty"></div>';
+  for(let g=1;g<=giorniMese;g++){
+    const persone=perGiorno[g]||[];
+    const isOggi=oggi.getFullYear()===anno&&oggi.getMonth()===mese&&oggi.getDate()===g;
+    html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}">
+      <div class="cal-ferie-num">${g}</div>
+      <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
+        const c=COL[r.tipo]||'var(--ink3)';
+        const ic=r.daTitolare?'👑 ':'';
+        const nome=(r.nomeCompleto||r.username||'').split(' ')[0];
+        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c}" title="${r.nomeCompleto||r.username} — ${CAL_FERIE_LABEL[r.tipo]||r.tipo}">${ic}${nome}</span>`;
+      }).join('')}${persone.length>3?`<span class="cal-ferie-chip-more">+${persone.length-3}</span>`:''}</div>
+    </div>`;
+  }
+  grid.innerHTML=html;
 }
 
 // RICHIESTE ASSENZE
