@@ -429,14 +429,31 @@ tbody tr:hover{background:var(--paper)}
               <button class="btn btn-sm" onclick="calFeriePrev()">←</button>
               <div class="cal-ferie-label" id="cal-ferie-label"></div>
               <button class="btn btn-sm" onclick="calFerieNext()">→</button>
+              <button class="btn btn-rosso btn-sm" id="btn-chiusura" style="margin-left:8px">+ Chiusura Ufficio</button>
+            </div>
+          </div>
+          <div class="form-box" id="form-chiusura" style="margin-bottom:12px">
+            <div class="section-title">Nuova Chiusura Ufficio</div>
+            <div id="alert-chiusura"></div>
+            <div class="form-grid">
+              <div><label class="fl">Data Inizio</label><input class="fi" id="ch-inizio" type="date"></div>
+              <div><label class="fl">Data Fine</label><input class="fi" id="ch-fine" type="date"></div>
+              <div style="grid-column:1/-1"><label class="fl">Motivo</label><input class="fi" id="ch-motivo" type="text" placeholder="es. Chiusura natalizia, Ponte del 25 aprile..."></div>
+            </div>
+            <div class="modal-actions" style="justify-content:flex-start;margin-top:10px">
+              <button class="btn btn-ink" onclick="salvaChiusura()">✓ Salva Chiusura</button>
+              <button class="btn" onclick="chiudiFormChiusura()">Annulla</button>
             </div>
           </div>
           <div class="cal-ferie-grid" id="cal-ferie-grid"></div>
+          <div id="lista-chiusure" style="margin-top:10px"></div>
           <div class="cal-legend">
             <span><span class="cal-legend-dot" style="background:var(--verde)"></span>Ferie</span>
             <span><span class="cal-legend-dot" style="background:var(--blu)"></span>Permesso</span>
             <span><span class="cal-legend-dot" style="background:var(--viola)"></span>ROL</span>
             <span>👑 Titolare</span>
+            <span><span class="cal-legend-dot" style="background:var(--rosso-light);border:1px solid var(--rosso)"></span>Chiusura uffici</span>
+            <span><span class="cal-legend-dot" style="background:var(--verde-light);border:1px solid var(--verde)"></span>Festivo/Weekend</span>
             <span id="cal-ferie-hint" style="display:none;color:var(--ink4)">Clicca un giorno per segnare/rimuovere le tue ferie</span>
           </div>
         </div>
@@ -743,7 +760,7 @@ const CAMPI=[
 const CN=CAMPI.filter(c=>c.t==='n');
 const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia'};
 
-let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa',filtroTipoF='tutti';
+let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa',filtroTipoF='tutti',chiusureUfficio=[];
 // Cache globale richieste/malattie per utente — riempita da loadDashboard
 let ADM_richPerUser={},ADM_malPerUser={};
 let detUser=null,detMese=new Date().getMonth(),detDays={},detGiorno=null;
@@ -990,8 +1007,12 @@ async function loadDashboard(){
   }));
 
   // Carica saldi per tutti
-  const richSnap=await db.collection('richieste_assenza').get();
-  const malSnap=await db.collection('malattie').get();
+  const [richSnap,malSnap,chiusSnap]=await Promise.all([
+    db.collection('richieste_assenza').get(),
+    db.collection('malattie').get(),
+    db.collection('chiusure').get()
+  ]);
+  chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
   ADM_richPerUser={};ADM_malPerUser={};
   richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_richPerUser[r.username])ADM_richPerUser[r.username]=[];ADM_richPerUser[r.username].push(r)});
   malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_malPerUser[r.username])ADM_malPerUser[r.username]=[];ADM_malPerUser[r.username].push(r)});
@@ -1321,7 +1342,13 @@ function renderCalendarioFerie(){
     const persone=perGiorno[g]||[];
     const isOggi=oggi.getFullYear()===anno&&oggi.getMonth()===mese&&oggi.getDate()===g;
     const clickable=isTitolare();
-    html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}${clickable?' cal-ferie-click':''}"${clickable?` onclick="calClickGiorno(${anno},${mese},${g})"`:''}>
+    const ds=anno+'-'+String(mese+1).padStart(2,'0')+'-'+String(g).padStart(2,'0');
+    const dow=new Date(anno,mese,g).getDay();
+    const chius=chiusuraDelGiorno(ds);
+    let bg='',tip='';
+    if(chius){bg='background:var(--rosso-light)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
+    else if(isFestivo(ds)||dow===0||dow===6){bg='background:var(--verde-light)'}
+    html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}${clickable?' cal-ferie-click':''}" style="${bg}"${tip}${clickable?` onclick="calClickGiorno(${anno},${mese},${g})"`:''}>
       <div class="cal-ferie-num">${g}</div>
       <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
         const c=COL[r.tipo]||'var(--ink3)';
@@ -1332,6 +1359,55 @@ function renderCalendarioFerie(){
     </div>`;
   }
   grid.innerHTML=html;
+  renderListaChiusure();
+}
+// Trova la chiusura ufficio (se esiste) che copre la data ds ('YYYY-MM-DD')
+function chiusuraDelGiorno(ds){
+  return chiusureUfficio.find(c=>c.dataInizio&&c.dataFine&&ds>=c.dataInizio&&ds<=c.dataFine);
+}
+function renderListaChiusure(){
+  const el=document.getElementById('lista-chiusure');
+  if(!el)return;
+  if(!chiusureUfficio.length){el.innerHTML='';return}
+  const ordinate=[...chiusureUfficio].sort((a,b)=>(a.dataInizio||'').localeCompare(b.dataInizio||''));
+  el.innerHTML='<div style="font-size:11px;color:var(--ink4);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;font-weight:700">Chiusure programmate</div>'+
+    ordinate.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:6px;background:var(--rosso-light);margin-bottom:4px;font-size:12px">
+      <span>🔒 <strong>${c.motivo||'Chiusura ufficio'}</strong> — ${fmtD(c.dataInizio)}${c.dataInizio!==c.dataFine?' → '+fmtD(c.dataFine):''}</span>
+      <button class="btn btn-sm" onclick="eliminaChiusura('${c.id}')" style="padding:2px 8px">🗑️</button>
+    </div>`).join('');
+}
+document.getElementById('btn-chiusura')?.addEventListener('click',()=>{
+  document.getElementById('form-chiusura').classList.add('open');
+  document.getElementById('btn-chiusura').style.display='none';
+});
+function chiudiFormChiusura(){
+  document.getElementById('form-chiusura').classList.remove('open');
+  document.getElementById('btn-chiusura').style.display='';
+  ['ch-inizio','ch-fine','ch-motivo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('alert-chiusura').innerHTML='';
+}
+async function salvaChiusura(){
+  const ini=document.getElementById('ch-inizio').value;
+  const fin=document.getElementById('ch-fine').value||ini;
+  const motivo=document.getElementById('ch-motivo').value.trim();
+  const al=document.getElementById('alert-chiusura');
+  if(!ini){al.innerHTML='<div class="alert-box alert-err">Inserisci almeno la data di inizio.</div>';return}
+  if(fin<ini){al.innerHTML='<div class="alert-box alert-err">La data fine non può precedere la data inizio.</div>';return}
+  try{
+    const rec={dataInizio:ini,dataFine:fin,motivo:motivo||'Chiusura ufficio',creatoDa:ADM.username,createdAt:new Date().toISOString()};
+    const ref=await db.collection('chiusure').add(rec);
+    chiusureUfficio.push({id:ref.id,...rec});
+    chiudiFormChiusura();
+    renderCalendarioFerie();
+  }catch(e){al.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+async function eliminaChiusura(id){
+  if(!confirm('Eliminare questa chiusura ufficio?'))return;
+  try{
+    await db.collection('chiusure').doc(id).delete();
+    chiusureUfficio=chiusureUfficio.filter(c=>c.id!==id);
+    renderCalendarioFerie();
+  }catch(e){alert('Errore: '+e.message)}
 }
 async function calClickGiorno(anno,mese,giorno){
   if(!isTitolare())return;
