@@ -835,6 +835,159 @@ function aggiornaRiepilogoSaldi(){
   }catch(e){console.error('Errore aggiornamento saldi:',e)}
 }
 
+// CALENDARIO
+function initCal(){
+  document.getElementById('cal-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const sel=document.getElementById('sel-mese');
+  MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m+' '+ANNO;if(i===meseSel)o.selected=true;sel.appendChild(o)});
+  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);loadMese(meseSel)});
+  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
+  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<11){meseSel++;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
+}
+
+function loadMese(m){
+  const ms=pad(m+1);
+  cache={};
+  // Legge dalla cache locale — ZERO query Firestore
+  Object.entries(ALL_GIORNI).forEach(([id,data])=>{
+    if(id.startsWith(ANNO+'-'+ms))cache[id]={...data};
+  });
+  // Assenze approvate per colorare il calendario
+  ALL_ASSENZE.filter(r=>r.stato==='approvata').forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(ANNO+'-'+ms)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  // Malattie
+  ALL_MALATTIE.forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(ANNO+'-'+ms)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  renderCal(m);
+}
+
+function renderCal(m){
+  const g=document.getElementById('cal-giorni');g.innerHTML='';
+  const primo=getPrimo(m),giorni=getDays(m);
+  for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
+  for(let day=1;day<=giorni;day++){
+    const ds=dsOf(m,day);
+    const dati=cache[ds];
+    const festivo=isFestivo(ds);
+    const assenza=dati?dati['_tipo_assenza']:null;
+    const btn=document.createElement('button');
+    let cls='cal-day';
+    if(isWE(m,day))cls+=' weekend';
+    if(festivo)cls+=' festivo';
+    if(assenza==='ferie')cls+=' ferie-day';
+    else if(assenza==='malattia')cls+=' malattia-day';
+    else if(hasD(dati))cls+=' has-data';
+    if(giornoSel===ds)cls+=' selected';
+    btn.className=cls;btn.textContent=day;
+    btn.onclick=()=>selectDay(ds);
+    g.appendChild(btn);
+  }
+}
+
+function selectDay(ds){
+  giornoSel=ds;renderCal(meseSel);
+  let dati=cache[ds]||ALL_GIORNI[ds]||null;
+  renderForm(ds,dati||{});
+}
+
+function renderForm(ds,dati){
+  const[y,m,g]=ds.split('-');
+  const label=`${g} ${MESI[parseInt(m)-1]} ${y}`;
+  const festivo=isFestivo(ds);
+  const totOre=totaleGiorno(dati);
+  let html=`<div class="form-header">
+    <div>
+      <div class="form-date">${label}</div>
+      ${festivo?'<div style="font-size:11px;color:var(--amber);margin-top:2px">★ Giorno festivo</div>':''}
+    </div>
+    <div class="form-actions">
+      <span class="save-status" id="sv-status"></span>
+      <button class="btn btn-blu btn-sm" onclick="saveDayManual()">💾 Salva</button>
+    </div>
+  </div><div class="fields-grid">`;
+  CAMPI.forEach(c=>{
+    const v=dati[c.k]!==undefined?dati[c.k]:'';
+    if(c.t==='textarea'){
+      html+=`<div class="field-group full"><label class="field-label">${c.l}</label><textarea class="field-input field-textarea" id="f-${c.k}" oninput="fieldChange('${c.k}',this.value)">${v}</textarea></div>`;
+    }else{
+      html+=`<div class="field-group"><label class="field-label">${c.l}</label><input class="field-input" type="${c.t}" id="f-${c.k}" value="${v}" ${c.t==='number'?'min="0" step="0.5"':''} placeholder="${c.ph||'0'}" oninput="fieldChange('${c.k}',this.value)"></div>`;
+    }
+  });
+  html+=`</div>`;
+  if(totOre>0){
+    html+=`<div class="totale-giorno"><span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${totOre}h</span></div>`;
+  }
+  // Mostra stato straordinari se presenti
+  const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
+  const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
+  if(straEl>0||straMec>0){
+    const stato=dati.statoStraordinari||'da_convalidare';
+    const statoMap={da_convalidare:{label:'⏳ In attesa di convalida',bg:'var(--amber-light)',color:'var(--amber)'},autorizzati:{label:'✓ Straordinari autorizzati',bg:'var(--verde-light)',color:'var(--verde)'},non_autorizzati:{label:'✕ Straordinari non autorizzati',bg:'var(--rosso-light)',color:'var(--rosso)'}};
+    const s=statoMap[stato]||statoMap.da_convalidare;
+    html+=`<div style="margin-top:8px;background:${s.bg};border-radius:6px;padding:8px 12px;font-size:12px;color:${s.color};font-weight:500">⚡ ${s.label}</div>`;
+  }
+  document.getElementById('form-giorno').innerHTML=html;
+}
+
+function fieldChange(k,v){
+  if(!giornoSel)return;
+  if(!cache[giornoSel])cache[giornoSel]={};
+  cache[giornoSel][k]=CAMPI.find(c=>c.k===k)?.t==='number'?(v===''?'':parseFloat(v)||0):v;
+  if(saveTimer)clearTimeout(saveTimer);
+  // Aggiorna totale in tempo reale
+  const tot=totaleGiorno(cache[giornoSel]);
+  const totEl=document.querySelector('.totale-giorno-val');
+  if(totEl)totEl.textContent=tot+'h';
+  else if(tot>0){
+    const form=document.getElementById('form-giorno');
+    const div=document.createElement('div');div.className='totale-giorno';
+    div.innerHTML=`<span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${tot}h</span>`;
+    form.appendChild(div);
+  }
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+}
+
+async function saveDay(ds){
+  if(!ds||!cache[ds])return;
+  const st=document.getElementById('sv-status');
+  if(st)st.innerHTML='<span class="save-loading">Salvataggio...</span>';
+  try{
+    const toSave={};
+    Object.entries(cache[ds]).forEach(([k,v])=>{if(!k.startsWith('_'))toSave[k]=v});
+    // Flag hasStraordinari per permettere all'admin di trovarli facilmente
+    const straEl=parseFloat(toSave.oreStraordinariElettrico)||0;
+    const straMec=parseFloat(toSave.oreStraordinariMeccanico)||0;
+    toSave.hasStraordinari=(straEl>0||straMec>0);
+    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    segnalaAttivita('ore');
+    // Aggiorna cache locale immediatamente
+    ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
+    if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
+    renderCal(meseSel);
+    setTimeout(()=>{if(st)st.innerHTML=''},2500);
+  }catch(e){if(st)st.innerHTML='<span class="save-err">✗ Errore</span>'}
+}
+function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)}
+
+// Segnala all'admin (pulsante Aggiorna) che ci sono nuovi dati da vedere
+function segnalaAttivita(tipo){
+  db.collection('meta').doc('lastActivity').set({username:U.username,tipo,timestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.log('Segnalazione attività fallita:',e.message));
+}
+
 // CALENDARIO FERIE CONDIVISO (dipendenti + titolari) — sola lettura per i dipendenti
 let calFerieMese=new Date();calFerieMese.setDate(1);
 const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
