@@ -927,18 +927,13 @@ function goPage(pid,btn){
 }
 
 // DASHBOARD
+// loadDashboard() interroga Firestore (dipendenti + timesheet annuale di OGNI dipendente + richieste + malattie):
+// è pesante di proposito (dati completi), quindi va chiamata solo all'avvio o su refresh esplicito.
+// Dopo una semplice modifica di un dipendente (sblocco, blocco, modifica, creazione, eliminazione) si usa
+// invece renderDashboardFromCache(), che ridisegna le tabelle SENZA rifare le query — istantaneo.
 async function loadDashboard(){
   const usersSnap=await db.collection('dipendenti').get();
   dipList=usersSnap.docs.map(d=>({username:d.id,...d.data()}));
-
-  // Sidebar rapido accesso
-  const navList=document.getElementById('dip-nav-list');
-  navList.innerHTML=dipList.map(d=>`
-    <button class="dip-nav-item" onclick="apriDettaglio('${d.username}')">
-      <div class="dip-avatar">${initials(d.nome,d.cognome)}</div>
-      <span>${d.nome||''} ${d.cognome||''}</span>
-    </button>
-  `).join('');
 
   // Carica dati timesheets per ogni dipendente
   dipDataCache={};
@@ -950,6 +945,31 @@ async function loadDashboard(){
       dipDataCache[emp.username]={days,totals};
     }catch{dipDataCache[emp.username]={days:{},totals:{}}}
   }));
+
+  // Carica saldi per tutti
+  const richSnap=await db.collection('richieste_assenza').get();
+  const malSnap=await db.collection('malattie').get();
+  ADM_richPerUser={};ADM_malPerUser={};
+  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_richPerUser[r.username])ADM_richPerUser[r.username]=[];ADM_richPerUser[r.username].push(r)});
+  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_malPerUser[r.username])ADM_malPerUser[r.username]=[];ADM_malPerUser[r.username].push(r)});
+  // Salva tutteR e tutteMalattie per la pagina Ferie & Assenze
+  tutteR=richSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  tutteMalattie=malSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+
+  renderDashboardFromCache();
+}
+
+function renderDashboardFromCache(){
+  const richPerUser=ADM_richPerUser,malPerUser=ADM_malPerUser;
+
+  // Sidebar rapido accesso
+  const navList=document.getElementById('dip-nav-list');
+  navList.innerHTML=dipList.map(d=>`
+    <button class="dip-nav-item" onclick="apriDettaglio('${d.username}')">
+      <div class="dip-avatar">${initials(d.nome,d.cognome)}</div>
+      <span>${d.nome||''} ${d.cognome||''}</span>
+    </button>
+  `).join('');
 
   // KPI globali
   const totOreAll=dipList.reduce((s,e)=>s+oreLav(dipDataCache[e.username]?.totals||{}),0);
@@ -963,17 +983,6 @@ async function loadDashboard(){
     {l:'Km Totali',v:totKmAll,u:' km',color:''},
     ...(totBloccati>0?[{l:'⚠️ Bloccati Inattività',v:totBloccati,u:'',color:'color:var(--rosso)'}]:[]),
   ].map(k=>`<div class="kpi" style="${k.color?'border-color:var(--rosso);':''}" ><div class="kpi-label">${k.l}</div><div class="kpi-val" style="${k.color}">${k.v}<span class="kpi-unit">${k.u}</span></div></div>`).join('');
-
-  // Carica saldi per tutti
-  const richSnap=await db.collection('richieste_assenza').get();
-  const malSnap=await db.collection('malattie').get();
-  ADM_richPerUser={};ADM_malPerUser={};
-  const richPerUser=ADM_richPerUser,malPerUser=ADM_malPerUser;
-  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!richPerUser[r.username])richPerUser[r.username]=[];richPerUser[r.username].push(r)});
-  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!malPerUser[r.username])malPerUser[r.username]=[];malPerUser[r.username].push(r)});
-  // Salva tutteR e tutteMalattie per la pagina Ferie & Assenze
-  tutteR=richSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-  tutteMalattie=malSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
 
   // Tabella saldi
   const tbodySaldi=document.getElementById('tbody-saldi');
@@ -1327,7 +1336,6 @@ function chiudiFormDip(){document.getElementById('form-nuovo').classList.remove(
 function loadDipendenti(){
   // Usa dipList già in cache — ZERO query
   const tbody=document.getElementById('tbody-dip');
-  if(!dipList.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">Nessun dipendente.</td></tr>';return}
   if(!dipList.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessun dipendente.</td></tr>';return}
   tbody.innerHTML=dipList.map(d=>{
     const bloccato=d.bloccatoInattivita===true;
@@ -1335,7 +1343,8 @@ function loadDipendenti(){
     const statoClass=bloccato?'badge-rifiutata':d.abilitato?'badge-attivo':'badge-disab';
     return `<tr style="cursor:default;${bloccato?'background:var(--rosso-light)':''}">
       <td style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
-      <td style="font-weight:500">${d.nome||''} ${d.cognome||''}</td>
+      <td style="font-weight:500">${d.nome||''}</td>
+      <td style="font-weight:500">${d.cognome||''}</td>
       <td style="font-family:'Inter',monospace;font-size:12px">${d.password||''}</td>
       <td style="font-size:12px">${oreGiornoDip(d)}h/giorno</td>
       <td class="td-r">${d.monteFerie||0}h</td>
@@ -1366,11 +1375,14 @@ async function creaDipendente(){
   if(!u||!n||!c||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi obbligatori.</div>';return}
   if(!/^[a-z0-9._-]+$/.test(u)){ad.innerHTML='<div class="alert-box alert-err">Username: solo lettere minuscole, numeri, punto e trattino.</div>';return}
   try{
-    await db.collection('dipendenti').doc(u).set({nome:n,cognome:c,password:p,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()});
+    const rec={nome:n,cognome:c,password:p,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()};
+    await db.collection('dipendenti').doc(u).set(rec);
+    dipList.push({username:u,...rec});
+    dipDataCache[u]={days:{},totals:{}};
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
     ['new-u','new-n','new-c','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
-    chiudiFormDip();loadDipendenti();loadDashboard();
+    chiudiFormDip();loadDipendenti();renderDashboardFromCache();
   }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
@@ -1413,7 +1425,7 @@ async function salvaDipendente(){
       const v=parseFloat(document.getElementById('t-'+k)?.value)||0;
       if(v>0)tariffe[k]=v;
     });
-    await db.collection('dipendenti').doc(editUsername).update({
+    const updates={
       nome:document.getElementById('edit-nome').value.trim(),
       cognome:document.getElementById('edit-cognome').value.trim(),
       password:document.getElementById('edit-password').value,
@@ -1425,33 +1437,62 @@ async function salvaDipendente(){
       dataAssunzione:document.getElementById('edit-data-assunzione').value||'',
       tipoContratto:document.getElementById('edit-contratto').value.trim()||'',
       noteInterne:document.getElementById('edit-note-interne').value.trim()||'',
-    });
+    };
+    await db.collection('dipendenti').doc(editUsername).update(updates);
+    const emp=dipList.find(e=>e.username===editUsername);
+    if(emp)Object.assign(emp,updates);
     document.getElementById('modal-dip').classList.remove('open');
     editUsername=null;
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente aggiornato.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
-    loadDipendenti();loadDashboard();
+    loadDipendenti();renderDashboardFromCache();
   }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
+// NB: toggleDip/sbloccaDip/eliminaDip aggiornano SOLO il documento del dipendente interessato
+// e poi ridisegnano le tabelle dalla cache locale (dipList) — nessuna nuova query pesante,
+// quindi la risposta è istantanea. In caso di errore (es. permessi Firestore) il messaggio
+// viene mostrato subito invece di fallire in silenzio.
 async function toggleDip(username,attuale){
-  await db.collection('dipendenti').doc(username).update({abilitato:!attuale});
-  loadDipendenti();
+  const ad=document.getElementById('alert-dip');
+  try{
+    await db.collection('dipendenti').doc(username).update({abilitato:!attuale});
+    const emp=dipList.find(e=>e.username===username);
+    if(emp)emp.abilitato=!attuale;
+    loadDipendenti();renderDashboardFromCache();
+  }catch(e){
+    ad.innerHTML='<div class="alert-box alert-err">Errore: impossibile aggiornare lo stato — '+e.message+'</div>';
+  }
 }
 async function sbloccaDip(username){
-  await db.collection('dipendenti').doc(username).update({
-    abilitato:true,
-    bloccatoInattivita:false,
-    ultimoAccesso:new Date().toISOString()
-  });
-  document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente sbloccato.</div>';
-  setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
-  loadDipendenti();loadDashboard();
+  const ad=document.getElementById('alert-dip');
+  try{
+    const nowIso=new Date().toISOString();
+    await db.collection('dipendenti').doc(username).update({
+      abilitato:true,
+      bloccatoInattivita:false,
+      ultimoAccesso:nowIso
+    });
+    const emp=dipList.find(e=>e.username===username);
+    if(emp){emp.abilitato=true;emp.bloccatoInattivita=false;emp.ultimoAccesso=nowIso;}
+    ad.innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente sbloccato.</div>';
+    setTimeout(()=>ad.innerHTML='',3000);
+    loadDipendenti();renderDashboardFromCache();
+  }catch(e){
+    ad.innerHTML='<div class="alert-box alert-err">Errore: sblocco NON riuscito — '+e.message+'</div>';
+  }
 }
 async function eliminaDip(username,nome){
   if(!confirm('Eliminare il profilo di "'+nome+'"?'))return;
-  await db.collection('dipendenti').doc(username).delete();
-  loadDipendenti();loadDashboard();
+  const ad=document.getElementById('alert-dip');
+  try{
+    await db.collection('dipendenti').doc(username).delete();
+    dipList=dipList.filter(e=>e.username!==username);
+    delete dipDataCache[username];
+    loadDipendenti();renderDashboardFromCache();
+  }catch(e){
+    ad.innerHTML='<div class="alert-box alert-err">Errore: eliminazione non riuscita — '+e.message+'</div>';
+  }
 }
 
 // EXPORT EXCEL DASHBOARD
