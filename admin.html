@@ -1519,7 +1519,11 @@ function chiudiModal(){document.getElementById('modal-ferie').classList.remove('
 async function decidi(stato){
   if(!modalRichiestaId)return;
   const nota=document.getElementById('modal-nota-admin').value;
-  await db.collection('richieste_assenza').doc(modalRichiestaId).update({stato,notaAdmin:nota,decisionAt:new Date().toISOString()});
+  const decisionAt=new Date().toISOString();
+  await db.collection('richieste_assenza').doc(modalRichiestaId).update({stato,notaAdmin:nota,decisionAt});
+  // Aggiorna subito la cache locale, altrimenti la tabella resta con lo stato vecchio finché non si ricarica la pagina
+  const idx=tutteR.findIndex(r=>r.id===modalRichiestaId);
+  if(idx>-1)tutteR[idx]={...tutteR[idx],stato,notaAdmin:nota,decisionAt};
   chiudiModal();loadRichieste();loadRichiesteCount();
 }
 
