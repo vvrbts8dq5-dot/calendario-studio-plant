@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -266,8 +267,8 @@ tbody tr:hover{background:var(--paper)}
     <div class="login-title">Admin Panel</div>
     <div class="login-sub">Accedi al pannello di controllo</div>
     <div class="login-error" id="login-error"></div>
-    <label class="f-label">Nome utente</label>
-    <input class="f-input" id="inp-user" type="text" placeholder="nome.utente" autocomplete="username">
+    <label class="f-label">Email</label>
+    <input class="f-input" id="inp-user" type="email" placeholder="nome.cognome@plantingegneria.com" autocomplete="username">
     <label class="f-label">Password</label>
     <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
     <button class="login-btn" id="btn-login">Accedi come Amministratore</button>
@@ -492,7 +493,8 @@ tbody tr:hover{background:var(--paper)}
             <div><label class="fl">Username (ID login)</label><input class="fi" id="new-u" placeholder="es. mario.rossi" type="text"></div>
             <div><label class="fl">Nome</label><input class="fi" id="new-n" placeholder="Mario" type="text"></div>
             <div><label class="fl">Cognome</label><input class="fi" id="new-c" placeholder="Rossi" type="text"></div>
-            <div><label class="fl">Password</label><input class="fi" id="new-p" placeholder="password" type="text"></div>
+            <div><label class="fl">Email (per l'accesso)</label><input class="fi" id="new-email" placeholder="mario.rossi@plantingegneria.com" type="email"></div>
+            <div><label class="fl">Password iniziale</label><input class="fi" id="new-p" placeholder="password" type="text"></div>
             <div>
               <label class="fl">Ore Giornaliere</label>
               <select class="fi" id="new-orario">
@@ -517,7 +519,7 @@ tbody tr:hover{background:var(--paper)}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Password</th><th>Orario</th><th class="td-r">Ferie</th><th class="td-r">Permessi</th><th class="td-r">ROL</th><th>Stato</th><th>Azioni</th></tr></thead>
+            <thead><tr><th>Username</th><th>Nome</th><th>Cognome</th><th>Email</th><th>Orario</th><th class="td-r">Ferie</th><th class="td-r">Permessi</th><th class="td-r">ROL</th><th>Stato</th><th>Azioni</th></tr></thead>
             <tbody id="tbody-dip"></tbody>
           </table>
         </div>
@@ -681,7 +683,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Nome utente</label><input class="fi" id="edit-username" type="text" placeholder="nome.cognome"></div>
       <div><label class="fl">Nome</label><input class="fi" id="edit-nome" type="text"></div>
       <div><label class="fl">Cognome</label><input class="fi" id="edit-cognome" type="text"></div>
-      <div><label class="fl">Password</label><input class="fi" id="edit-password" type="text"></div>
+      <div><label class="fl">Email (login)</label><input class="fi" id="edit-email" type="email" disabled style="opacity:.6"></div>
       <div>
         <label class="fl">Ore Giornaliere</label>
         <select class="fi" id="edit-orario">
@@ -698,6 +700,10 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
       <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
+    </div>
+    <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <button class="btn" onclick="inviaResetPasswordDip()">✉️ Invia email reset password</button>
+      <span id="alert-reset-pw" style="font-size:11px"></span>
     </div>
     <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">⚠️ Cambiare il nome utente sposta tutto lo storico (ore, ferie, malattie) sul nuovo nome — operazione delicata, chiede conferma.</div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
@@ -736,6 +742,8 @@ tbody tr:hover{background:var(--paper)}
 <script>
 const FC={apiKey:"AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",authDomain:"calendario-studio-plant.firebaseapp.com",projectId:"calendario-studio-plant",storageBucket:"calendario-studio-plant.firebasestorage.app",messagingSenderId:"693007035080",appId:"1:693007035080:web:026feab436ecd3814053fd"};
 firebase.initializeApp(FC);
+const auth=firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>console.log('Persistenza auth:',e.message));
 const db=firebase.firestore();
 
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
@@ -793,28 +801,52 @@ function oreGiornoDip(o){
 // LOGIN
 document.getElementById('btn-login').addEventListener('click',doLogin);
 document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// Trova il documento admins/{username} associato a un'email (l'email è un campo sul documento,
+// lo username resta l'id del documento come prima).
+async function trovaAdminPerEmail(email){
+  const snap=await db.collection('admins').where('email','==',email).limit(1).get();
+  if(snap.empty)return null;
+  const doc=snap.docs[0];
+  return {username:doc.id,data:doc.data()};
+}
+
 async function doLogin(){
-  const u=document.getElementById('inp-user').value.trim().toLowerCase();
+  const email=document.getElementById('inp-user').value.trim().toLowerCase();
   const p=document.getElementById('inp-pass').value;
   const errEl=document.getElementById('login-error');errEl.style.display='none';
-  if(!u||!p){showErr('Inserisci username e password.');return}
+  if(!email||!p){showErr('Inserisci email e password.');return}
   document.getElementById('btn-login').textContent='Accesso...';
   try{
-    const snap=await db.collection('admins').doc(u).get();
-    if(!snap.exists){showErr('Utente non trovato.');return}
-    const d=snap.data();
-    if(!d.abilitato){showErr('Account non abilitato.');return}
-    if(d.password!==p){showErr('Password errata.');return}
+    await auth.signInWithEmailAndPassword(email,p);
+    const trovato=await trovaAdminPerEmail(email);
+    if(!trovato){showErr('Utente non trovato.');await auth.signOut();return}
+    const d=trovato.data,u=trovato.username;
+    if(!d.abilitato){showErr('Account non abilitato.');await auth.signOut();return}
     ADM={username:u,nome:d.nome||u,ruolo:d.ruolo||'admin',orePreviste:d.orePreviste||0};
-    sessionStorage.setItem('adm_sess',JSON.stringify(ADM));
     startApp();
-  }catch(e){showErr('Errore: '+e.message)}
+  }catch(e){
+    if(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(e.code)){showErr('Email o password errati.')}
+    else{showErr('Errore: '+e.message)}
+  }
   finally{document.getElementById('btn-login').textContent='Accedi come Amministratore'}
 }
 function showErr(m){const e=document.getElementById('login-error');e.textContent=m;e.style.display='block'}
 
-const sess=sessionStorage.getItem('adm_sess');
-if(sess){try{ADM=JSON.parse(sess);startApp()}catch(e){sessionStorage.removeItem('adm_sess')}}
+// Ripristino sessione tramite Firebase Auth (persistenza SESSION: come prima, si esce chiudendo la scheda)
+auth.onAuthStateChanged(async user=>{
+  if(!user||ADM)return;
+  try{
+    const trovato=await trovaAdminPerEmail(user.email);
+    if(trovato&&trovato.data.abilitato){
+      const d=trovato.data;
+      ADM={username:trovato.username,nome:d.nome||trovato.username,ruolo:d.ruolo||'admin',orePreviste:d.orePreviste||0};
+      startApp();
+    }else{
+      await auth.signOut();
+    }
+  }catch(e){console.log('Ripristino sessione:',e.message)}
+});
 
 const ANNO_CORRENTE=new Date().getFullYear();
 // Determina anno attivo: se siamo a gennaio, l'anno attivo è quello corrente ma è ancora modificabile l'anno precedente
@@ -952,10 +984,11 @@ async function aggiornaGlobale(){
   }
 }
 
-document.getElementById('btn-logout').addEventListener('click',()=>{
-  sessionStorage.removeItem('adm_sess');ADM=null;
+document.getElementById('btn-logout').addEventListener('click',async()=>{
+  ADM=null;
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display='flex';
+  try{await auth.signOut()}catch(e){console.log('Logout:',e.message)}
 });
 
 // SIDEBAR MOBILE
@@ -1546,7 +1579,7 @@ function loadDipendenti(){
       <td style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${d.username}</td>
       <td style="font-weight:500">${d.nome||''}</td>
       <td style="font-weight:500">${d.cognome||''}</td>
-      <td style="font-family:'Inter',monospace;font-size:12px">${d.password||''}</td>
+      <td style="font-family:'Inter',monospace;font-size:11px;color:var(--ink4)">${d.email||''}</td>
       <td style="font-size:12px">${oreGiornoDip(d)}h/giorno</td>
       <td class="td-r">${d.monteFerie||0}h</td>
       <td class="td-r">${d.montePermesso||0}h</td>
@@ -1563,28 +1596,57 @@ function loadDipendenti(){
   }).join('');
 }
 
+// Crea un account Firebase Auth usando un'app Firebase "secondaria" temporanea, così la
+// sessione dell'admin che sta operando NON viene disconnessa (createUserWithEmailAndPassword
+// su firebase.auth() normale logga automaticamente il nuovo utente al posto tuo).
+// L'app secondaria viene distrutta subito dopo l'uso.
+async function creaAccountAuthSecondario(email,password){
+  const nomeApp='Secondary_'+Date.now();
+  const secondaryApp=firebase.initializeApp(FC,nomeApp);
+  try{
+    const cred=await secondaryApp.auth().createUserWithEmailAndPassword(email,password);
+    await secondaryApp.auth().signOut();
+    return cred.user.uid;
+  }finally{
+    await secondaryApp.delete();
+  }
+}
+
 async function creaDipendente(){
   const u=document.getElementById('new-u').value.trim().toLowerCase();
   const n=document.getElementById('new-n').value.trim();
   const c=document.getElementById('new-c').value.trim();
+  const email=document.getElementById('new-email').value.trim().toLowerCase();
   const p=document.getElementById('new-p').value;
   const orario=document.getElementById('new-orario').value;
   const ferie=parseFloat(document.getElementById('new-ferie').value)||0;
   const permessi=parseFloat(document.getElementById('new-permessi').value)||0;
   const rol=parseFloat(document.getElementById('new-rol').value)||0;
   const ad=document.getElementById('alert-form-dip');ad.innerHTML='';
-  if(!u||!n||!c||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi obbligatori.</div>';return}
+  if(!u||!n||!c||!email||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi obbligatori.</div>';return}
   if(!/^[a-z0-9._-]+$/.test(u)){ad.innerHTML='<div class="alert-box alert-err">Username: solo lettere minuscole, numeri, punto e trattino.</div>';return}
+  if(p.length<6){ad.innerHTML='<div class="alert-box alert-err">La password deve avere almeno 6 caratteri (richiesto da Firebase).</div>';return}
+  const btnCrea=document.querySelector('#form-nuovo button.btn-ink');
+  if(btnCrea){btnCrea.disabled=true;btnCrea.textContent='Creazione account...'}
   try{
-    const rec={nome:n,cognome:c,password:p,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()};
+    // 1) Crea l'account di accesso (Firebase Authentication)
+    await creaAccountAuthSecondario(email,p);
+    // 2) Scrive il profilo su Firestore — NIENTE password in chiaro, solo l'email per il login
+    const rec={nome:n,cognome:c,email,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()};
     await db.collection('dipendenti').doc(u).set(rec);
     dipList.push({username:u,...rec});
     dipDataCache[u]={days:{},totals:{}};
-    document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo.</div>';
-    setTimeout(()=>document.getElementById('alert-dip').innerHTML='',3000);
-    ['new-u','new-n','new-c','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo. Può accedere con l\'email '+email+'.</div>';
+    setTimeout(()=>document.getElementById('alert-dip').innerHTML='',5000);
+    ['new-u','new-n','new-c','new-email','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
     chiudiFormDip();loadDipendenti();renderDashboardFromCache();
-  }catch(e){ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+  }catch(e){
+    if(e.code==='auth/email-already-in-use'){ad.innerHTML='<div class="alert-box alert-err">Questa email ha già un account di accesso. Usa un\'altra email o elimina prima il vecchio account da Firebase Console → Authentication.</div>'}
+    else if(e.code==='auth/invalid-email'){ad.innerHTML='<div class="alert-box alert-err">Email non valida.</div>'}
+    else{ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+  }finally{
+    if(btnCrea){btnCrea.disabled=false;btnCrea.textContent='✓ Crea Dipendente'}
+  }
 }
 
 function apriModificaDip(username){
@@ -1594,7 +1656,8 @@ function apriModificaDip(username){
   document.getElementById('edit-username').value=emp.username;
   document.getElementById('edit-nome').value=emp.nome||'';
   document.getElementById('edit-cognome').value=emp.cognome||'';
-  document.getElementById('edit-password').value=emp.password||'';
+  document.getElementById('edit-email').value=emp.email||'';
+  document.getElementById('alert-reset-pw').textContent='';
   document.getElementById('edit-orario').value=String(oreGiornoDip(emp));
   document.getElementById('edit-ferie').value=emp.monteFerie||0;
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
@@ -1615,6 +1678,21 @@ function apriModificaDip(username){
   document.getElementById('modal-dip').classList.add('open');
 }
 
+// Invia l'email di reset password al dipendente attualmente aperto nella modale di modifica.
+// Non richiede il piano Blaze: sendPasswordResetEmail è una funzione client-side gratuita.
+async function inviaResetPasswordDip(){
+  const el=document.getElementById('alert-reset-pw');
+  const emp=dipList.find(e=>e.username===editUsername);
+  if(!emp||!emp.email){el.textContent='⚠️ Nessuna email associata a questo account.';el.style.color='var(--rosso)';return}
+  el.textContent='Invio in corso...';el.style.color='var(--ink4)';
+  try{
+    await auth.sendPasswordResetEmail(emp.email);
+    el.textContent='✓ Email inviata a '+emp.email;el.style.color='var(--verde)';
+  }catch(e){
+    el.textContent='Errore: '+e.message;el.style.color='var(--rosso)';
+  }
+}
+
 async function salvaDipendente(){
   if(!editUsername)return;
   const ad=document.getElementById('alert-edit-dip');
@@ -1631,7 +1709,6 @@ async function salvaDipendente(){
     const updates={
       nome:document.getElementById('edit-nome').value.trim(),
       cognome:document.getElementById('edit-cognome').value.trim(),
-      password:document.getElementById('edit-password').value,
       tipoOrario:document.getElementById('edit-orario').value,
       monteFerie:parseFloat(document.getElementById('edit-ferie').value)||0,
       montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
@@ -2282,7 +2359,6 @@ async function initRuoloTitolare(){
       const d=snap.data();
       ADM.ruolo=d.ruolo||'admin';
       ADM.orePreviste=d.orePreviste||0;
-      sessionStorage.setItem('adm_sess',JSON.stringify(ADM));
     }
   }catch(e){console.log('Ruolo errore:',e.message)}
   const nav=document.getElementById('nav-titolare');
@@ -2482,7 +2558,7 @@ async function salvaOrePreviste(){
   const v=parseFloat(document.getElementById('tit-ore-previste').value)||0;
   try{
     await db.collection('admins').doc(TIT_target).update({orePreviste:v});
-    if(ADM&&TIT_target===ADM.username){ADM.orePreviste=v;sessionStorage.setItem('adm_sess',JSON.stringify(ADM))}
+    if(ADM&&TIT_target===ADM.username){ADM.orePreviste=v}
     const t=TIT_listaTitolari.find(x=>x.username===TIT_target);if(t)t.orePreviste=v;
     renderTitRiepilogo();
   }catch(e){alert('Errore salvataggio ore previste: '+e.message)}
