@@ -8,8 +8,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 :root{
   --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
@@ -630,7 +630,10 @@ tbody tr:hover{background:var(--paper)}
       <div class="page" id="page-budget">
         <div class="page-header">
           <div class="page-title">📁 Budget Contract</div>
-          <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="loadCommesse(true)">🔄 Aggiorna</button>
+            <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
+          </div>
         </div>
         <div id="lista-commesse"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -737,7 +740,10 @@ tbody tr:hover{background:var(--paper)}
       <div class="page" id="page-contabilita">
         <div class="page-header">
           <div class="page-title">🧾 Monitoraggio Contabilità</div>
-          <button class="btn btn-ink" onclick="contabApriForm(null)">+ Nuova Riga</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="loadContabilita(true)">🔄 Aggiorna</button>
+            <button class="btn btn-ink" onclick="contabApriForm(null)">+ Nuova Riga</button>
+          </div>
         </div>
 
         <div id="contab-import-wrap"></div>
@@ -3052,16 +3058,18 @@ const BC_DEFAULT_LISTINO=[
   {nome:'Acetato',prezzo:0.25},
   {nome:'Cartoncino',prezzo:0.30}
 ];
-let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[],BC_admins=[];
+let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[],BC_admins=[],BC_commesseLoaded=false;
 
 function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
 
-async function loadCommesse(){
+async function loadCommesse(forza){
+  if(BC_commesseLoaded && !forza){renderListaCommesse();return}
   const el=document.getElementById('lista-commesse');
   el.innerHTML='<div class="empty-state">Caricamento...</div>';
   try{
     const snap=await db.collection('commesse').get();
     BC_commesse=snap.docs.map(d=>({numero:d.id,...d.data()})).sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+    BC_commesseLoaded=true;
     renderListaCommesse();
   }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
 }
@@ -3120,7 +3128,7 @@ async function salvaNuovaCommessa(){
   try{
     await db.collection('commesse').doc(numero).set(rec);
     document.getElementById('modal-commessa-nuova').classList.remove('open');
-    await loadCommesse();
+    await loadCommesse(true);
   }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
@@ -3493,6 +3501,6 @@ async function eliminaStampaBC(id){
   bcRenderTutto(c);
 }
 </script>
-<script src="contab_module.js"></script>
+<script src="contab_module.js" defer></script>
 </body>
 </html>
