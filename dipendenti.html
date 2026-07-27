@@ -890,7 +890,7 @@ async function startApp(){
   const orario=`Orario ${oreGiornoDip(profilo)}h/giorno`;
   document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
   initCal();
-  await caricaTuttiDati();
+  await Promise.all([caricaTuttiDati(), loadCommesseDip()]);
   loadMese(meseSel);
   aggiornaRiepilogoSaldi();
   renderCalendarioFerie();
@@ -1127,7 +1127,62 @@ function renderForm(ds,dati){
     const s=statoMap[stato]||statoMap.da_convalidare;
     html+=`<div style="margin-top:8px;background:${s.bg};border-radius:6px;padding:8px 12px;font-size:12px;color:${s.color};font-weight:500">⚡ ${s.label}</div>`;
   }
+  html+=renderRigheCommesseBox(dati);
   document.getElementById('form-giorno').innerHTML=html;
+}
+
+// ── COLLEGAMENTO CALENDARIO → BUDGET CONTRACT ──────────────────────────
+// Fino a 5 righe per giornata: ognuna collegata (in automatico, allo stesso modo
+// dell'autosave esistente) a una riga dentro commesse/{numero}/righe.
+function rcArr(dati){
+  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',nota:(r&&r.nota)||''}));
+  while(a.length<5)a.push({commessa:'',disciplina:'ele',ore:'',nota:''});
+  return a;
+}
+function renderRigheCommesseBox(dati){
+  const rows=rcArr(dati);
+  return `<div class="card" style="margin-top:16px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:2px">📁 Ore per Commessa</div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Le ore inserite qui si collegano automaticamente al Budget Contract della commessa scelta. Puoi dividere la giornata su più commesse diverse.</div>
+    ${rows.map((r,i)=>`
+      <div style="display:grid;grid-template-columns:1.7fr 1fr .8fr 1.3fr auto;gap:8px;margin-bottom:8px;align-items:center">
+        <select class="field-input" onchange="rcChange(${i},'commessa',this.value)">
+          <option value="">— Nessuna commessa —</option>
+          ${BC_commesse.map(c=>`<option value="${c.numero}" ${r.commessa===c.numero?'selected':''}>${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('')}
+        </select>
+        <select class="field-input" onchange="rcChange(${i},'disciplina',this.value)">
+          <option value="ele" ${r.disciplina!=='mec'?'selected':''}>⚡ Elettrico</option>
+          <option value="mec" ${r.disciplina==='mec'?'selected':''}>⚙️ Meccanico</option>
+        </select>
+        <input class="field-input" type="number" min="0" step="0.5" placeholder="Ore" value="${r.ore===''?'':r.ore}" oninput="rcChange(${i},'ore',this.value)">
+        <input class="field-input" type="text" placeholder="Nota (opz.)" value="${String(r.nota||'').replace(/"/g,'&quot;')}" oninput="rcChange(${i},'nota',this.value)">
+        <button class="btn btn-sm" onclick="rcClear(${i})" title="Svuota riga">🗑</button>
+      </div>`).join('')}
+  </div>`;
+}
+function rcEnsure(){
+  if(!giornoSel)return null;
+  if(!cache[giornoSel])cache[giornoSel]={};
+  if(!cache[giornoSel].righeCommesse)cache[giornoSel].righeCommesse=rcArr(ALL_GIORNI[giornoSel]||{});
+  const arr=cache[giornoSel].righeCommesse;
+  while(arr.length<5)arr.push({commessa:'',disciplina:'ele',ore:'',nota:''});
+  return arr;
+}
+function rcChange(i,field,value){
+  const arr=rcEnsure();
+  if(!arr)return;
+  if(!arr[i])arr[i]={commessa:'',disciplina:'ele',ore:'',nota:''};
+  arr[i][field]=field==='ore'?(value===''?'':(parseFloat(value)||0)):value;
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+}
+function rcClear(i){
+  const arr=rcEnsure();
+  if(!arr)return;
+  arr[i]={commessa:'',disciplina:'ele',ore:'',nota:''};
+  renderForm(giornoSel,cache[giornoSel]);
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
 }
 
 function fieldChange(k,v){
@@ -1148,6 +1203,34 @@ function fieldChange(k,v){
   saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
 }
 
+// Collega/scollega le righe "Ore per Commessa" del giorno ds alle righe reali
+// dentro commesse/{numero}/righe. ID deterministico per slot (0-4): cambia solo
+// se la commessa scelta in quello slot cambia, evitando duplicati o righe orfane.
+async function syncRigheCommesseBC(ds,curr){
+  const prev=(ALL_GIORNI[ds]&&ALL_GIORNI[ds].righeCommesse)||[];
+  const nomeCompleto=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  const tasks=[];
+  for(let i=0;i<5;i++){
+    const p=prev[i]||{},c=curr[i]||{};
+    const prevNumero=p.commessa||'',currNumero=c.commessa||'';
+    const prevOre=parseFloat(p.ore)||0,currOre=parseFloat(c.ore)||0;
+    const rigaId='cal_'+U.username+'_'+ds+'_'+i;
+    if(prevNumero&&(prevNumero!==currNumero||currOre<=0)){
+      tasks.push(db.collection('commesse').doc(prevNumero).collection('righe').doc(rigaId).delete().catch(()=>{}));
+    }
+    if(currNumero&&currOre>0){
+      tasks.push(db.collection('commesse').doc(currNumero).collection('righe').doc(rigaId).set({
+        username:U.username,nomeCompleto,tipoPersona:'dipendente',
+        livello:profilo.livello||'senior',disciplina:c.disciplina||'ele',
+        data:ds,descrizione:(c.nota||'').trim()||'(da calendario ore)',
+        ore:currOre,speseVive:0,km:0,
+        origineCalendario:true,
+        createdBy:U.username,createdAt:new Date().toISOString()
+      },{merge:true}).catch(e=>console.log('Sync BC calendario:',e.message)));
+    }
+  }
+  await Promise.all(tasks);
+}
 async function saveDay(ds){
   if(!ds||!cache[ds])return;
   const st=document.getElementById('sv-status');
@@ -1159,7 +1242,9 @@ async function saveDay(ds){
     const straEl=parseFloat(toSave.oreStraordinariElettrico)||0;
     const straMec=parseFloat(toSave.oreStraordinariMeccanico)||0;
     toSave.hasStraordinari=(straEl>0||straMec>0);
-    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const salvaGiornoP=db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const syncP=syncRigheCommesseBC(ds,toSave.righeCommesse||[]);
+    await Promise.all([salvaGiornoP,syncP]);
     segnalaAttivita('ore');
     // Aggiorna cache locale immediatamente
     ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
@@ -1662,7 +1747,8 @@ function bcRenderRighe(righe){
     const tariffa=r.livello==='senior'?ts:tj;
     const costo=ore*tariffa+(parseFloat(r.speseVive)||0)+(parseFloat(r.km)||0)*tk;
     const [y,m,g]=(r.data||'').split('-');
-    const mioBottone=r.username===U.username?`<button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button>`:'';
+    const daCalendario=r.origineCalendario===true;
+    const mioBottone=daCalendario?'<span style="font-size:11px;color:var(--ink4)" title="Collegata automaticamente dal calendario ore">📅 auto</span>':(r.username===U.username?`<button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button>`:'');
     return `<tr>
       <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
       <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>

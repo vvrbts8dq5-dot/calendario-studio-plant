@@ -840,7 +840,9 @@ tbody tr:hover{background:var(--paper)}
           <div class="form-grid">
             <div style="grid-column:1/-1"><label class="fl">Attività svolta</label><input class="fi" id="tit-descrizione" type="text" placeholder="es. Organizzazione e gestione interna - mail + telefonate"></div>
             <div><label class="fl">Data</label><input class="fi" id="tit-data" type="date"></div>
-            <div><label class="fl">Rif. Commessa</label><input class="fi" id="tit-commessa" type="text" placeholder="es. 26001"></div>
+            <div><label class="fl">Rif. Commessa</label><select class="fi" id="tit-commessa"><option value="">— Nessuna —</option></select></div>
+            <div><label class="fl">Livello (per Budget Contract)</label><select class="fi" id="tit-livello"><option value="senior">Senior</option><option value="junior">Junior</option></select></div>
+            <div><label class="fl">Disciplina (per Budget Contract)</label><select class="fi" id="tit-disciplina"><option value="ele">⚡ Elettrico</option><option value="mec">⚙️ Meccanico</option></select></div>
             <div><label class="fl">Ore Societarie</label><input class="fi" id="tit-oreSocietarie" type="number" step="0.5" min="0"></div>
             <div><label class="fl">Ore su Commessa</label><input class="fi" id="tit-oreCommessa" type="number" step="0.5" min="0"></div>
             <div><label class="fl">Ore Altre Attività</label><input class="fi" id="tit-oreIndirette" type="number" step="0.5" min="0"></div>
@@ -1443,7 +1445,7 @@ function goPage(pid,btn){
   if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
-  if(pid==='titolare')loadTitolarePage();
+  if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
 }
@@ -3011,7 +3013,11 @@ function apriFormTit(id){
   const r=id?TIT_righe.find(x=>x.id===id):null;
   document.getElementById('tit-descrizione').value=r&&r.descrizione?r.descrizione:'';
   document.getElementById('tit-data').value=r&&r.data?r.data:new Date().toISOString().split('T')[0];
-  document.getElementById('tit-commessa').value=r&&r.commessa?r.commessa:'';
+  const selCommessaTit=document.getElementById('tit-commessa');
+  selCommessaTit.innerHTML='<option value="">— Nessuna —</option>'+BC_commesse.map(c=>`<option value="${c.numero}">${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('');
+  selCommessaTit.value=r&&r.commessa?r.commessa:'';
+  document.getElementById('tit-livello').value=(r&&r.livello)||'senior';
+  document.getElementById('tit-disciplina').value=(r&&r.disciplina)||'ele';
   TIT_CAMPI_N.forEach(k=>{
     const val=r?(parseFloat(r[k])||0):0;
     document.getElementById('tit-'+k).value=val>0?val:'';
@@ -3027,24 +3033,31 @@ async function salvaRigaTit(){
     descrizione:document.getElementById('tit-descrizione').value.trim(),
     data:document.getElementById('tit-data').value,
     commessa:document.getElementById('tit-commessa').value.trim(),
+    livello:document.getElementById('tit-livello').value,
+    disciplina:document.getElementById('tit-disciplina').value,
   };
   TIT_CAMPI_N.forEach(k=>{dati[k]=parseFloat(document.getElementById('tit-'+k).value)||0});
   if(!dati.descrizione||!dati.data){al.innerHTML='<div class="alert-box alert-err">Inserisci almeno descrizione e data.</div>';return}
   if(!dati.data.startsWith(String(ANNO))){al.innerHTML='<div class="alert-box alert-err">La data deve appartenere all’anno '+ANNO+'.</div>';return}
+  const prevRiga=TIT_editId?TIT_righe.find(x=>x.id===TIT_editId):null;
   try{
     const coll=db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe');
+    let rigaId;
     if(TIT_editId){
       dati.modificatoDa=ADM.username;dati.modificatoIl=new Date().toISOString();
       await coll.doc(TIT_editId).update(dati);
       await notificaTit('modificato',dati);
       const idx=TIT_righe.findIndex(x=>x.id===TIT_editId);
       if(idx>=0)TIT_righe[idx]={...TIT_righe[idx],...dati};
+      rigaId=TIT_editId;
     }else{
       dati.creatoDa=ADM.username;dati.createdAt=new Date().toISOString();
       const ref=await coll.add(dati);
       await notificaTit('inserito',dati);
       TIT_righe.push({id:ref.id,...dati});
+      rigaId=ref.id;
     }
+    await syncRigaTitBC(rigaId,prevRiga,dati);
     TIT_righe.sort((a,b)=>(String(a.data||'')).localeCompare(String(b.data||'')));
     chiudiFormTit();
     // Naviga al mese della riga salvata
@@ -3054,11 +3067,39 @@ async function salvaRigaTit(){
   }catch(e){al.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
+// Collega/scollega la riga del Registro Titolare alla riga reale dentro
+// commesse/{numero}/righe. ID deterministico = 'tit_' + id della riga titolare,
+// così modifica/cancellazione aggiornano sempre la stessa riga collegata.
+async function syncRigaTitBC(id,prev,dati){
+  const bcId='tit_'+id;
+  const prevNumero=(prev&&prev.commessa)||'';
+  const prevOre=prev?(parseFloat(prev.oreCommessa)||0):0;
+  const currNumero=dati.commessa||'';
+  const currOre=parseFloat(dati.oreCommessa)||0;
+  const tasks=[];
+  if(prevNumero&&(prevNumero!==currNumero||currOre<=0)){
+    tasks.push(db.collection('commesse').doc(prevNumero).collection('righe').doc(bcId).delete().catch(()=>{}));
+  }
+  if(currNumero&&currOre>0){
+    tasks.push(db.collection('commesse').doc(currNumero).collection('righe').doc(bcId).set({
+      username:TIT_target,nomeCompleto:nomeTit(TIT_target),tipoPersona:'admin',
+      livello:dati.livello||'senior',disciplina:dati.disciplina||'ele',
+      data:dati.data,descrizione:dati.descrizione||'(da Registro Titolare)',
+      ore:currOre,speseVive:0,km:0,
+      origineCalendario:true,
+      createdBy:ADM.username,createdAt:new Date().toISOString()
+    },{merge:true}).catch(e=>console.log('Sync BC titolare:',e.message)));
+  }
+  await Promise.all(tasks);
+}
 async function eliminaRigaTit(id){
   const r=TIT_righe.find(x=>x.id===id);if(!r)return;
   if(!confirm('Eliminare la riga "'+(r.descrizione||'')+'" del '+fmtD(r.data)+'?'))return;
   try{
     await db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').doc(id).delete();
+    if(r.commessa&&(parseFloat(r.oreCommessa)||0)>0){
+      await db.collection('commesse').doc(r.commessa).collection('righe').doc('tit_'+id).delete().catch(()=>{});
+    }
     await notificaTit('eliminato',r);
     TIT_righe=TIT_righe.filter(x=>x.id!==id);
     renderTitMese();renderTitRiepilogo();
@@ -3341,6 +3382,8 @@ function bcRenderRighe(righe){
     const tariffa=r.livello==='senior'?ts:tj;
     const costo=ore*tariffa+(parseFloat(r.speseVive)||0)+(parseFloat(r.km)||0)*tk;
     const [y,m,g]=(r.data||'').split('-');
+    const daCalendario=r.origineCalendario===true;
+    const azioneRiga=daCalendario?'<span style="font-size:11px;color:var(--ink4)" title="Collegata automaticamente dal calendario ore / Registro Titolare">📅 auto</span>':`<button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button>`;
     return `<tr>
       <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
       <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
@@ -3350,7 +3393,7 @@ function bcRenderRighe(righe){
       <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
       <td class="td-r">${r.km>0?r.km+' km':'—'}</td>
       <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(costo)}</td>
-      <td><button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button></td>
+      <td>${azioneRiga}</td>
     </tr>`;
   }).join('');
 }
