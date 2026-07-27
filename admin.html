@@ -20,6 +20,7 @@
   --rosso:#DC2626;--rosso-light:#FDECEC;
   --viola:#C05621;--viola-light:#F5E6DC;
   --festivo:#A855F7;--festivo-light:#F5EDFC;
+  --giallo:#CA8A04;--giallo-light:#FEF9C3;
   --sidebar-w:260px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -244,6 +245,35 @@ tbody tr:hover{background:var(--paper)}
 .bc-listino-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--paper2);font-size:12px}
 .bc-listino-row:last-child{border-bottom:none}
 
+/* MONITORAGGIO CONTABILITA' */
+.contab-toolbar{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.contab-toolbar-grp{display:flex;flex-direction:column;gap:5px}
+.contab-toolbar-grp .fl{margin-bottom:0}
+.sel-contab{padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--white);color:var(--ink);outline:none;min-width:150px}
+.stato-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-family:'Inter',monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.stato-badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.stato-badge.st-proforma_emessa{background:var(--giallo-light);color:var(--giallo)}
+.stato-badge.st-fattura_emessa{background:var(--amber-light);color:var(--amber)}
+.stato-badge.st-fattura_incassata{background:var(--verde-light);color:var(--verde)}
+.stato-badge.st-incarico_avvocato{background:var(--blu-light);color:var(--blu-dark)}
+.stato-badge.st-importo_da_verificare{background:var(--rosso-light);color:var(--rosso)}
+.stato-badge.st-volontariato{background:var(--paper2);color:var(--ink4)}
+.stato-badge.st-{background:var(--paper2);color:var(--ink4)}
+.sel-stato{padding:4px 8px;border-radius:8px;font-size:11px;font-family:'Inter',monospace;border:.5px solid var(--border);outline:none;cursor:pointer}
+.contab-row-proforma_emessa{background:var(--giallo-light)!important}
+.contab-row-fattura_emessa{background:var(--amber-light)!important}
+.contab-row-fattura_incassata{background:var(--verde-light)!important}
+.contab-row-incarico_avvocato{background:var(--blu-light)!important}
+.contab-row-importo_da_verificare{background:var(--rosso-light)!important}
+.contab-row-volontariato{background:var(--paper2)!important}
+.contab-totali{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.contab-tot-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:12px 16px}
+.contab-tot-lbl{font-family:'Inter',monospace;font-size:10px;color:var(--ink4);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.contab-tot-val{font-family:'Inter',sans-serif;font-size:18px;font-weight:700}
+.btn-bc-link{font-size:10px;padding:2px 8px}
+.contab-import-banner{background:var(--blu-light);border:.5px solid var(--blu);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.contab-import-banner-txt{font-size:12px;color:var(--ink2)}
+
 /* RESPONSIVE */
 .btn-hamburger{display:none;background:none;border:none;color:var(--ink2);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px}
 .btn-hamburger:hover{background:var(--paper2)}
@@ -323,6 +353,9 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="budget" onclick="goPage('budget',this)">
         <span class="nav-icon">📁</span> Budget Contract
+      </button>
+      <button class="nav-item" data-page="contabilita" onclick="goPage('contabilita',this)">
+        <span class="nav-icon">🧾</span> Monitoraggio Contabilità
       </button>
       <button class="nav-item" data-page="archivio" onclick="goPage('archivio',this)">
         <span class="nav-icon">🗂️</span> Archivio Anni
@@ -700,6 +733,52 @@ tbody tr:hover{background:var(--paper)}
         </div>
       </div>
 
+      <!-- MONITORAGGIO CONTABILITA' -->
+      <div class="page" id="page-contabilita">
+        <div class="page-header">
+          <div class="page-title">🧾 Monitoraggio Contabilità</div>
+          <button class="btn btn-ink" onclick="contabApriForm(null)">+ Nuova Riga</button>
+        </div>
+
+        <div id="contab-import-wrap"></div>
+
+        <div class="contab-toolbar">
+          <div class="contab-toolbar-grp">
+            <label class="fl">Anno</label>
+            <select class="sel-contab" id="contab-sel-anno" onchange="contabSetAnno(this.value)">
+              <option value="tutti">Tutti gli anni</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+            </select>
+          </div>
+          <div class="contab-toolbar-grp">
+            <label class="fl">Stato</label>
+            <div class="filtri" style="margin-bottom:0">
+              <button class="btn-filtro active" data-f="tutti" onclick="contabSetFiltro('tutti',this)">Tutti</button>
+              <button class="btn-filtro" data-f="pagati" onclick="contabSetFiltro('pagati',this)">✓ Pagati</button>
+              <button class="btn-filtro" data-f="aperti" onclick="contabSetFiltro('aperti',this)">Aperti</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="contab-totali" id="contab-totali"></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Anno</th><th>Codice</th><th>Cliente debitore</th><th>Descrizione</th>
+              <th class="td-r">Preventivo</th><th class="td-r">Incassato</th><th class="td-r">Rimanenza</th>
+              <th class="td-r">Quota Marco D.</th><th class="td-r">Quota Michele A.</th>
+              <th>Stato</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="contab-tbody"><tr><td colspan="11" class="empty-state">Caricamento...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ARCHIVIO ANNI -->
       <div class="page" id="page-archivio">
         <div class="page-header">
@@ -942,6 +1021,64 @@ tbody tr:hover{background:var(--paper)}
     </div>
     <div class="modal-actions">
       <button class="btn btn-ink" onclick="document.getElementById('modal-listino').classList.remove('open')">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RIGA CONTABILITA' -->
+<div class="modal-overlay" id="modal-contab-riga">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title" id="contab-modal-title">Nuova Riga Contabilità</div>
+    <div class="modal-sub">Monitoraggio Contabilità — solo amministrazione</div>
+    <div id="contab-riga-alert"></div>
+    <div class="form-grid">
+      <div><label class="fl">Anno</label><input class="fi" id="contab-r-anno" type="number" step="1"></div>
+      <div><label class="fl">Codice commessa</label><input class="fi" id="contab-r-codice" type="text"></div>
+      <div><label class="fl">Codice offerta</label><input class="fi" id="contab-r-offerta" type="text"></div>
+      <div><label class="fl">Stato pagamento</label>
+        <select class="fi" id="contab-r-stato" onchange="contabRicalcolaAnteprima()">
+          <option value="">— nessuno —</option>
+          <option value="proforma_emessa">Proforma emessa</option>
+          <option value="fattura_emessa">Fattura emessa</option>
+          <option value="fattura_incassata">Fattura incassata</option>
+          <option value="incarico_avvocato">Incarico ad avvocato</option>
+          <option value="importo_da_verificare">Importo da verificare</option>
+          <option value="volontariato">Volontariato</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1"><label class="fl">Cliente debitore</label><input class="fi" id="contab-r-cliente" type="text"></div>
+      <div style="grid-column:1/-1"><label class="fl">Breve descrizione lavoro in debito</label><input class="fi" id="contab-r-descrizione" type="text"></div>
+      <div><label class="fl">Importo da preventivo (€)</label><input class="fi" id="contab-r-importo" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+    </div>
+    <div class="section-title" style="margin-top:16px">Acconti pagati</div>
+    <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div><label class="fl">1° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc1" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+      <div><label class="fl">2° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc2" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+      <div><label class="fl">3° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc3" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+      <div><label class="fl">4° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc4" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+      <div><label class="fl">5° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc5" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+      <div><label class="fl">6° Acconto (€)</label><input class="fi contab-acc" id="contab-r-acc6" type="number" step="0.01" oninput="contabRicalcolaAnteprima()"></div>
+    </div>
+    <div class="bc-info-row" style="margin-top:8px">
+      <span class="bc-info-key">RIMANENZA DA PAGARE</span>
+      <span class="bc-info-val" id="contab-r-rimanenza-preview">€ 0,00</span>
+    </div>
+    <div class="section-title" style="margin-top:16px">Ripartizione tra titolari</div>
+    <div class="form-grid">
+      <div><label class="fl">Quota Marco D. (€)</label><input class="fi" id="contab-r-quotamarco" type="number" step="0.01"></div>
+      <div><label class="fl">Quota Michele A. (€)</label><input class="fi" id="contab-r-quotamichele" type="number" step="0.01"></div>
+    </div>
+    <div class="section-title" style="margin-top:16px">Altri importi</div>
+    <div class="form-grid">
+      <div><label class="fl">Altri importi (€)</label><input class="fi" id="contab-r-altriimp" type="number" step="0.01"></div>
+      <div><label class="fl">Destinatario altri importi</label><input class="fi" id="contab-r-altridest" type="text"></div>
+      <div><label class="fl">Pagato altri importi (€)</label><input class="fi" id="contab-r-altripag" type="number" step="0.01"></div>
+    </div>
+    <div style="margin-top:14px"><label class="fl">Annotazioni varie</label><textarea class="fi" id="contab-r-annotazioni" rows="2" style="resize:vertical"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-contab-riga').classList.remove('open')">Annulla</button>
+      <button class="btn btn-rosso" id="contab-btn-elimina" style="display:none" onclick="contabEliminaRiga()">🗑 Elimina</button>
+      <button class="btn btn-ink" onclick="contabSalvaRiga()">✓ Salva</button>
     </div>
   </div>
 </div>
@@ -1215,7 +1352,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1225,6 +1362,7 @@ function goPage(pid,btn){
   if(pid==='archivio')initArchivio();
   if(pid==='titolare')loadTitolarePage();
   if(pid==='budget')loadCommesse();
+  if(pid==='contabilita')loadContabilita();
 }
 
 // DASHBOARD
@@ -3355,5 +3493,6 @@ async function eliminaStampaBC(id){
   bcRenderTutto(c);
 }
 </script>
+<script src="contab_module.js"></script>
 </body>
 </html>
