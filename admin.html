@@ -226,6 +226,24 @@ tbody tr:hover{background:var(--paper)}
 .perc-card .p-label{font-size:11px;color:var(--ink2);margin-bottom:8px;line-height:1.35;min-height:42px}
 .perc-card .p-val{font-family:'Inter',sans-serif;font-size:22px;font-weight:800}
 
+/* BUDGET CONTRACT */
+.commessa-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.commessa-card:hover{border-color:var(--blu);background:var(--paper2)}
+.commessa-num{font-family:'Inter',monospace;font-weight:700;font-size:13px;color:var(--blu);min-width:64px}
+.commessa-info{flex:1;min-width:180px}
+.commessa-title{font-size:13px;font-weight:600}
+.commessa-sub{font-size:11px;color:var(--ink4);margin-top:2px}
+.commessa-pills{display:flex;gap:10px;flex-wrap:wrap}
+.commessa-pill{font-family:'Inter',monospace;font-size:11px;padding:3px 9px;border-radius:10px;background:var(--paper2);color:var(--ink3)}
+.commessa-pill.warn{background:var(--amber-light);color:var(--amber)}
+.commessa-pill.danger{background:var(--rosso-light);color:var(--rosso)}
+.bc-info-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:.5px solid var(--paper2)}
+.bc-info-row:last-child{border-bottom:none}
+.bc-info-key{color:var(--ink4);font-family:'Inter',monospace;font-size:11px}
+.bc-info-val{font-weight:600}
+.bc-listino-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--paper2);font-size:12px}
+.bc-listino-row:last-child{border-bottom:none}
+
 /* RESPONSIVE */
 .btn-hamburger{display:none;background:none;border:none;color:var(--ink2);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px}
 .btn-hamburger:hover{background:var(--paper2)}
@@ -302,6 +320,9 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="costi" onclick="goPage('costi',this)">
         <span class="nav-icon">💶</span> Costi Mensili
+      </button>
+      <button class="nav-item" data-page="budget" onclick="goPage('budget',this)">
+        <span class="nav-icon">📁</span> Budget Contract
       </button>
       <button class="nav-item" data-page="archivio" onclick="goPage('archivio',this)">
         <span class="nav-icon">🗂️</span> Archivio Anni
@@ -511,6 +532,12 @@ tbody tr:hover{background:var(--paper)}
             <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="new-ferie" placeholder="es. 160" type="number"></div>
             <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="new-permessi" placeholder="es. 32" type="number"></div>
             <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="new-rol" placeholder="es. 32" type="number"></div>
+            <div><label class="fl">Livello (Budget Contract)</label>
+              <select class="fi" id="new-livello">
+                <option value="senior">Senior</option>
+                <option value="junior">Junior</option>
+              </select>
+            </div>
           </div>
           <div style="margin-top:16px;display:flex;gap:8px">
             <button class="btn btn-ink" onclick="creaDipendente()">✓ Crea Dipendente</button>
@@ -564,6 +591,113 @@ tbody tr:hover{background:var(--paper)}
           </div>
         </div>
         <div id="costi-content"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- BUDGET CONTRACT - ELENCO -->
+      <div class="page" id="page-budget">
+        <div class="page-header">
+          <div class="page-title">📁 Budget Contract</div>
+          <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
+        </div>
+        <div id="lista-commesse"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- BUDGET CONTRACT - DETTAGLIO COMMESSA -->
+      <div class="page" id="page-budget-dettaglio">
+        <div class="page-header">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-sm" onclick="goPage('budget',document.querySelector('.nav-item[data-page=budget]'))">← Budget Contract</button>
+            <div class="page-title" id="bc-det-title">Commessa</div>
+          </div>
+          <button class="btn" onclick="apriModalTariffeCommessa()">✎ Tariffe & Monte Ore</button>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title">Anagrafica Commessa</div>
+          <div id="bc-anagrafica"></div>
+        </div>
+
+        <div class="saldi-grid" id="bc-residui" style="margin-bottom:20px"></div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Righe di Lavoro</div>
+          <button class="btn btn-blu btn-sm" onclick="apriFormRigaBC()">+ Aggiungi Riga</button>
+        </div>
+        <div class="form-box" id="bc-form-riga">
+          <div id="bc-riga-alert"></div>
+          <div class="form-grid">
+            <div><label class="fl">Chi ha lavorato</label>
+              <select class="fi" id="bc-r-persona" onchange="bcAggiornaLivelloRiga()"></select>
+            </div>
+            <div id="bc-r-livello-wrap">
+              <label class="fl">Livello</label>
+              <select class="fi" id="bc-r-livello">
+                <option value="senior">Senior</option>
+                <option value="junior">Junior</option>
+              </select>
+            </div>
+            <div><label class="fl">Disciplina</label>
+              <select class="fi" id="bc-r-disciplina">
+                <option value="ele">Elettrico</option>
+                <option value="mec">Meccanico</option>
+              </select>
+            </div>
+            <div><label class="fl">Data</label><input class="fi" id="bc-r-data" type="date"></div>
+            <div style="grid-column:1/-1"><label class="fl">Attività (breve descrizione)</label><input class="fi" id="bc-r-descrizione" type="text" placeholder="es. Sopralluogo cantiere"></div>
+            <div><label class="fl">Ore</label><input class="fi" id="bc-r-ore" type="number" step="0.5" min="0"></div>
+            <div><label class="fl">Spese vive (€)</label><input class="fi" id="bc-r-spese" type="number" step="0.01" min="0"></div>
+            <div><label class="fl">Km A+R</label><input class="fi" id="bc-r-km" type="number" step="1" min="0"></div>
+          </div>
+          <div class="modal-actions" style="justify-content:flex-start;margin-top:10px">
+            <button class="btn btn-ink" onclick="salvaRigaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormRigaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Utente</th><th>Livello/Disciplina</th><th>Attività</th>
+              <th class="td-r">Ore</th><th class="td-r">Spese vive</th><th class="td-r">Km A+R</th><th class="td-r">Costo riga</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="bc-tbody-righe"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="section-title">Riepilogo Costi Commessa</div>
+          <div id="bc-riepilogo"></div>
+        </div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Calcolo Stampe / Plottaggi</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="apriModalListino()">✎ Listino Prezzi</button>
+            <button class="btn btn-blu btn-sm" onclick="apriFormStampaBC()">+ Aggiungi Riga</button>
+          </div>
+        </div>
+        <div class="form-box" id="bc-form-stampa">
+          <div id="bc-stampa-alert"></div>
+          <div class="form-grid">
+            <div><label class="fl">Data</label><input class="fi" id="bc-s-data" type="date"></div>
+            <div><label class="fl">Voce listino</label><select class="fi" id="bc-s-voce"></select></div>
+            <div><label class="fl">N° copie</label><input class="fi" id="bc-s-copie" type="number" step="1" min="1" value="1"></div>
+            <div><label class="fl">Note</label><input class="fi" id="bc-s-note" type="text"></div>
+          </div>
+          <div class="modal-actions" style="justify-content:flex-start;margin-top:10px">
+            <button class="btn btn-ink" onclick="salvaStampaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormStampaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Voce</th><th class="td-r">Costo unitario</th><th class="td-r">Copie</th><th class="td-r">Totale</th><th>Note</th><th>Azioni</th></tr></thead>
+            <tbody id="bc-tbody-stampe"></tbody>
+          </table>
+        </div>
+        <div class="bc-info-row" style="max-width:320px;margin-top:10px">
+          <span class="bc-info-key">COSTO STAMPE PRODOTTE</span>
+          <span class="bc-info-val" id="bc-tot-stampe">€ 0,00</span>
+        </div>
       </div>
 
       <!-- ARCHIVIO ANNI -->
@@ -700,6 +834,12 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
       <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
+      <div><label class="fl">Livello (Budget Contract)</label>
+        <select class="fi" id="edit-livello">
+          <option value="senior">Senior</option>
+          <option value="junior">Junior</option>
+        </select>
+      </div>
     </div>
     <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
       <button class="btn" onclick="inviaResetPasswordDip()">✉️ Invia email reset password</button>
@@ -735,6 +875,73 @@ tbody tr:hover{background:var(--paper)}
     <div class="modal-actions">
       <button class="btn" onclick="document.getElementById('modal-dip').classList.remove('open')">Annulla</button>
       <button class="btn btn-ink" onclick="salvaDipendente()">✓ Salva Modifiche</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUOVA COMMESSA -->
+<div class="modal-overlay" id="modal-commessa-nuova">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">Nuova Commessa</div>
+    <div class="modal-sub">Anagrafica, tariffe e monte ore — tutto specifico per questa commessa</div>
+    <div id="bc-nuova-alert"></div>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div><label class="fl">N° Commessa</label><input class="fi" id="bc-n-numero" type="text" placeholder="es. 26001"></div>
+      <div><label class="fl">Anno</label><input class="fi" id="bc-n-anno" type="number" value="2026"></div>
+      <div style="grid-column:1/-1"><label class="fl">Committente</label><input class="fi" id="bc-n-committente" type="text"></div>
+      <div style="grid-column:1/-1"><label class="fl">Progetto</label><input class="fi" id="bc-n-progetto" type="text"></div>
+    </div>
+    <div style="height:.5px;background:var(--border);margin:14px 0"></div>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div><label class="fl">Tariffa Senior (€/h)</label><input class="fi" id="bc-n-tsenior" type="number" step="0.01" value="98"></div>
+      <div><label class="fl">Tariffa Junior (€/h)</label><input class="fi" id="bc-n-tjunior" type="number" step="0.01" value="31"></div>
+      <div><label class="fl">Rimborso Km (€/km)</label><input class="fi" id="bc-n-tkm" type="number" step="0.001" value="0.45"></div>
+      <div><label class="fl">Monte Ore Elettrico</label><input class="fi" id="bc-n-monteele" type="number" step="1" value="0"></div>
+      <div><label class="fl">Monte Ore Meccanico</label><input class="fi" id="bc-n-montemec" type="number" step="1" value="0"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-commessa-nuova').classList.remove('open')">Annulla</button>
+      <button class="btn btn-ink" onclick="salvaNuovaCommessa()">✓ Crea Commessa</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TARIFFE/MONTE ORE COMMESSA -->
+<div class="modal-overlay" id="modal-commessa-tariffe">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">Tariffe & Monte Ore</div>
+    <div class="modal-sub" id="bc-tariffe-sub"></div>
+    <div id="bc-tariffe-alert"></div>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div><label class="fl">Committente</label><input class="fi" id="bc-t-committente" type="text"></div>
+      <div><label class="fl">Progetto</label><input class="fi" id="bc-t-progetto" type="text"></div>
+      <div><label class="fl">Tariffa Senior (€/h)</label><input class="fi" id="bc-t-tsenior" type="number" step="0.01"></div>
+      <div><label class="fl">Tariffa Junior (€/h)</label><input class="fi" id="bc-t-tjunior" type="number" step="0.01"></div>
+      <div><label class="fl">Rimborso Km (€/km)</label><input class="fi" id="bc-t-tkm" type="number" step="0.001"></div>
+      <div><label class="fl">Monte Ore Elettrico</label><input class="fi" id="bc-t-monteele" type="number" step="1"></div>
+      <div><label class="fl">Monte Ore Meccanico</label><input class="fi" id="bc-t-montemec" type="number" step="1"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('modal-commessa-tariffe').classList.remove('open')">Annulla</button>
+      <button class="btn btn-rosso" onclick="eliminaCommessaBC()">🗑 Elimina Commessa</button>
+      <button class="btn btn-ink" onclick="salvaTariffeCommessa()">✓ Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LISTINO STAMPE -->
+<div class="modal-overlay" id="modal-listino">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">Listino Stampe / Plottaggi</div>
+    <div class="modal-sub">Specifico per questa commessa — modificabile solo da admin</div>
+    <div id="bc-listino-lista" style="margin-bottom:14px"></div>
+    <div class="form-grid" style="grid-template-columns:1fr 100px auto;align-items:end">
+      <div><label class="fl">Nuova voce</label><input class="fi" id="bc-listino-nome" type="text" placeholder="es. Foglio A0 - B/N"></div>
+      <div><label class="fl">Prezzo €</label><input class="fi" id="bc-listino-prezzo" type="number" step="0.01"></div>
+      <button class="btn btn-ink" onclick="aggiungiVoceListino()">+ Aggiungi</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ink" onclick="document.getElementById('modal-listino').classList.remove('open')">Chiudi</button>
     </div>
   </div>
 </div>
@@ -1008,7 +1215,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1017,6 +1224,7 @@ function goPage(pid,btn){
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
   if(pid==='titolare')loadTitolarePage();
+  if(pid==='budget')loadCommesse();
 }
 
 // DASHBOARD
@@ -1622,6 +1830,7 @@ async function creaDipendente(){
   const ferie=parseFloat(document.getElementById('new-ferie').value)||0;
   const permessi=parseFloat(document.getElementById('new-permessi').value)||0;
   const rol=parseFloat(document.getElementById('new-rol').value)||0;
+  const livello=document.getElementById('new-livello').value;
   const ad=document.getElementById('alert-form-dip');ad.innerHTML='';
   if(!u||!n||!c||!email||!p){ad.innerHTML='<div class="alert-box alert-err">Compila tutti i campi obbligatori.</div>';return}
   if(!/^[a-z0-9._-]+$/.test(u)){ad.innerHTML='<div class="alert-box alert-err">Username: solo lettere minuscole, numeri, punto e trattino.</div>';return}
@@ -1632,13 +1841,14 @@ async function creaDipendente(){
     // 1) Crea l'account di accesso (Firebase Authentication)
     await creaAccountAuthSecondario(email,p);
     // 2) Scrive il profilo su Firestore — NIENTE password in chiaro, solo l'email per il login
-    const rec={nome:n,cognome:c,email,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,abilitato:true,createdAt:new Date().toISOString()};
+    const rec={nome:n,cognome:c,email,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,livello,abilitato:true,createdAt:new Date().toISOString()};
     await db.collection('dipendenti').doc(u).set(rec);
     dipList.push({username:u,...rec});
     dipDataCache[u]={days:{},totals:{}};
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo. Può accedere con l\'email '+email+'.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',5000);
     ['new-u','new-n','new-c','new-email','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('new-livello').value='senior';
     chiudiFormDip();loadDipendenti();renderDashboardFromCache();
   }catch(e){
     if(e.code==='auth/email-already-in-use'){ad.innerHTML='<div class="alert-box alert-err">Questa email ha già un account di accesso. Usa un\'altra email o elimina prima il vecchio account da Firebase Console → Authentication.</div>'}
@@ -1662,6 +1872,7 @@ function apriModificaDip(username){
   document.getElementById('edit-ferie').value=emp.monteFerie||0;
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
   document.getElementById('edit-rol').value=emp.monteRol||0;
+  document.getElementById('edit-livello').value=emp.livello||'senior';
   // Tariffe
   const t=emp.tariffe||{};
   ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
@@ -1713,6 +1924,7 @@ async function salvaDipendente(){
       monteFerie:parseFloat(document.getElementById('edit-ferie').value)||0,
       montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
       monteRol:parseFloat(document.getElementById('edit-rol').value)||0,
+      livello:document.getElementById('edit-livello').value,
       tariffe,
       dataAssunzione:document.getElementById('edit-data-assunzione').value||'',
       tipoContratto:document.getElementById('edit-contratto').value.trim()||'',
@@ -2684,6 +2896,463 @@ function esportaTitExcel(){
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[m]);
   }
   XLSX.writeFile(wb,'Registro_'+nomeTit(TIT_target).replace(/\s+/g,'_')+'_'+ANNO+'.xlsx');
+}
+
+// ===================== BUDGET CONTRACT =====================
+const BC_DEFAULT_LISTINO=[
+  {nome:'Foglio A0 - B/N',prezzo:2.90},
+  {nome:'Foglio A0 - COLORI',prezzo:7.80},
+  {nome:'Foglio A1 - B/N',prezzo:2.30},
+  {nome:'Foglio A1 - COLORI',prezzo:5.70},
+  {nome:'Foglio A2 - B/N',prezzo:1.40},
+  {nome:'Foglio A2 - COLORI',prezzo:3.90},
+  {nome:'Foglio A3 - B/N',prezzo:0.90},
+  {nome:'Foglio A3 - COLORI',prezzo:2.80},
+  {nome:'Foglio A4 - B/N',prezzo:0.04},
+  {nome:'Astina Costola >10mm',prezzo:1.00},
+  {nome:'Astina Quadrata <10mm',prezzo:2.00},
+  {nome:'Acetato',prezzo:0.25},
+  {nome:'Cartoncino',prezzo:0.30}
+];
+let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[],BC_admins=[];
+
+function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
+
+async function loadCommesse(){
+  const el=document.getElementById('lista-commesse');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  try{
+    const snap=await db.collection('commesse').get();
+    BC_commesse=snap.docs.map(d=>({numero:d.id,...d.data()})).sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+    renderListaCommesse();
+  }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
+}
+
+function renderListaCommesse(){
+  const el=document.getElementById('lista-commesse');
+  if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa creata. Usa "+ Nuova Commessa" per iniziare.</div>';return}
+  el.innerHTML=BC_commesse.map(c=>`
+    <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
+      <div class="commessa-num">${c.numero}</div>
+      <div class="commessa-info">
+        <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${c.monteOreEle||0}h · Meccanico ${c.monteOreMec||0}h</div>
+      </div>
+      <div class="commessa-pills">
+        <span class="commessa-pill">Sr ${bcEuro(c.tariffaSenior)}/h</span>
+        <span class="commessa-pill">Jr ${bcEuro(c.tariffaJunior)}/h</span>
+        <span class="commessa-pill">Km ${bcEuro(c.tariffaKm)}</span>
+      </div>
+    </div>`).join('');
+}
+
+function apriModalNuovaCommessa(){
+  document.getElementById('bc-n-numero').value='';
+  document.getElementById('bc-n-anno').value=ANNO;
+  document.getElementById('bc-n-committente').value='';
+  document.getElementById('bc-n-progetto').value='';
+  document.getElementById('bc-n-tsenior').value=98;
+  document.getElementById('bc-n-tjunior').value=31;
+  document.getElementById('bc-n-tkm').value=0.45;
+  document.getElementById('bc-n-monteele').value=0;
+  document.getElementById('bc-n-montemec').value=0;
+  document.getElementById('bc-nuova-alert').innerHTML='';
+  document.getElementById('modal-commessa-nuova').classList.add('open');
+}
+
+async function salvaNuovaCommessa(){
+  const alertEl=document.getElementById('bc-nuova-alert');
+  const numero=document.getElementById('bc-n-numero').value.trim();
+  if(!numero){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci il numero commessa</div>';return}
+  if(BC_commesse.find(c=>c.numero===numero)){alertEl.innerHTML='<div class="alert-box alert-err">Esiste già una commessa con questo numero</div>';return}
+  const rec={
+    numero,
+    anno:parseInt(document.getElementById('bc-n-anno').value)||ANNO,
+    committente:document.getElementById('bc-n-committente').value.trim(),
+    progetto:document.getElementById('bc-n-progetto').value.trim(),
+    tariffaSenior:parseFloat(document.getElementById('bc-n-tsenior').value)||0,
+    tariffaJunior:parseFloat(document.getElementById('bc-n-tjunior').value)||0,
+    tariffaKm:parseFloat(document.getElementById('bc-n-tkm').value)||0,
+    monteOreEle:parseFloat(document.getElementById('bc-n-monteele').value)||0,
+    monteOreMec:parseFloat(document.getElementById('bc-n-montemec').value)||0,
+    listinoStampe:JSON.parse(JSON.stringify(BC_DEFAULT_LISTINO)),
+    createdBy:ADM.username,
+    createdAt:new Date().toISOString()
+  };
+  try{
+    await db.collection('commesse').doc(numero).set(rec);
+    document.getElementById('modal-commessa-nuova').classList.remove('open');
+    await loadCommesse();
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function bcCaricaRighe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('righe').orderBy('data','desc').get();
+  BC_righe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function bcCaricaStampe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('stampe').orderBy('data','desc').get();
+  BC_stampe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function bcCaricaAdmins(){
+  if(BC_admins.length)return;
+  const snap=await db.collection('admins').get();
+  BC_admins=snap.docs.map(d=>({username:d.id,...d.data()}));
+}
+
+async function apriCommessaBC(numero){
+  BC_current=numero;
+  goPage('budget-dettaglio',null);
+  document.getElementById('bc-det-title').textContent='Commessa '+numero;
+  document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Caricamento...</div>';
+  document.getElementById('bc-tbody-righe').innerHTML='';
+  document.getElementById('bc-tbody-stampe').innerHTML='';
+  chiudiFormRigaBC();chiudiFormStampaBC();
+  try{
+    const doc=await db.collection('commesse').doc(numero).get();
+    if(!doc.exists){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Commessa non trovata</div>';return}
+    const commessa={numero:doc.id,...doc.data()};
+    BC_commesse=BC_commesse.filter(c=>c.numero!==numero).concat([commessa]);
+    await Promise.all([bcCaricaRighe(numero),bcCaricaStampe(numero),bcCaricaAdmins()]);
+    bcRenderTutto(commessa);
+  }catch(e){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Errore: '+e.message+'</div>'}
+}
+
+function bcCalcRiepilogo(commessa,righe,stampe){
+  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0;
+  righe.forEach(r=>{
+    const ore=parseFloat(r.ore)||0;
+    if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
+    else{if(r.disciplina==='ele')oreJuniorEle+=ore;else oreJuniorMec+=ore}
+    speseViveTot+=parseFloat(r.speseVive)||0;
+    kmTot+=parseFloat(r.km)||0;
+  });
+  const tariffaSenior=parseFloat(commessa.tariffaSenior)||0;
+  const tariffaJunior=parseFloat(commessa.tariffaJunior)||0;
+  const tariffaKm=parseFloat(commessa.tariffaKm)||0;
+  const oreEleTot=oreSeniorEle+oreJuniorEle;
+  const oreMecTot=oreSeniorMec+oreJuniorMec;
+  const costoSeniorTot=(oreSeniorEle+oreSeniorMec)*tariffaSenior;
+  const costoJuniorTot=(oreJuniorEle+oreJuniorMec)*tariffaJunior;
+  const costoKmTot=kmTot*tariffaKm;
+  const costoTrasferta=costoKmTot+speseViveTot;
+  const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
+  const costoGenerale=costoSeniorTot+costoJuniorTot+costoTrasferta; // le stampe restano una voce separata, come nel foglio Excel
+  const monteOreEle=parseFloat(commessa.monteOreEle)||0;
+  const monteOreMec=parseFloat(commessa.monteOreMec)||0;
+  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,
+    tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
+    costoStampeTot,costoGenerale,monteOreEle,monteOreMec,residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
+}
+
+function bcRenderTutto(commessa){
+  bcRenderAnagrafica(commessa);
+  const riep=bcCalcRiepilogo(commessa,BC_righe,BC_stampe);
+  bcRenderResidui(riep);
+  bcPopolaSelectPersona();
+  bcRenderRighe(BC_righe,commessa);
+  bcRenderRiepilogo(riep);
+  bcPopolaSelectListino(commessa);
+  bcRenderStampe(BC_stampe);
+}
+
+function bcRenderAnagrafica(c){
+  document.getElementById('bc-det-title').textContent='Commessa '+c.numero;
+  document.getElementById('bc-anagrafica').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">COMMITTENTE</span><span class="bc-info-val">${c.committente||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">PROGETTO</span><span class="bc-info-val">${c.progetto||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ANNO</span><span class="bc-info-val">${c.anno||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(c.tariffaSenior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(c.tariffaJunior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(c.tariffaKm)}/km</span></div>`;
+}
+
+function bcRenderResidui(riep){
+  function cls(res,tot){if(tot<=0)return 'ok';return res>tot*0.2?'ok':res>0?'warn':'danger'}
+  const clsEle=cls(riep.residuoEle,riep.monteOreEle),clsMec=cls(riep.residuoMec,riep.monteOreMec);
+  document.getElementById('bc-residui').innerHTML=`
+    <div class="saldo-card"><div class="saldo-tipo">⚡ Monte Ore Elettrico</div><div class="saldo-dettaglio">Monte ${riep.monteOreEle}h · Usate ${riep.oreEleTot}h</div>
+      <div class="progress-bar"><div class="progress-fill fill-${clsEle}" style="width:${riep.monteOreEle>0?Math.max(0,Math.min(100,Math.round(riep.residuoEle/riep.monteOreEle*100))):0}%"></div></div>
+      <div class="saldo-res ${clsEle}" style="margin-top:6px">${riep.residuoEle}h</div><div style="font-size:11px;color:var(--ink4)">${riep.residuoEle<0?'⚠️ budget superato':'residue'}</div>
+    </div>
+    <div class="saldo-card"><div class="saldo-tipo">⚙️ Monte Ore Meccanico</div><div class="saldo-dettaglio">Monte ${riep.monteOreMec}h · Usate ${riep.oreMecTot}h</div>
+      <div class="progress-bar"><div class="progress-fill fill-${clsMec}" style="width:${riep.monteOreMec>0?Math.max(0,Math.min(100,Math.round(riep.residuoMec/riep.monteOreMec*100))):0}%"></div></div>
+      <div class="saldo-res ${clsMec}" style="margin-top:6px">${riep.residuoMec}h</div><div style="font-size:11px;color:var(--ink4)">${riep.residuoMec<0?'⚠️ budget superato':'residue'}</div>
+    </div>
+    <div class="saldo-card"><div class="saldo-tipo">💰 Costo Consuntivato</div><div class="saldo-dettaglio">Manodopera + trasferta</div>
+      <div class="saldo-res" style="color:var(--blu);margin-top:14px">${bcEuro(riep.costoGenerale)}</div><div style="font-size:11px;color:var(--ink4)">totale generale</div>
+    </div>`;
+}
+
+function bcPopolaSelectPersona(){
+  const sel=document.getElementById('bc-r-persona');
+  const opts=[];
+  dipList.forEach(d=>{if(d.abilitato)opts.push(`<option value="dip:${d.username}">${(d.nome||'')+' '+(d.cognome||'')} (dipendente)</option>`)});
+  BC_admins.forEach(a=>{opts.push(`<option value="adm:${a.username}">${a.nome||a.username} (${a.ruolo==='titolare'?'titolare':'amministrazione'})</option>`)});
+  sel.innerHTML=opts.join('');
+  bcAggiornaLivelloRiga();
+}
+
+function bcAggiornaLivelloRiga(){
+  const sel=document.getElementById('bc-r-persona');
+  const wrap=document.getElementById('bc-r-livello-wrap');
+  wrap.style.display=(sel.value&&sel.value.startsWith('dip:'))?'none':'';
+}
+
+function bcRenderRighe(righe){
+  const tb=document.getElementById('bc-tbody-righe');
+  if(!righe.length){tb.innerHTML='<tr><td colspan="9" class="empty-state">Nessuna riga inserita</td></tr>';return}
+  const c=BC_commesse.find(x=>x.numero===BC_current)||{};
+  const ts=parseFloat(c.tariffaSenior)||0,tj=parseFloat(c.tariffaJunior)||0,tk=parseFloat(c.tariffaKm)||0;
+  tb.innerHTML=righe.map(r=>{
+    const ore=parseFloat(r.ore)||0;
+    const tariffa=r.livello==='senior'?ts:tj;
+    const costo=ore*tariffa+(parseFloat(r.speseVive)||0)+(parseFloat(r.km)||0)*tk;
+    const [y,m,g]=(r.data||'').split('-');
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
+      <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
+      <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':'Mec'}</span></td>
+      <td style="font-size:12px;color:var(--ink4)">${r.descrizione||'—'}</td>
+      <td class="td-r">${ore}h</td>
+      <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
+      <td class="td-r">${r.km>0?r.km+' km':'—'}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(costo)}</td>
+      <td><button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function bcRenderRiepilogo(riep){
+  document.getElementById('bc-riepilogo').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">ORE SENIOR (Ele ${riep.oreSeniorEle}h + Mec ${riep.oreSeniorMec}h)</span><span class="bc-info-val">${riep.oreSeniorEle+riep.oreSeniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ORE JUNIOR (Ele ${riep.oreJuniorEle}h + Mec ${riep.oreJuniorMec}h)</span><span class="bc-info-val">${riep.oreJuniorEle+riep.oreJuniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO SENIOR</span><span class="bc-info-val">${bcEuro(riep.costoSeniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO JUNIOR</span><span class="bc-info-val">${bcEuro(riep.costoJuniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">SPESE VIVE</span><span class="bc-info-val">${bcEuro(riep.speseViveTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM (${bcEuro(riep.tariffaKm)}/km)</span><span class="bc-info-val">${bcEuro(riep.costoKmTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TOTALE SPESE DI TRASFERTA</span><span class="bc-info-val">${bcEuro(riep.costoTrasferta)}</span></div>
+    <div class="bc-info-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px"><span class="bc-info-key" style="font-weight:700;color:var(--ink)">COSTO GENERALE COMMESSA</span><span class="bc-info-val" style="font-size:15px;color:var(--verde)">${bcEuro(riep.costoGenerale)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">Costo stampe (voce separata, vedi sotto)</span><span class="bc-info-val">${bcEuro(riep.costoStampeTot)}</span></div>`;
+}
+
+function apriModalTariffeCommessa(){
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  if(!c)return;
+  document.getElementById('bc-tariffe-sub').textContent='Commessa '+c.numero;
+  document.getElementById('bc-t-committente').value=c.committente||'';
+  document.getElementById('bc-t-progetto').value=c.progetto||'';
+  document.getElementById('bc-t-tsenior').value=c.tariffaSenior||0;
+  document.getElementById('bc-t-tjunior').value=c.tariffaJunior||0;
+  document.getElementById('bc-t-tkm').value=c.tariffaKm||0;
+  document.getElementById('bc-t-monteele').value=c.monteOreEle||0;
+  document.getElementById('bc-t-montemec').value=c.monteOreMec||0;
+  document.getElementById('bc-tariffe-alert').innerHTML='';
+  document.getElementById('modal-commessa-tariffe').classList.add('open');
+}
+
+async function salvaTariffeCommessa(){
+  if(!BC_current)return;
+  const alertEl=document.getElementById('bc-tariffe-alert');
+  const updates={
+    committente:document.getElementById('bc-t-committente').value.trim(),
+    progetto:document.getElementById('bc-t-progetto').value.trim(),
+    tariffaSenior:parseFloat(document.getElementById('bc-t-tsenior').value)||0,
+    tariffaJunior:parseFloat(document.getElementById('bc-t-tjunior').value)||0,
+    tariffaKm:parseFloat(document.getElementById('bc-t-tkm').value)||0,
+    monteOreEle:parseFloat(document.getElementById('bc-t-monteele').value)||0,
+    monteOreMec:parseFloat(document.getElementById('bc-t-montemec').value)||0
+  };
+  try{
+    await db.collection('commesse').doc(BC_current).update(updates);
+    document.getElementById('modal-commessa-tariffe').classList.remove('open');
+    await apriCommessaBC(BC_current);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaCommessaBC(){
+  if(!BC_current)return;
+  if(!confirm('Eliminare definitivamente la commessa '+BC_current+' e tutti i suoi dati (righe e stampe)? Operazione irreversibile.'))return;
+  const alertEl=document.getElementById('bc-tariffe-alert');
+  try{
+    const [righeSnap,stampeSnap]=await Promise.all([
+      db.collection('commesse').doc(BC_current).collection('righe').get(),
+      db.collection('commesse').doc(BC_current).collection('stampe').get()
+    ]);
+    const batch=db.batch();
+    righeSnap.docs.forEach(d=>batch.delete(d.ref));
+    stampeSnap.docs.forEach(d=>batch.delete(d.ref));
+    batch.delete(db.collection('commesse').doc(BC_current));
+    await batch.commit();
+    document.getElementById('modal-commessa-tariffe').classList.remove('open');
+    const num=BC_current;BC_current=null;
+    BC_commesse=BC_commesse.filter(c=>c.numero!==num);
+    goPage('budget',document.querySelector('.nav-item[data-page=budget]'));
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+function apriModalListino(){
+  document.getElementById('bc-listino-nome').value='';
+  document.getElementById('bc-listino-prezzo').value='';
+  bcRenderListino();
+  document.getElementById('modal-listino').classList.add('open');
+}
+
+function bcRenderListino(){
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  const listino=(c&&c.listinoStampe)||[];
+  const el=document.getElementById('bc-listino-lista');
+  if(!listino.length){el.innerHTML='<div class="empty-state" style="padding:14px 0">Nessuna voce nel listino</div>';return}
+  el.innerHTML=listino.map((v,i)=>`<div class="bc-listino-row"><span style="flex:1">${v.nome}</span><span style="font-family:'Inter',monospace">${bcEuro(v.prezzo)}</span><button class="btn btn-sm" onclick="eliminaVoceListino(${i})">🗑</button></div>`).join('');
+}
+
+async function aggiungiVoceListino(){
+  const nome=document.getElementById('bc-listino-nome').value.trim();
+  const prezzo=parseFloat(document.getElementById('bc-listino-prezzo').value);
+  if(!nome||isNaN(prezzo))return;
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  if(!c)return;
+  const listino=(c.listinoStampe||[]).concat([{nome,prezzo}]);
+  await db.collection('commesse').doc(BC_current).update({listinoStampe:listino});
+  c.listinoStampe=listino;
+  document.getElementById('bc-listino-nome').value='';
+  document.getElementById('bc-listino-prezzo').value='';
+  bcRenderListino();
+  bcPopolaSelectListino(c);
+}
+
+async function eliminaVoceListino(idx){
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  if(!c)return;
+  const listino=(c.listinoStampe||[]).slice();
+  listino.splice(idx,1);
+  await db.collection('commesse').doc(BC_current).update({listinoStampe:listino});
+  c.listinoStampe=listino;
+  bcRenderListino();
+  bcPopolaSelectListino(c);
+}
+
+function bcPopolaSelectListino(commessa){
+  const sel=document.getElementById('bc-s-voce');
+  const listino=(commessa&&commessa.listinoStampe)||BC_DEFAULT_LISTINO;
+  sel.innerHTML=listino.map((v,i)=>`<option value="${i}">${v.nome} — ${bcEuro(v.prezzo)}</option>`).join('');
+}
+
+function bcRenderStampe(stampe){
+  const tb=document.getElementById('bc-tbody-stampe');
+  let tot=0;
+  if(!stampe.length){tb.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna riga inserita</td></tr>';document.getElementById('bc-tot-stampe').textContent=bcEuro(0);return}
+  tb.innerHTML=stampe.map(s=>{
+    const totale=(parseFloat(s.costoUnitario)||0)*(parseFloat(s.copie)||0);
+    tot+=totale;
+    const [y,m,g]=(s.data||'').split('-');
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(s.data||'—')}</td>
+      <td>${s.voce||'—'}</td>
+      <td class="td-r">${bcEuro(s.costoUnitario)}</td>
+      <td class="td-r">${s.copie||0}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(totale)}</td>
+      <td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td>
+      <td><button class="btn btn-sm" onclick="eliminaStampaBC('${s.id}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('bc-tot-stampe').textContent=bcEuro(tot);
+}
+
+function apriFormRigaBC(){
+  document.getElementById('bc-riga-alert').innerHTML='';
+  document.getElementById('bc-r-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-r-descrizione').value='';
+  document.getElementById('bc-r-ore').value='';
+  document.getElementById('bc-r-spese').value='';
+  document.getElementById('bc-r-km').value='';
+  bcPopolaSelectPersona();
+  document.getElementById('bc-form-riga').style.display='block';
+}
+function chiudiFormRigaBC(){const f=document.getElementById('bc-form-riga');if(f)f.style.display='none'}
+
+async function salvaRigaBC(){
+  const alertEl=document.getElementById('bc-riga-alert');
+  const selVal=document.getElementById('bc-r-persona').value;
+  const data=document.getElementById('bc-r-data').value;
+  const ore=parseFloat(document.getElementById('bc-r-ore').value);
+  if(!selVal){alertEl.innerHTML='<div class="alert-box alert-err">Seleziona chi ha lavorato</div>';return}
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!ore||ore<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci le ore lavorate</div>';return}
+  const isDip=selVal.startsWith('dip:');
+  const username=selVal.slice(4);
+  let nomeCompleto,livello;
+  if(isDip){
+    const d=dipList.find(x=>x.username===username);
+    nomeCompleto=d?`${d.nome||''} ${d.cognome||''}`.trim():username;
+    livello=(d&&d.livello)||'senior';
+  }else{
+    const a=BC_admins.find(x=>x.username===username);
+    nomeCompleto=a?(a.nome||username):username;
+    livello=document.getElementById('bc-r-livello').value;
+  }
+  const rec={
+    username,nomeCompleto,tipoPersona:isDip?'dipendente':'admin',
+    livello,disciplina:document.getElementById('bc-r-disciplina').value,data,
+    descrizione:document.getElementById('bc-r-descrizione').value.trim(),
+    ore,speseVive:parseFloat(document.getElementById('bc-r-spese').value)||0,
+    km:parseFloat(document.getElementById('bc-r-km').value)||0,
+    createdBy:ADM.username,createdAt:new Date().toISOString()
+  };
+  try{
+    await db.collection('commesse').doc(BC_current).collection('righe').add(rec);
+    chiudiFormRigaBC();
+    await bcCaricaRighe(BC_current);
+    const c=BC_commesse.find(x=>x.numero===BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaRigaBC(id){
+  if(!confirm('Eliminare questa riga di lavoro?'))return;
+  await db.collection('commesse').doc(BC_current).collection('righe').doc(id).delete();
+  await bcCaricaRighe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
+}
+
+function apriFormStampaBC(){
+  document.getElementById('bc-stampa-alert').innerHTML='';
+  document.getElementById('bc-s-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-s-copie').value=1;
+  document.getElementById('bc-s-note').value='';
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcPopolaSelectListino(c);
+  document.getElementById('bc-form-stampa').style.display='block';
+}
+function chiudiFormStampaBC(){const f=document.getElementById('bc-form-stampa');if(f)f.style.display='none'}
+
+async function salvaStampaBC(){
+  const alertEl=document.getElementById('bc-stampa-alert');
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  const listino=(c&&c.listinoStampe)||[];
+  const idx=parseInt(document.getElementById('bc-s-voce').value);
+  const voce=listino[idx];
+  const data=document.getElementById('bc-s-data').value;
+  const copie=parseFloat(document.getElementById('bc-s-copie').value);
+  if(!voce){alertEl.innerHTML='<div class="alert-box alert-err">Seleziona una voce dal listino</div>';return}
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!copie||copie<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci il numero di copie</div>';return}
+  const rec={data,voce:voce.nome,costoUnitario:voce.prezzo,copie,note:document.getElementById('bc-s-note').value.trim(),createdBy:ADM.username,createdAt:new Date().toISOString()};
+  try{
+    await db.collection('commesse').doc(BC_current).collection('stampe').add(rec);
+    chiudiFormStampaBC();
+    await bcCaricaStampe(BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaStampaBC(id){
+  if(!confirm('Eliminare questa riga stampa?'))return;
+  await db.collection('commesse').doc(BC_current).collection('stampe').doc(id).delete();
+  await bcCaricaStampe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
 }
 </script>
 </body>

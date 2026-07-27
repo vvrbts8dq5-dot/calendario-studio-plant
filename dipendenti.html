@@ -229,6 +229,21 @@ tbody tr:last-child{border-bottom:none}
 .cal-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--ink3)}
 .cal-legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
 
+/* BUDGET CONTRACT */
+.commessa-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.commessa-card:hover{border-color:var(--blu);background:var(--paper2)}
+.commessa-num{font-family:'Inter',monospace;font-weight:700;font-size:13px;color:var(--blu);min-width:64px}
+.commessa-info{flex:1;min-width:180px}
+.commessa-title{font-size:13px;font-weight:600}
+.commessa-sub{font-size:11px;color:var(--ink4);margin-top:2px}
+.commessa-pills{display:flex;gap:10px;flex-wrap:wrap}
+.commessa-pill{font-family:'Inter',monospace;font-size:11px;padding:3px 9px;border-radius:10px;background:var(--paper2);color:var(--ink3)}
+.bc-info-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:.5px solid var(--paper2)}
+.bc-info-row:last-child{border-bottom:none}
+.bc-info-key{color:var(--ink4);font-family:'Inter',monospace;font-size:11px}
+.bc-info-val{font-weight:600}
+.saldi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+
 /* RESPONSIVE */
 .btn-hamburger{display:none;background:none;border:none;color:var(--ink2);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px}
 .btn-hamburger:hover{background:var(--paper2)}
@@ -293,6 +308,9 @@ tbody tr:last-child{border-bottom:none}
       </button>
       <button class="nav-item" data-page="riepilogo">
         <span class="nav-icon">📊</span> Riepilogo Mensile
+      </button>
+      <button class="nav-item" data-page="budget">
+        <span class="nav-icon">📁</span> Budget Contract
       </button>
       <button class="nav-item" data-page="archivio">
         <span class="nav-icon">🗂️</span> Archivio Anni
@@ -515,6 +533,98 @@ tbody tr:last-child{border-bottom:none}
             <thead><tr><th>Tipologia</th><th class="td-r">Totale</th></tr></thead>
             <tbody id="tbody-totali"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- BUDGET CONTRACT - ELENCO -->
+      <div class="page" id="page-budget">
+        <div class="page-header">
+          <div class="page-title">📁 Budget Contract</div>
+        </div>
+        <div id="lista-commesse-dip"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- BUDGET CONTRACT - DETTAGLIO COMMESSA -->
+      <div class="page" id="page-budget-dettaglio">
+        <div class="page-header">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-sm" onclick="dipGoPage('budget')">← Budget Contract</button>
+            <div class="page-title" id="bc-det-title">Commessa</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title">Anagrafica Commessa</div>
+          <div id="bc-anagrafica"></div>
+        </div>
+
+        <div class="saldi-grid" id="bc-residui" style="margin-bottom:20px"></div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Righe di Lavoro</div>
+          <button class="btn btn-blu btn-sm" onclick="apriFormRigaBC()">+ Aggiungi Riga</button>
+        </div>
+        <div class="form-richiesta" id="bc-form-riga">
+          <div id="bc-riga-alert"></div>
+          <div class="form-grid">
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Disciplina</label>
+              <select class="f-input" style="margin:0" id="bc-r-disciplina">
+                <option value="ele">Elettrico</option>
+                <option value="mec">Meccanico</option>
+              </select>
+            </div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data</label><input class="f-input" style="margin:0" id="bc-r-data" type="date"></div>
+            <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Attività (breve descrizione)</label><input class="f-input" style="margin:0" id="bc-r-descrizione" type="text" placeholder="es. Sopralluogo cantiere"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore</label><input class="f-input" style="margin:0" id="bc-r-ore" type="number" step="0.5" min="0"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Spese vive (€)</label><input class="f-input" style="margin:0" id="bc-r-spese" type="number" step="0.01" min="0"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Km A+R</label><input class="f-input" style="margin:0" id="bc-r-km" type="number" step="1" min="0"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-blu" onclick="salvaRigaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormRigaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Utente</th><th>Livello/Disciplina</th><th>Attività</th>
+              <th class="td-r">Ore</th><th class="td-r">Spese vive</th><th class="td-r">Km A+R</th><th class="td-r">Costo riga</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="bc-tbody-righe"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="section-title">Riepilogo Costi Commessa</div>
+          <div id="bc-riepilogo"></div>
+        </div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Calcolo Stampe / Plottaggi</div>
+          <button class="btn btn-blu btn-sm" onclick="apriFormStampaBC()">+ Aggiungi Riga</button>
+        </div>
+        <div class="form-richiesta" id="bc-form-stampa">
+          <div id="bc-stampa-alert"></div>
+          <div class="form-grid">
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data</label><input class="f-input" style="margin:0" id="bc-s-data" type="date"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Voce listino</label><select class="f-input" style="margin:0" id="bc-s-voce"></select></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">N° copie</label><input class="f-input" style="margin:0" id="bc-s-copie" type="number" step="1" min="1" value="1"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><input class="f-input" style="margin:0" id="bc-s-note" type="text"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-blu" onclick="salvaStampaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormStampaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Voce</th><th class="td-r">Costo unitario</th><th class="td-r">Copie</th><th class="td-r">Totale</th><th>Note</th><th>Azioni</th></tr></thead>
+            <tbody id="bc-tbody-stampe"></tbody>
+          </table>
+        </div>
+        <div class="bc-info-row" style="max-width:320px;margin-top:10px">
+          <span class="bc-info-key">COSTO STAMPE PRODOTTE</span>
+          <span class="bc-info-val" id="bc-tot-stampe">€ 0,00</span>
         </div>
       </div>
 
@@ -754,11 +864,12 @@ document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
     document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
     document.getElementById('page-'+b.dataset.page).classList.add('active');
-    const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile'};
+    const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile',budget:'Budget Contract','budget-dettaglio':'Commessa'};
     document.getElementById('topbar-title').textContent=titles[b.dataset.page]||'';
     if(b.dataset.page==='assenze'){loadTutteAssenze();renderCalendarioFerie()}
     if(b.dataset.page==='riepilogo'){loadRiepilogoMese(parseInt(document.getElementById('sel-mese-riepilogo').value))}
     if(b.dataset.page==='archivio'){initArchivioDip()}
+    if(b.dataset.page==='budget'){loadCommesseDip()}
   });
 });
 
@@ -1320,6 +1431,312 @@ function esportaPDF(){
   const totOre=giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0);
   doc.text(`Totale ore mese: ${totOre}h`,14,y);
   doc.save(`${nome}_${MESI[mese]}_${ANNO}.pdf`);
+}
+
+// ===================== BUDGET CONTRACT (portale dipendenti) =====================
+// Permessi: il dipendente vede tutte le commesse e il residuo monte ore, può inserire
+// righe di lavoro e stampe/plottaggi solo per sé stesso. Non può creare commesse,
+// modificare tariffe/monte ore, né il listino prezzi (solo admin.html può farlo).
+const BC_DEFAULT_LISTINO=[
+  {nome:'Foglio A0 - B/N',prezzo:2.90},
+  {nome:'Foglio A0 - COLORI',prezzo:7.80},
+  {nome:'Foglio A1 - B/N',prezzo:2.30},
+  {nome:'Foglio A1 - COLORI',prezzo:5.70},
+  {nome:'Foglio A2 - B/N',prezzo:1.40},
+  {nome:'Foglio A2 - COLORI',prezzo:3.90},
+  {nome:'Foglio A3 - B/N',prezzo:0.90},
+  {nome:'Foglio A3 - COLORI',prezzo:2.80},
+  {nome:'Foglio A4 - B/N',prezzo:0.04},
+  {nome:'Astina Costola >10mm',prezzo:1.00},
+  {nome:'Astina Quadrata <10mm',prezzo:2.00},
+  {nome:'Acetato',prezzo:0.25},
+  {nome:'Cartoncino',prezzo:0.30}
+];
+let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[];
+
+function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
+
+function dipGoPage(pid){
+  closeSidebar();
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  const navBtn=document.querySelector('.nav-item[data-page="'+pid+'"]');
+  if(navBtn)navBtn.classList.add('active');
+  document.getElementById('page-'+pid).classList.add('active');
+  const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile',budget:'Budget Contract','budget-dettaglio':'Commessa'};
+  document.getElementById('topbar-title').textContent=titles[pid]||'';
+}
+
+async function loadCommesseDip(){
+  const el=document.getElementById('lista-commesse-dip');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  try{
+    const snap=await db.collection('commesse').get();
+    BC_commesse=snap.docs.map(d=>({numero:d.id,...d.data()})).sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+    if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa disponibile al momento.</div>';return}
+    el.innerHTML=BC_commesse.map(c=>`
+      <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
+        <div class="commessa-num">${c.numero}</div>
+        <div class="commessa-info">
+          <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+          <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${c.monteOreEle||0}h · Meccanico ${c.monteOreMec||0}h</div>
+        </div>
+        <div class="commessa-pills">
+          <span class="commessa-pill">Sr ${bcEuro(c.tariffaSenior)}/h</span>
+          <span class="commessa-pill">Jr ${bcEuro(c.tariffaJunior)}/h</span>
+          <span class="commessa-pill">Km ${bcEuro(c.tariffaKm)}</span>
+        </div>
+      </div>`).join('');
+  }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
+}
+
+async function bcCaricaRighe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('righe').orderBy('data','desc').get();
+  BC_righe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function bcCaricaStampe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('stampe').orderBy('data','desc').get();
+  BC_stampe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+async function apriCommessaBC(numero){
+  BC_current=numero;
+  dipGoPage('budget-dettaglio');
+  document.getElementById('bc-det-title').textContent='Commessa '+numero;
+  document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Caricamento...</div>';
+  document.getElementById('bc-tbody-righe').innerHTML='';
+  document.getElementById('bc-tbody-stampe').innerHTML='';
+  chiudiFormRigaBC();chiudiFormStampaBC();
+  try{
+    const doc=await db.collection('commesse').doc(numero).get();
+    if(!doc.exists){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Commessa non trovata</div>';return}
+    const commessa={numero:doc.id,...doc.data()};
+    BC_commesse=BC_commesse.filter(c=>c.numero!==numero).concat([commessa]);
+    await Promise.all([bcCaricaRighe(numero),bcCaricaStampe(numero)]);
+    bcRenderTutto(commessa);
+  }catch(e){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Errore: '+e.message+'</div>'}
+}
+
+function bcCalcRiepilogo(commessa,righe,stampe){
+  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0;
+  righe.forEach(r=>{
+    const ore=parseFloat(r.ore)||0;
+    if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
+    else{if(r.disciplina==='ele')oreJuniorEle+=ore;else oreJuniorMec+=ore}
+    speseViveTot+=parseFloat(r.speseVive)||0;
+    kmTot+=parseFloat(r.km)||0;
+  });
+  const tariffaSenior=parseFloat(commessa.tariffaSenior)||0;
+  const tariffaJunior=parseFloat(commessa.tariffaJunior)||0;
+  const tariffaKm=parseFloat(commessa.tariffaKm)||0;
+  const oreEleTot=oreSeniorEle+oreJuniorEle;
+  const oreMecTot=oreSeniorMec+oreJuniorMec;
+  const costoSeniorTot=(oreSeniorEle+oreSeniorMec)*tariffaSenior;
+  const costoJuniorTot=(oreJuniorEle+oreJuniorMec)*tariffaJunior;
+  const costoKmTot=kmTot*tariffaKm;
+  const costoTrasferta=costoKmTot+speseViveTot;
+  const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
+  const costoGenerale=costoSeniorTot+costoJuniorTot+costoTrasferta;
+  const monteOreEle=parseFloat(commessa.monteOreEle)||0;
+  const monteOreMec=parseFloat(commessa.monteOreMec)||0;
+  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,
+    tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
+    costoStampeTot,costoGenerale,monteOreEle,monteOreMec,residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
+}
+
+function bcRenderTutto(commessa){
+  bcRenderAnagrafica(commessa);
+  const riep=bcCalcRiepilogo(commessa,BC_righe,BC_stampe);
+  bcRenderResidui(riep);
+  bcRenderRighe(BC_righe,commessa);
+  bcRenderRiepilogo(riep);
+  bcPopolaSelectListino(commessa);
+  bcRenderStampe(BC_stampe);
+}
+
+function bcRenderAnagrafica(c){
+  document.getElementById('bc-det-title').textContent='Commessa '+c.numero;
+  document.getElementById('bc-anagrafica').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">COMMITTENTE</span><span class="bc-info-val">${c.committente||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">PROGETTO</span><span class="bc-info-val">${c.progetto||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ANNO</span><span class="bc-info-val">${c.anno||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(c.tariffaSenior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(c.tariffaJunior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(c.tariffaKm)}/km</span></div>`;
+}
+
+function bcRenderResidui(riep){
+  function cls(res,tot){if(tot<=0)return 'ok';return res>tot*0.2?'ok':res>0?'warn':'danger'}
+  const clsEle=cls(riep.residuoEle,riep.monteOreEle),clsMec=cls(riep.residuoMec,riep.monteOreMec);
+  document.getElementById('bc-residui').innerHTML=`
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">⚡ Monte Ore Elettrico</div><div class="saldo-dettaglio">Monte: ${riep.monteOreEle}h · Usate: ${riep.oreEleTot}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${clsEle}" style="width:${riep.monteOreEle>0?Math.max(0,Math.min(100,Math.round(riep.residuoEle/riep.monteOreEle*100))):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${clsEle}">${riep.residuoEle}h</div><div class="saldo-sub">${riep.residuoEle<0?'⚠️ superato':'residue'}</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">⚙️ Monte Ore Meccanico</div><div class="saldo-dettaglio">Monte: ${riep.monteOreMec}h · Usate: ${riep.oreMecTot}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${clsMec}" style="width:${riep.monteOreMec>0?Math.max(0,Math.min(100,Math.round(riep.residuoMec/riep.monteOreMec*100))):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${clsMec}">${riep.residuoMec}h</div><div class="saldo-sub">${riep.residuoMec<0?'⚠️ superato':'residue'}</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">💰 Costo Consuntivato</div><div class="saldo-dettaglio">Manodopera + trasferta</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--blu)">${bcEuro(riep.costoGenerale)}</div><div class="saldo-sub">totale</div></div>
+    </div>`;
+}
+
+function bcRenderRighe(righe){
+  const tb=document.getElementById('bc-tbody-righe');
+  if(!righe.length){tb.innerHTML='<tr><td colspan="9" class="empty-state">Nessuna riga inserita</td></tr>';return}
+  const c=BC_commesse.find(x=>x.numero===BC_current)||{};
+  const ts=parseFloat(c.tariffaSenior)||0,tj=parseFloat(c.tariffaJunior)||0,tk=parseFloat(c.tariffaKm)||0;
+  tb.innerHTML=righe.map(r=>{
+    const ore=parseFloat(r.ore)||0;
+    const tariffa=r.livello==='senior'?ts:tj;
+    const costo=ore*tariffa+(parseFloat(r.speseVive)||0)+(parseFloat(r.km)||0)*tk;
+    const [y,m,g]=(r.data||'').split('-');
+    const mioBottone=r.username===U.username?`<button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button>`:'';
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
+      <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
+      <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':'Mec'}</span></td>
+      <td style="font-size:12px;color:var(--ink4)">${r.descrizione||'—'}</td>
+      <td class="td-r">${ore}h</td>
+      <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
+      <td class="td-r">${r.km>0?r.km+' km':'—'}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(costo)}</td>
+      <td>${mioBottone}</td>
+    </tr>`;
+  }).join('');
+}
+
+function bcRenderRiepilogo(riep){
+  document.getElementById('bc-riepilogo').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">ORE SENIOR (Ele ${riep.oreSeniorEle}h + Mec ${riep.oreSeniorMec}h)</span><span class="bc-info-val">${riep.oreSeniorEle+riep.oreSeniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ORE JUNIOR (Ele ${riep.oreJuniorEle}h + Mec ${riep.oreJuniorMec}h)</span><span class="bc-info-val">${riep.oreJuniorEle+riep.oreJuniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO SENIOR</span><span class="bc-info-val">${bcEuro(riep.costoSeniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO JUNIOR</span><span class="bc-info-val">${bcEuro(riep.costoJuniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">SPESE VIVE</span><span class="bc-info-val">${bcEuro(riep.speseViveTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM (${bcEuro(riep.tariffaKm)}/km)</span><span class="bc-info-val">${bcEuro(riep.costoKmTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TOTALE SPESE DI TRASFERTA</span><span class="bc-info-val">${bcEuro(riep.costoTrasferta)}</span></div>
+    <div class="bc-info-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px"><span class="bc-info-key" style="font-weight:700;color:var(--ink)">COSTO GENERALE COMMESSA</span><span class="bc-info-val" style="font-size:15px;color:var(--verde)">${bcEuro(riep.costoGenerale)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">Costo stampe (voce separata, vedi sotto)</span><span class="bc-info-val">${bcEuro(riep.costoStampeTot)}</span></div>`;
+}
+
+function bcPopolaSelectListino(commessa){
+  const sel=document.getElementById('bc-s-voce');
+  const listino=(commessa&&commessa.listinoStampe)||BC_DEFAULT_LISTINO;
+  sel.innerHTML=listino.map((v,i)=>`<option value="${i}">${v.nome} — ${bcEuro(v.prezzo)}</option>`).join('');
+}
+
+function bcRenderStampe(stampe){
+  const tb=document.getElementById('bc-tbody-stampe');
+  let tot=0;
+  if(!stampe.length){tb.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna riga inserita</td></tr>';document.getElementById('bc-tot-stampe').textContent=bcEuro(0);return}
+  tb.innerHTML=stampe.map(s=>{
+    const totale=(parseFloat(s.costoUnitario)||0)*(parseFloat(s.copie)||0);
+    tot+=totale;
+    const [y,m,g]=(s.data||'').split('-');
+    const mioBottone=s.username===U.username?`<button class="btn btn-sm" onclick="eliminaStampaBC('${s.id}')">🗑</button>`:'';
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(s.data||'—')}</td>
+      <td>${s.voce||'—'}</td>
+      <td class="td-r">${bcEuro(s.costoUnitario)}</td>
+      <td class="td-r">${s.copie||0}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(totale)}</td>
+      <td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td>
+      <td>${mioBottone}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('bc-tot-stampe').textContent=bcEuro(tot);
+}
+
+function apriFormRigaBC(){
+  document.getElementById('bc-riga-alert').innerHTML='';
+  document.getElementById('bc-r-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-r-descrizione').value='';
+  document.getElementById('bc-r-ore').value='';
+  document.getElementById('bc-r-spese').value='';
+  document.getElementById('bc-r-km').value='';
+  document.getElementById('bc-form-riga').classList.add('open');
+}
+function chiudiFormRigaBC(){const f=document.getElementById('bc-form-riga');if(f)f.classList.remove('open')}
+
+async function salvaRigaBC(){
+  const alertEl=document.getElementById('bc-riga-alert');
+  const data=document.getElementById('bc-r-data').value;
+  const ore=parseFloat(document.getElementById('bc-r-ore').value);
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!ore||ore<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci le ore lavorate</div>';return}
+  const nomeCompleto=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  const rec={
+    username:U.username,nomeCompleto,tipoPersona:'dipendente',
+    livello:profilo.livello||'senior',disciplina:document.getElementById('bc-r-disciplina').value,data,
+    descrizione:document.getElementById('bc-r-descrizione').value.trim(),
+    ore,speseVive:parseFloat(document.getElementById('bc-r-spese').value)||0,
+    km:parseFloat(document.getElementById('bc-r-km').value)||0,
+    createdBy:U.username,createdAt:new Date().toISOString()
+  };
+  try{
+    await db.collection('commesse').doc(BC_current).collection('righe').add(rec);
+    chiudiFormRigaBC();
+    await bcCaricaRighe(BC_current);
+    const c=BC_commesse.find(x=>x.numero===BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaRigaBC(id){
+  const r=BC_righe.find(x=>x.id===id);
+  if(r&&r.username!==U.username)return; // può eliminare solo le proprie righe
+  if(!confirm('Eliminare questa riga di lavoro?'))return;
+  await db.collection('commesse').doc(BC_current).collection('righe').doc(id).delete();
+  await bcCaricaRighe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
+}
+
+function apriFormStampaBC(){
+  document.getElementById('bc-stampa-alert').innerHTML='';
+  document.getElementById('bc-s-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-s-copie').value=1;
+  document.getElementById('bc-s-note').value='';
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcPopolaSelectListino(c);
+  document.getElementById('bc-form-stampa').classList.add('open');
+}
+function chiudiFormStampaBC(){const f=document.getElementById('bc-form-stampa');if(f)f.classList.remove('open')}
+
+async function salvaStampaBC(){
+  const alertEl=document.getElementById('bc-stampa-alert');
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  const listino=(c&&c.listinoStampe)||[];
+  const idx=parseInt(document.getElementById('bc-s-voce').value);
+  const voce=listino[idx];
+  const data=document.getElementById('bc-s-data').value;
+  const copie=parseFloat(document.getElementById('bc-s-copie').value);
+  if(!voce){alertEl.innerHTML='<div class="alert-box alert-err">Seleziona una voce dal listino</div>';return}
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!copie||copie<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci il numero di copie</div>';return}
+  const rec={data,voce:voce.nome,costoUnitario:voce.prezzo,copie,note:document.getElementById('bc-s-note').value.trim(),username:U.username,createdBy:U.username,createdAt:new Date().toISOString()};
+  try{
+    await db.collection('commesse').doc(BC_current).collection('stampe').add(rec);
+    chiudiFormStampaBC();
+    await bcCaricaStampe(BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaStampaBC(id){
+  const s=BC_stampe.find(x=>x.id===id);
+  if(s&&s.username!==U.username)return;
+  if(!confirm('Eliminare questa riga stampa?'))return;
+  await db.collection('commesse').doc(BC_current).collection('stampe').doc(id).delete();
+  await bcCaricaStampe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
 }
 </script>
 </body>
