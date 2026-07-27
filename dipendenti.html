@@ -1566,6 +1566,7 @@ async function apriCommessaBC(numero){
   dipGoPage('budget-dettaglio');
   document.getElementById('bc-det-title').textContent='Commessa '+numero;
   document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Caricamento...</div>';
+  document.getElementById('bc-residui').innerHTML='<div class="empty-state">Caricamento...</div>';
   document.getElementById('bc-tbody-righe').innerHTML='';
   document.getElementById('bc-tbody-stampe').innerHTML='';
   chiudiFormRigaBC();chiudiFormStampaBC();
@@ -1574,6 +1575,8 @@ async function apriCommessaBC(numero){
     if(!doc.exists){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Commessa non trovata</div>';return}
     const commessa={numero:doc.id,...doc.data()};
     BC_commesse=BC_commesse.filter(c=>c.numero!==numero).concat([commessa]);
+    // Mostra subito l'anagrafica: non serve aspettare righe/stampe per questi dati
+    bcRenderAnagrafica(commessa);
     await Promise.all([bcCaricaRighe(numero),bcCaricaStampe(numero)]);
     bcRenderTutto(commessa);
   }catch(e){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Errore: '+e.message+'</div>'}
