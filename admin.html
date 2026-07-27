@@ -318,7 +318,10 @@ tbody tr:hover{background:var(--paper)}
     <label class="f-label">Email</label>
     <input class="f-input" id="inp-user" type="email" placeholder="nome.cognome@plantingegneria.com" autocomplete="username">
     <label class="f-label">Password</label>
-    <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    <div style="position:relative">
+      <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:42px">
+      <button type="button" onclick="togglePassAdmin()" id="btn-toggle-pass" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;padding:6px;line-height:1">👁</button>
+    </div>
     <button class="login-btn" id="btn-login">Accedi come Amministratore</button>
   </div>
 </div>
@@ -343,6 +346,7 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="dipendenti" onclick="goPage('dipendenti',this)">
         <span class="nav-icon">👥</span> Dipendenti
+        <span class="nav-badge" id="badge-sblocco">0</span>
       </button>
       <button class="nav-item" data-page="straordinari" onclick="goPage('straordinari',this)">
         <span class="nav-icon">⚡</span> Straordinari
@@ -537,8 +541,12 @@ tbody tr:hover{background:var(--paper)}
       <div class="page" id="page-dipendenti">
         <div class="page-header">
           <div class="page-title">Dipendenti</div>
-          <button class="btn btn-ink" id="btn-nuovo-dip">+ Nuovo Dipendente</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="btn-sblocca-tutti" onclick="sbloccaTutti()">🔓 Sblocca tutti</button>
+            <button class="btn btn-ink" id="btn-nuovo-dip">+ Nuovo Dipendente</button>
+          </div>
         </div>
+        <div id="richieste-sblocco-box"></div>
         <div id="alert-dip"></div>
         <div class="form-box" id="form-nuovo">
           <div class="section-title">Crea Nuovo Dipendente</div>
@@ -1182,6 +1190,12 @@ async function doLogin(){
   finally{document.getElementById('btn-login').textContent='Accedi come Amministratore'}
 }
 function showErr(m){const e=document.getElementById('login-error');e.textContent=m;e.style.display='block'}
+function togglePassAdmin(){
+  const inp=document.getElementById('inp-pass');
+  const btn=document.getElementById('btn-toggle-pass');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁';}
+}
 
 // Ripristino sessione tramite Firebase Auth (persistenza SESSION: come prima, si esce chiudendo la scheda)
 auth.onAuthStateChanged(async user=>{
@@ -1224,6 +1238,15 @@ function startApp(){
       badge.textContent=cnt;
       badge.className='nav-badge'+(cnt>0?' alert':'');
     });
+  // Notifiche real-time richieste di sblocco per inattività
+  db.collection('richieste_sblocco').where('stato','==','in_attesa')
+    .onSnapshot(snap=>{
+      const cnt=snap.size;
+      const badge=document.getElementById('badge-sblocco');
+      if(badge){badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'');}
+      RICHIESTE_SBLOCCO=snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderRichiesteSblocco();
+    });
   // Notifiche real-time straordinari da convalidare
   aggiornaBadgeStraord();
   // Controlla se è 1 gennaio → mostra modal gestione ferie
@@ -1248,10 +1271,13 @@ async function checkInattivita(){
       const d=docSnap.data();
       // Salta già bloccati o disabilitati manualmente
       if(d.bloccatoInattivita||!d.abilitato)return;
-      // Se non ha mai fatto login, usa la data di creazione
-      const riferimento=d.ultimoAccesso||d.createdAt;
-      if(!riferimento)return;
-      const ultimo=new Date(riferimento);
+      // Se non ha MAI avuto un accesso registrato non blocchiamo retroattivamente
+      // (evita il blocco di massa al primo avvio del controllo): iniziamo a contare da oggi.
+      if(!d.ultimoAccesso){
+        promises.push(db.collection('dipendenti').doc(docSnap.id).update({ultimoAccesso:new Date().toISOString()}));
+        return;
+      }
+      const ultimo=new Date(d.ultimoAccesso);
       ultimo.setHours(0,0,0,0);
       // Conta giorni lavorativi dall'ultimo accesso ad oggi (escluso oggi)
       let ggLav=0;
@@ -1275,9 +1301,60 @@ async function checkInattivita(){
     });
     if(promises.length>0){
       await Promise.all(promises);
-      console.log(`Bloccati ${promises.length} dipendenti per inattività`);
+      console.log(`Controllo inattività: ${promises.length} aggiornamenti applicati`);
     }
   }catch(e){console.log('Check inattività errore:',e.message)}
+}
+
+let RICHIESTE_SBLOCCO=[];
+function renderRichiesteSblocco(){
+  const box=document.getElementById('richieste-sblocco-box');
+  if(!box)return;
+  if(!RICHIESTE_SBLOCCO.length){box.innerHTML='';return}
+  box.innerHTML=RICHIESTE_SBLOCCO.map(r=>`
+    <div class="alert-box" style="background:#fff3cd;color:#7a5c00;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>🔔 Vuoi sbloccare <strong>${r.nomeCompleto||r.username}</strong>?</div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-verde btn-sm" onclick="approvaSblocco('${r.id}','${r.username}')">🔓 Sblocca</button>
+        <button class="btn btn-sm" onclick="rifiutaSblocco('${r.id}')">Ignora</button>
+      </div>
+    </div>`).join('');
+}
+async function approvaSblocco(reqId,username){
+  try{
+    const nowIso=new Date().toISOString();
+    await db.collection('dipendenti').doc(username).update({abilitato:true,bloccatoInattivita:false,ultimoAccesso:nowIso});
+    await db.collection('richieste_sblocco').doc(reqId).update({stato:'approvata',risoltoIl:nowIso,risoltoDa:ADM?ADM.username:''});
+    const emp=dipList.find(e=>e.username===username);
+    if(emp){emp.abilitato=true;emp.bloccatoInattivita=false;emp.ultimoAccesso=nowIso;}
+    loadDipendenti();renderDashboardFromCache();
+  }catch(e){alert('Errore: '+e.message)}
+}
+async function rifiutaSblocco(reqId){
+  try{
+    await db.collection('richieste_sblocco').doc(reqId).update({stato:'ignorata',risoltoIl:new Date().toISOString(),risoltoDa:ADM?ADM.username:''});
+  }catch(e){alert('Errore: '+e.message)}
+}
+async function sbloccaTutti(){
+  if(!confirm('Sbloccare TUTTI i dipendenti attualmente bloccati per inattività?'))return;
+  const ad=document.getElementById('alert-dip');
+  try{
+    const snap=await db.collection('dipendenti').where('bloccatoInattivita','==',true).get();
+    if(snap.empty){if(ad)ad.innerHTML='<div class="alert-box alert-ok">Nessun dipendente bloccato al momento.</div>';return}
+    const nowIso=new Date().toISOString();
+    const batch=db.batch();
+    snap.forEach(d=>batch.update(d.ref,{bloccatoInattivita:false,abilitato:true,ultimoAccesso:nowIso}));
+    await batch.commit();
+    const reqSnap=await db.collection('richieste_sblocco').where('stato','==','in_attesa').get();
+    if(!reqSnap.empty){
+      const batch2=db.batch();
+      reqSnap.forEach(d=>batch2.update(d.ref,{stato:'approvata',risoltoIl:nowIso,risoltoDa:ADM?ADM.username:''}));
+      await batch2.commit();
+    }
+    if(ad)ad.innerHTML='<div class="alert-box alert-ok">✓ '+snap.size+' dipendenti sbloccati.</div>';
+    setTimeout(()=>{if(ad)ad.innerHTML=''},3000);
+    loadDipendenti();renderDashboardFromCache();
+  }catch(e){if(ad)ad.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
 }
 
 // AGGIORNAMENTO GLOBALE (pulsante topbar con indicatore verde/rosso)
@@ -2185,6 +2262,12 @@ async function sbloccaDip(username){
     });
     const emp=dipList.find(e=>e.username===username);
     if(emp){emp.abilitato=true;emp.bloccatoInattivita=false;emp.ultimoAccesso=nowIso;}
+    const reqSnap=await db.collection('richieste_sblocco').where('username','==',username).where('stato','==','in_attesa').get();
+    if(!reqSnap.empty){
+      const batchReq=db.batch();
+      reqSnap.forEach(d=>batchReq.update(d.ref,{stato:'approvata',risoltoIl:nowIso,risoltoDa:ADM?ADM.username:''}));
+      await batchReq.commit();
+    }
     ad.innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente sbloccato.</div>';
     setTimeout(()=>ad.innerHTML='',3000);
     loadDipendenti();renderDashboardFromCache();
@@ -3063,8 +3146,8 @@ let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[],BC_admins=[],BC_comm
 function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
 
 async function loadCommesse(forza){
-  if(BC_commesseLoaded && !forza){renderListaCommesse();return}
   const el=document.getElementById('lista-commesse');
+  if(BC_commesseLoaded&&!forza){renderListaCommesse();return}
   el.innerHTML='<div class="empty-state">Caricamento...</div>';
   try{
     const snap=await db.collection('commesse').get();
