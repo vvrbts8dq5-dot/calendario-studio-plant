@@ -8,7 +8,7 @@ const CONTAB_STATO_LABELS={
   importo_da_verificare:'Importo da verificare',
   volontariato:'Volontariato'
 };
-let CONTAB_all=[], CONTAB_anno='tutti', CONTAB_filtro='tutti', CONTAB_editId=null;
+let CONTAB_all=[], CONTAB_anno='tutti', CONTAB_filtro='tutti', CONTAB_search='', CONTAB_editId=null;
 
 function ceur(v){return '€'+(parseFloat(v)||0).toFixed(2);}
 
@@ -43,12 +43,20 @@ function contabSetFiltro(v,btn){
   if(btn)btn.classList.add('active');
   renderContabilita();
 }
+function contabSetSearch(v){CONTAB_search=v;renderContabilita();}
 
 function contabRigheFiltrate(){
+  const f=(CONTAB_search||'').trim().toLowerCase();
   return CONTAB_all.filter(r=>{
     if(CONTAB_anno!=='tutti' && String(r.anno)!==String(CONTAB_anno))return false;
     if(CONTAB_filtro==='pagati' && r.statoPagamento!=='fattura_incassata')return false;
     if(CONTAB_filtro==='aperti' && r.statoPagamento==='fattura_incassata')return false;
+    if(f && !(
+      String(r.codiceCommessa||'').toLowerCase().includes(f)
+      || String(r.codiceOfferta||'').toLowerCase().includes(f)
+      || String(r.clienteDebitore||'').toLowerCase().includes(f)
+      || String(r.descrizione||'').toLowerCase().includes(f)
+    ))return false;
     return true;
   }).sort((a,b)=>(b.anno-a.anno)||String(a.codiceCommessa||'').localeCompare(String(b.codiceCommessa||'')));
 }

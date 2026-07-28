@@ -662,7 +662,8 @@ tbody tr:hover{background:var(--paper)}
       <div class="page" id="page-budget">
         <div class="page-header">
           <div class="page-title">📁 Budget Contract</div>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="fi" id="bc-list-search" type="text" style="max-width:240px" placeholder="Cerca per numero o nome..." oninput="renderListaCommesse()">
             <button class="btn" onclick="loadCommesse(true)">🔄 Aggiorna</button>
             <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
           </div>
@@ -810,6 +811,10 @@ tbody tr:hover{background:var(--paper)}
               <button class="btn-filtro" data-f="pagati" onclick="contabSetFiltro('pagati',this)">✓ Pagati</button>
               <button class="btn-filtro" data-f="aperti" onclick="contabSetFiltro('aperti',this)">Aperti</button>
             </div>
+          </div>
+          <div class="contab-toolbar-grp">
+            <label class="fl">Cerca</label>
+            <input class="fi" id="contab-search" type="text" style="min-width:220px" placeholder="Codice, cliente, descrizione..." oninput="contabSetSearch(this.value)">
           </div>
         </div>
 
@@ -3420,7 +3425,10 @@ async function loadCommesse(forza){
 function renderListaCommesse(){
   const el=document.getElementById('lista-commesse');
   if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa creata. Usa "+ Nuova Commessa" per iniziare.</div>';return}
-  el.innerHTML=BC_commesse.map(c=>`
+  const f=(document.getElementById('bc-list-search')?.value||'').trim().toLowerCase();
+  const listaBC=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  if(!listaBC.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata per la ricerca.</div>';return}
+  el.innerHTML=listaBC.map(c=>`
     <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
       <div class="commessa-num">${c.numero}</div>
       <div class="commessa-info">
