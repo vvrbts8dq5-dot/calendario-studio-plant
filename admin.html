@@ -251,6 +251,14 @@ tbody tr:hover{background:var(--paper)}
 .commessa-pill{font-family:'Inter',monospace;font-size:11px;padding:3px 9px;border-radius:10px;background:var(--paper2);color:var(--ink3)}
 .commessa-pill.warn{background:var(--amber-light);color:var(--amber)}
 .commessa-pill.danger{background:var(--rosso-light);color:var(--rosso)}
+.ss-wrap{position:relative}
+.ss-list{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--white);border:.5px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:80;display:none}
+.ss-list.open{display:block}
+.ss-opt{padding:8px 12px;font-size:12px;cursor:pointer;color:var(--ink2)}
+.ss-opt:hover,.ss-opt.sel{background:var(--paper2)}
+.ss-empty{padding:8px 12px;font-size:12px;color:var(--ink4)}
+.rub-note{width:100%;min-height:44px;resize:vertical;font-family:'Inter',sans-serif}
+
 .bc-info-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:.5px solid var(--paper2)}
 .bc-info-row:last-child{border-bottom:none}
 .bc-info-key{color:var(--ink4);font-family:'Inter',monospace;font-size:11px}
@@ -370,6 +378,9 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="budget" onclick="goPage('budget',this)">
         <span class="nav-icon">📁</span> Budget Contract
+      </button>
+      <button class="nav-item" data-page="rubrica" onclick="goPage('rubrica',this)">
+        <span class="nav-icon">📇</span> Rubrica Commesse
       </button>
       <button class="nav-item" data-page="contabilita" onclick="goPage('contabilita',this)">
         <span class="nav-icon">🧾</span> Monitoraggio Contabilità
@@ -657,6 +668,16 @@ tbody tr:hover{background:var(--paper)}
           </div>
         </div>
         <div id="lista-commesse"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- RUBRICA COMMESSE -->
+      <div class="page" id="page-rubrica">
+        <div class="page-header">
+          <div class="page-title">📇 Rubrica Commesse</div>
+          <input class="fi" id="rub-search" type="text" style="max-width:320px" placeholder="Cerca per numero o nome..." oninput="renderRubrica()">
+        </div>
+        <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">Elenco sempre aggiornato con le commesse create in Budget Contract. Le note sono modificabili qui e si salvano da sole.</div>
+        <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>
 
       <!-- BUDGET CONTRACT - DETTAGLIO COMMESSA -->
@@ -998,6 +1019,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Anno</label><input class="fi" id="bc-n-anno" type="number" value="2026"></div>
       <div style="grid-column:1/-1"><label class="fl">Committente</label><input class="fi" id="bc-n-committente" type="text"></div>
       <div style="grid-column:1/-1"><label class="fl">Progetto</label><input class="fi" id="bc-n-progetto" type="text"></div>
+      <div style="grid-column:1/-1"><label class="fl">Note</label><textarea class="fi" id="bc-n-note" rows="2" placeholder="Note interne, visibili nella Rubrica Commesse"></textarea></div>
     </div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
     <div class="form-grid" style="margin-bottom:6px">
@@ -1471,7 +1493,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1482,6 +1504,7 @@ function goPage(pid,btn){
   if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
+  if(pid==='rubrica')loadCommesse().then(renderRubrica);
 }
 
 // DASHBOARD
@@ -3067,6 +3090,7 @@ function apriFormTit(id){
   const selCommessaTit=document.getElementById('tit-commessa');
   selCommessaTit.innerHTML='<option value="">— Nessuna —</option>'+BC_commesse.map(c=>`<option value="${c.numero}">${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('');
   selCommessaTit.value=r&&r.commessa?r.commessa:'';
+  makeSearchable(selCommessaTit,'Cerca per numero o nome...');
   document.getElementById('tit-livello').value=(r&&r.livello)||'senior';
   document.getElementById('tit-disciplina').value=(r&&r.disciplina)||'ele';
   TIT_CAMPI_N.forEach(k=>{
@@ -3237,6 +3261,104 @@ const BC_DEFAULT_LISTINO=[
 ];
 let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[],BC_admins=[],BC_commesseLoaded=false;
 
+// ── TENDINE COMMESSE RICERCABILI (scrivi numero o nome per filtrare) ──
+function makeSearchable(selectEl,placeholder){
+  if(!selectEl)return;
+  if(selectEl.dataset.ssInit){if(selectEl._ssRefresh)selectEl._ssRefresh();return}
+  selectEl.dataset.ssInit='1';
+  selectEl.style.display='none';
+  const wrap=document.createElement('div');wrap.className='ss-wrap';
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='fi ss-input';inp.autocomplete='off';
+  inp.placeholder=placeholder||'Cerca per numero o nome...';
+  const list=document.createElement('div');list.className='ss-list';
+  wrap.appendChild(inp);wrap.appendChild(list);
+  selectEl.insertAdjacentElement('afterend',wrap);
+  function labelFor(v){const o=[...selectEl.options].find(o=>o.value===v);return o?o.textContent:''}
+  function draw(filter){
+    const f=(filter||'').trim().toLowerCase();
+    const opts=[...selectEl.options];
+    const filtered=f?opts.filter(o=>o.textContent.toLowerCase().includes(f)):opts;
+    list.innerHTML=filtered.length?filtered.map(o=>`<div class="ss-opt${o.value===selectEl.value?' sel':''}" data-v="${(o.value+'').replace(/"/g,'&quot;')}">${o.textContent}</div>`).join(''):'<div class="ss-empty">Nessun risultato</div>';
+  }
+  inp.addEventListener('input',()=>{draw(inp.value);list.classList.add('open')});
+  inp.addEventListener('focus',()=>{inp.select();draw('');list.classList.add('open')});
+  inp.addEventListener('blur',()=>{setTimeout(()=>{list.classList.remove('open');inp.value=labelFor(selectEl.value)},150)});
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){inp.value=labelFor(selectEl.value);list.classList.remove('open');inp.blur()}
+    if(e.key==='Enter'){const first=list.querySelector('.ss-opt');if(first){e.preventDefault();first.dispatchEvent(new Event('mousedown',{bubbles:true}))}}
+  });
+  list.addEventListener('mousedown',e=>{
+    const opt=e.target.closest('.ss-opt');if(!opt)return;
+    e.preventDefault();
+    selectEl.value=opt.dataset.v;
+    selectEl.dispatchEvent(new Event('change',{bubbles:true}));
+    inp.value=labelFor(opt.dataset.v);
+    list.classList.remove('open');
+  });
+  const proto=Object.getPrototypeOf(selectEl);
+  const desc=Object.getOwnPropertyDescriptor(proto,'value')||Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(selectEl,'value',{configurable:true,get(){return desc.get.call(this)},set(v){desc.set.call(this,v);inp.value=labelFor(this.value)}});
+  selectEl._ssRefresh=()=>{inp.value=labelFor(selectEl.value)};
+  inp.value=labelFor(selectEl.value);
+}
+// Variante per campo di TESTO LIBERO (Contabilità: il codice commessa resta testo libero,
+// serve solo il suggerimento — chi digita un codice storico non presente tra le commesse può comunque salvarlo)
+function makeAutocomplete(inputEl,getItems,placeholder){
+  if(!inputEl||inputEl.dataset.acInit)return;
+  inputEl.dataset.acInit='1';
+  inputEl.autocomplete='off';
+  if(placeholder)inputEl.placeholder=placeholder;
+  if(inputEl.parentElement)inputEl.parentElement.style.position='relative';
+  const list=document.createElement('div');list.className='ss-list';
+  inputEl.insertAdjacentElement('afterend',list);
+  function draw(){
+    const f=inputEl.value.trim().toLowerCase();
+    const items=getItems();
+    const filtered=f?items.filter(it=>it.label.toLowerCase().includes(f)):items;
+    list.innerHTML=filtered.length?filtered.slice(0,50).map(it=>`<div class="ss-opt" data-v="${(it.value+'').replace(/"/g,'&quot;')}">${it.label}</div>`).join(''):'<div class="ss-empty">Nessun risultato</div>';
+  }
+  inputEl.addEventListener('input',()=>{draw();list.classList.add('open')});
+  inputEl.addEventListener('focus',()=>{draw();list.classList.add('open')});
+  inputEl.addEventListener('blur',()=>{setTimeout(()=>list.classList.remove('open'),150)});
+  list.addEventListener('mousedown',e=>{
+    const opt=e.target.closest('.ss-opt');if(!opt)return;
+    e.preventDefault();
+    inputEl.value=opt.dataset.v;
+    inputEl.dispatchEvent(new Event('input',{bubbles:true}));
+    list.classList.remove('open');
+  });
+}
+
+// ── RUBRICA COMMESSE (ricerca per numero/nome, note modificabili) ──
+function renderRubrica(){
+  const el=document.getElementById('rubrica-lista');
+  if(!el)return;
+  const f=(document.getElementById('rub-search')?.value||'').trim().toLowerCase();
+  const list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  if(!list.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata.</div>';return}
+  el.innerHTML=list.map(c=>`
+    <div class="commessa-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:10px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div class="commessa-num">${c.numero}</div>
+        <div class="commessa-info">
+          <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+          <div class="commessa-sub">Anno ${c.anno||'—'}</div>
+        </div>
+      </div>
+      <textarea class="fi rub-note" rows="2" data-numero="${(c.numero+'').replace(/"/g,'&quot;')}" onblur="salvaNotaRubrica(this)" placeholder="Note (es. dettagli utili, referenti, promemoria)...">${String(c.note||'').replace(/</g,'&lt;')}</textarea>
+    </div>`).join('');
+}
+async function salvaNotaRubrica(el){
+  const numero=el.dataset.numero;
+  const nota=el.value;
+  try{
+    await db.collection('commesse').doc(numero).update({note:nota});
+    const c=BC_commesse.find(x=>x.numero===numero);if(c)c.note=nota;
+  }catch(e){alert('Errore salvataggio nota: '+e.message)}
+}
+
+
 function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
 
 async function loadCommesse(forza){
@@ -3274,6 +3396,7 @@ function apriModalNuovaCommessa(){
   document.getElementById('bc-n-anno').value=ANNO;
   document.getElementById('bc-n-committente').value='';
   document.getElementById('bc-n-progetto').value='';
+  document.getElementById('bc-n-note').value='';
   document.getElementById('bc-n-tsenior').value=98;
   document.getElementById('bc-n-tjunior').value=31;
   document.getElementById('bc-n-tkm').value=0.45;
@@ -3293,6 +3416,7 @@ async function salvaNuovaCommessa(){
     anno:parseInt(document.getElementById('bc-n-anno').value)||ANNO,
     committente:document.getElementById('bc-n-committente').value.trim(),
     progetto:document.getElementById('bc-n-progetto').value.trim(),
+    note:document.getElementById('bc-n-note').value.trim(),
     tariffaSenior:parseFloat(document.getElementById('bc-n-tsenior').value)||0,
     tariffaJunior:parseFloat(document.getElementById('bc-n-tjunior').value)||0,
     tariffaKm:parseFloat(document.getElementById('bc-n-tkm').value)||0,
