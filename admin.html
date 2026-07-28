@@ -20,6 +20,12 @@
   --rosso:#DC2626;--rosso-light:#FDECEC;
   --viola:#C05621;--viola-light:#F5E6DC;
   --festivo:#A855F7;--festivo-light:#F5EDFC;
+  --gc-festivo:#16A34A;--gc-festivo-bg:#DCFCE7;
+  --gc-chiusura:#DC2626;--gc-chiusura-bg:#FEE2E2;
+  --gc-ferie:#F97316;--gc-ferie-bg:#FFEDD5;
+  --gc-malattia:#8B5CF6;--gc-malattia-bg:#EDE9FE;
+  --gc-permesso:#2563EB;--gc-permesso-bg:#DBEAFE;
+  --gc-rol:#CA8A04;--gc-rol-bg:#FEF9C3;
   --giallo:#CA8A04;--giallo-light:#FEF9C3;
   --sidebar-w:260px;
 }
@@ -154,6 +160,13 @@ tbody tr:hover{background:var(--paper)}
 .cal-day.has-data{background:var(--verde-light);color:var(--verde)}
 .cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
 .cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
+.cal-day.gc-festivo{background:var(--gc-festivo-bg);color:var(--gc-festivo);font-weight:600}
+.cal-day.gc-chiusura{background:var(--gc-chiusura-bg);color:var(--gc-chiusura);font-weight:600}
+.cal-day.gc-ferie{background:var(--gc-ferie-bg);color:var(--gc-ferie);font-weight:600}
+.cal-day.gc-malattia{background:var(--gc-malattia-bg);color:var(--gc-malattia);font-weight:600}
+.cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
+.cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
+.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected{background:var(--ink)!important;color:#fff!important}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
 .tot-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
 .tot-row:last-child{border-bottom:none}
@@ -507,12 +520,12 @@ tbody tr:hover{background:var(--paper)}
           <div class="cal-ferie-grid" id="cal-ferie-grid"></div>
           <div id="lista-chiusure" style="margin-top:10px"></div>
           <div class="cal-legend">
-            <span><span class="cal-legend-dot" style="background:var(--verde)"></span>Ferie</span>
-            <span><span class="cal-legend-dot" style="background:var(--blu)"></span>Permesso</span>
-            <span><span class="cal-legend-dot" style="background:var(--viola)"></span>ROL</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
             <span>👑 Titolare</span>
-            <span><span class="cal-legend-dot" style="background:var(--rosso-light);border:1px solid var(--rosso)"></span>Chiusura uffici</span>
-            <span><span class="cal-legend-dot" style="background:var(--verde-light);border:1px solid var(--verde)"></span>Festivo/Weekend</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-chiusura-bg);border:1px solid var(--gc-chiusura)"></span>Chiusura uffici</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-festivo-bg);border:1px solid var(--gc-festivo)"></span>Festivo</span>
             <span id="cal-ferie-hint" style="display:none;color:var(--ink4)">Clicca un giorno per segnare/rimuovere le tue ferie</span>
           </div>
         </div>
@@ -1108,7 +1121,25 @@ const db=firebase.firestore();
 
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-const FESTIVITA=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
+
+// Finestra mobile: sempre 12 mesi in avanti rispetto al mese corrente (calcolata dal vivo)
+const MESE_ATTUALE_ABS=new Date().getMonth();
+const MESE_MAX_ABS=MESE_ATTUALE_ABS+12;
+function annoMese(meseAbs){const a=ANNO+Math.floor(meseAbs/12);const m=((meseAbs%12)+12)%12;return{anno:a,mese:m}}
+function meseAbsDaData(ds){const p=String(ds||'').split('-');const y=parseInt(p[0])||ANNO,m=(parseInt(p[1])||1)-1;return(y-ANNO)*12+m}
+
+// Festività italiane — Pasqua/Pasquetta calcolate automaticamente (algoritmo di Gauss), valide per qualsiasi anno
+function pasquaGauss(anno){
+  const a=anno%19,b=Math.floor(anno/100),c=anno%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,mm=Math.floor((a+11*h+22*l)/451),mese=Math.floor((h+l-7*mm+114)/31),giorno=((h+l-7*mm+114)%31)+1;
+  return new Date(anno,mese-1,giorno);
+}
+function festivitaAnno(anno){
+  const p2=n=>String(n).padStart(2,'0');
+  const pasqua=pasquaGauss(anno);
+  const pasquetta=new Date(pasqua);pasquetta.setDate(pasqua.getDate()+1);
+  const fmt=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+  return[`${anno}-01-01`,`${anno}-01-06`,fmt(pasqua),fmt(pasquetta),`${anno}-04-25`,`${anno}-05-01`,`${anno}-06-02`,`${anno}-08-15`,`${anno}-11-01`,`${anno}-12-08`,`${anno}-12-25`,`${anno}-12-26`];
+}
 const CAMPI=[
   {k:'commessa',l:'N° Commessa',t:'text'},
   {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'n'},
@@ -1137,6 +1168,7 @@ let modalRichiestaId=null;
 
 function pad(n){return String(n).padStart(2,'0')}
 function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function dsOfAbs(m,g){const{anno,mese}=annoMese(m);return `${anno}-${pad(mese+1)}-${pad(g)}`}
 function isFestivo(ds){return FESTIVITA.includes(ds)}
 function getDays(m){return new Date(ANNO,m+1,0).getDate()}
 function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
@@ -1221,6 +1253,8 @@ const ANNO_PREC=ANNO_CORRENTE-1;
 // L'anno precedente è modificabile fino al 31 gennaio
 const oggi_check=new Date();
 const ANNO_PREC_MODIFICABILE=(oggi_check.getMonth()===0); // gennaio=0
+// Festività nazionali — calcolate su ANNO e ANNO+1 (copre l'intera finestra mobile di 12 mesi)
+const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
 
 function startApp(){
   document.getElementById('login-screen').style.display='none';
@@ -1261,7 +1295,7 @@ function startApp(){
   for(let y=ANNO;y>=2026;y--){const o=document.createElement('option');o.value=y;o.textContent=y;costiAnno.appendChild(o);}
 }
 
-const FESTIVITA_CHECK=['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'];
+const FESTIVITA_CHECK=FESTIVITA; // stesso calcolo automatico Pasqua/Pasquetta di FESTIVITA
 
 async function checkInattivita(){
   try{
@@ -1463,9 +1497,13 @@ async function loadDashboard(){
   dipDataCache={};
   await Promise.all(dipList.map(async emp=>{
     try{
-      const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-      const days={};snap.forEach(d=>{days[d.id]=d.data()});
-      const totals={};CN.forEach(c=>{totals[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
+      const[snap,snapNext]=await Promise.all([
+        db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get(),
+        db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
+      ]);
+      const days={};snap.forEach(d=>{days[d.id]=d.data()});snapNext.forEach(d=>{days[d.id]=d.data()});
+      // I totali della dashboard restano riferiti al solo ANNO corrente
+      const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(days).filter(([id])=>id.startsWith(String(ANNO)+'-')).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0)});
       dipDataCache[emp.username]={days,totals};
     }catch{dipDataCache[emp.username]={days:{},totals:{}}}
   }));
@@ -1569,10 +1607,10 @@ async function apriDettaglio(username){
 
   // Init mesi select
   const sel=document.getElementById('det-sel-mese');
-  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===detMese?' selected':''}>${m} ${ANNO}</option>`).join('');
+  {let opts='';for(let i=0;i<=MESE_MAX_ABS;i++){const{anno,mese}=annoMese(i);opts+=`<option value="${i}"${i===detMese?' selected':''}>${MESI[mese]} ${anno}</option>`}sel.innerHTML=opts;}
   sel.onchange=()=>{detMese=parseInt(sel.value);detGiorno=null;loadDetMese()};
   document.getElementById('det-prec').onclick=()=>{if(detMese>0){detMese--;sel.value=detMese;detGiorno=null;loadDetMese()}};
-  document.getElementById('det-succ').onclick=()=>{if(detMese<11){detMese++;sel.value=detMese;detGiorno=null;loadDetMese()}};
+  document.getElementById('det-succ').onclick=()=>{if(detMese<MESE_MAX_ABS){detMese++;sel.value=detMese;detGiorno=null;loadDetMese()}};
   document.getElementById('det-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
 
   // Evidenzia nella sidebar
@@ -1629,24 +1667,25 @@ function caricaDetSaldi(emp){
 }
 
 function loadDetMese(){
-  const ms=pad(detMese+1);
+  const{anno:detAnno,mese:detMeseLoc}=annoMese(detMese);
+  const pref=detAnno+'-'+pad(detMeseLoc+1);
   // Legge dalla cache globale — ZERO query Firestore
   detDays={};
   const cachedDays=dipDataCache[detUser]?.days||{};
   Object.entries(cachedDays).forEach(([id,data])=>{
-    if(id.startsWith(`${ANNO}-${ms}`))detDays[id]={...data};
+    if(id.startsWith(pref))detDays[id]={...data};
   });
   // Assenze approvate dalla cache
   (ADM_richPerUser[detUser]||[]).forEach(r=>{
     if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')){
       const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
-      while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
+      while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
     }
   });
   // Malattie dalla cache
   (ADM_malPerUser[detUser]||[]).forEach(r=>{
     const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
-    while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(`${ANNO}-${ms}`)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia'}cur.setDate(cur.getDate()+1)}
+    while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia'}cur.setDate(cur.getDate()+1)}
   });
   renderDetCal();
   renderDetTotali();
@@ -1658,17 +1697,20 @@ function renderDetCal(){
   const primo=getPrimo(detMese),giorni=getDays(detMese);
   for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
   for(let day=1;day<=giorni;day++){
-    const ds=`${ANNO}-${pad(detMese+1)}-${pad(day)}`;
+    const ds=dsOfAbs(detMese,day);
     const dati=detDays[ds];
+    const festivo=isFestivo(ds);
     const assenza=dati?dati['_assenza']:null;
+    const chius=chiusuraDelGiorno(ds);
     const btn=document.createElement('button');
     let cls='cal-day';
-    if(isWE(detMese,day))cls+=' weekend';
-    if(isFestivo(ds))cls+=' festivo';
-    if(assenza==='ferie')cls+=' ferie-day';
-    else if(assenza==='malattia')cls+=' malattia-day';
-    else if(assenza)cls+=' ferie-day';
-    else if(hasD(dati))cls+=' has-data';
+    // Priorità colore: chiusura uffici > malattia > ferie > festivo > permesso > rol > (tutto il resto: casella vuota)
+    if(chius)cls+=' gc-chiusura';
+    else if(assenza==='malattia')cls+=' gc-malattia';
+    else if(assenza==='ferie')cls+=' gc-ferie';
+    else if(festivo)cls+=' gc-festivo';
+    else if(assenza==='permesso')cls+=' gc-permesso';
+    else if(assenza==='rol')cls+=' gc-rol';
     if(detGiorno===ds)cls+=' selected';
     btn.className=cls;btn.textContent=day;
     btn.onclick=()=>{detGiorno=detGiorno===ds?null:ds;renderDetCal();renderDetGiorno()};
@@ -1677,13 +1719,14 @@ function renderDetCal(){
 }
 
 function renderDetTotali(){
-  const ms=pad(detMese+1);
-  const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0)});
+  const{anno:detAnnoT,mese:detMeseT}=annoMese(detMese);
+  const pref=detAnnoT+'-'+pad(detMeseT+1);
+  const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(detDays).filter(([d])=>d.startsWith(pref)).reduce((s,[,dd])=>s+(parseFloat(dd[c.k])||0),0)});
   const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
   const emp=dipList.find(e=>e.username===detUser)||{};
   const tariffe=emp.tariffe||{};
   const el=document.getElementById('det-totali-mese');
-  el.innerHTML=`<div class="section-title" style="margin-bottom:10px">Totali ${MESI[detMese]}</div>`;
+  el.innerHTML=`<div class="section-title" style="margin-bottom:10px">Totali ${MESI[detMeseT]} ${detAnnoT}</div>`;
   const hasAny=CN.some(c=>totals[c.k]>0);
   if(!hasAny){el.innerHTML+='<div style="font-size:12px;color:var(--ink4)">Nessun dato per questo mese.</div>';return}
   let totaleCosto=0;
@@ -1717,8 +1760,9 @@ function renderDetTotali(){
 }
 
 function renderDetListaGiorni(){
-  const ms=pad(detMese+1);
-  const giorni=Object.entries(detDays).filter(([d])=>d.startsWith(`${ANNO}-${ms}`)).sort(([a],[b])=>a.localeCompare(b));
+  const{anno:detAnnoL,mese:detMeseL}=annoMese(detMese);
+  const pref=detAnnoL+'-'+pad(detMeseL+1);
+  const giorni=Object.entries(detDays).filter(([d])=>d.startsWith(pref)).sort(([a],[b])=>a.localeCompare(b));
   const el=document.getElementById('det-lista-giorni');
   if(!giorni.length){el.innerHTML='';return}
   el.innerHTML='<div class="card" style="margin-top:14px"><div class="section-title" style="margin-bottom:10px">Giorni ('+giorni.length+')</div><div class="giorni-list">'+
@@ -1797,7 +1841,7 @@ function renderCalendarioFerie(){
       d.setDate(d.getDate()+1);guard++;
     }
   });
-  const COL={ferie:'var(--verde)',permesso:'var(--blu)',rol:'var(--viola)'};
+  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)'};
   const oggi=new Date();
   let html='';
   ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
@@ -1810,8 +1854,9 @@ function renderCalendarioFerie(){
     const dow=new Date(anno,mese,g).getDay();
     const chius=chiusuraDelGiorno(ds);
     let bg='',tip='';
-    if(chius){bg='background:var(--rosso-light)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
-    else if(isFestivo(ds)||dow===0||dow===6){bg='background:var(--verde-light)'}
+    // Priorità colore: chiusura uffici > festivo > (weekend/resto: nessun colore)
+    if(chius){bg='background:var(--gc-chiusura-bg)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
+    else if(isFestivo(ds)){bg='background:var(--gc-festivo-bg)'}
     html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}${clickable?' cal-ferie-click':''}" style="${bg}"${tip}${clickable?` onclick="calClickGiorno(${anno},${mese},${g})"`:''}>
       <div class="cal-ferie-num">${g}</div>
       <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
@@ -2354,16 +2399,17 @@ async function esportaDetPDF(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
   const tariffe=emp.tariffe||{};
-  const ms=pad(detMese+1);
-  const snap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(detUser).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(`${ANNO}-${ms}`))all[d.id]=d.data()});
+  const{anno:pdfAnno,mese:pdfMese}=annoMese(detMese);
+  const pref=pdfAnno+'-'+pad(pdfMese+1);
+  const snap=await db.collection('timesheets').doc(String(pdfAnno)).collection('dipendenti').doc(detUser).collection('giorni').get();
+  const all={};snap.forEach(d=>{if(d.id.startsWith(pref))all[d.id]=d.data()});
   const giorni=Object.keys(all).sort();
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   doc.setFont('helvetica','bold');doc.setFontSize(14);
   doc.text(`Riepilogo Ore — ${nome}`,14,16);
   doc.setFont('helvetica','normal');doc.setFontSize(10);
-  doc.text(`${MESI[detMese]} ${ANNO} · Orario ${oreGiornoDip(emp)}h/giorno`,14,23);
+  doc.text(`${MESI[pdfMese]} ${pdfAnno} · Orario ${oreGiornoDip(emp)}h/giorno`,14,23);
   let y=32;
   const cols=['Data',...CN.slice(0,8).map(c=>c.l.substring(0,12)),'Tot.h'];
   const colW=[18,...Array(8).fill(22),14];
@@ -2384,9 +2430,9 @@ async function esportaDetPDF(){
   y+=6;doc.setFont('helvetica','bold');doc.setFontSize(9);
   const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
   const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
-  doc.text(`Totale ore ${MESI[detMese]}: ${totOre}h`,14,y);
-  if(totCosto>0){y+=6;doc.text(`Totale costo ${MESI[detMese]}: €${totCosto.toFixed(2)}`,14,y);}
-  doc.save(`${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
+  doc.text(`Totale ore ${MESI[pdfMese]}: ${totOre}h`,14,y);
+  if(totCosto>0){y+=6;doc.text(`Totale costo ${MESI[pdfMese]}: €${totCosto.toFixed(2)}`,14,y);}
+  doc.save(`${nome.replace(/\s+/g,'_')}_${MESI[pdfMese]}_${pdfAnno}.pdf`);
 }
 
 // ── MODAL ANNO NUOVO ──────────────────────────────────────────────────
@@ -2582,9 +2628,10 @@ async function loadArchivio(){
 function stampFoglio(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
-  const ms=pad(detMese+1);
+  const{anno:fgAnno,mese:fgMese}=annoMese(detMese);
+  const pref=fgAnno+'-'+pad(fgMese+1);
   // Legge dalla cache — ZERO query
-  const all={};Object.entries(dipDataCache[detUser]?.days||{}).forEach(([id,data])=>{if(id.startsWith(`${ANNO}-${ms}`))all[id]=data});
+  const all={};Object.entries(dipDataCache[detUser]?.days||{}).forEach(([id,data])=>{if(id.startsWith(pref))all[id]=data});
   const giorni=Object.keys(all).sort();
   const tariffe=emp.tariffe||{};
   const {jsPDF}=window.jspdf;
@@ -2598,7 +2645,7 @@ function stampFoglio(){
   doc.setFontSize(11);doc.setFont('helvetica','bold');
   doc.text(`Dipendente: ${nome}`,14,40);
   doc.setFont('helvetica','normal');
-  doc.text(`Periodo: ${MESI[detMese]} ${ANNO}`,14,47);
+  doc.text(`Periodo: ${MESI[fgMese]} ${fgAnno}`,14,47);
   doc.text(`Orario: ${oreGiornoDip(emp)}h/giorno`,14,54);
   if(emp.tipoContratto)doc.text(`Contratto: ${emp.tipoContratto}`,120,47);
   doc.line(14,58,196,58);
@@ -2650,7 +2697,7 @@ function stampFoglio(){
   doc.text('Firma Dipendente: _______________________________',14,y);
   doc.text('Firma Responsabile: _______________________________',110,y);
   y+=10;doc.text(`Data: _____ / _____ / _____`,14,y);
-  doc.save(`FoglioFirma_${nome.replace(/\s+/g,'_')}_${MESI[detMese]}_${ANNO}.pdf`);
+  doc.save(`FoglioFirma_${nome.replace(/\s+/g,'_')}_${MESI[fgMese]}_${fgAnno}.pdf`);
 }
 
 // ── STRAORDINARI ──────────────────────────────────────────────────────
@@ -2879,8 +2926,11 @@ async function loadTitolarePage(forza){
 }
 
 async function caricaRigheTit(){
-  const snap=await db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').get();
-  TIT_righe=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const[snap,snapNext]=await Promise.all([
+    db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').get(),
+    db.collection('titolari_attivita').doc(String(ANNO+1)).collection('utenti').doc(TIT_target).collection('righe').get()
+  ]);
+  TIT_righe=[...snap.docs.map(d=>({id:d.id,...d.data()})),...snapNext.docs.map(d=>({id:d.id,...d.data()}))];
   TIT_righe.sort((a,b)=>(String(a.data||'')).localeCompare(String(b.data||'')));
   TIT_loadedFor=TIT_target;
 }
@@ -2905,18 +2955,19 @@ function nomeTit(u){
 function initTitMeseSel(){
   if(TIT_meseInit)return;TIT_meseInit=true;
   const sel=document.getElementById('tit-sel-mese');
-  sel.innerHTML=MESI.map((m,i)=>`<option value="${i}"${i===TIT_mese?' selected':''}>${m} ${ANNO}</option>`).join('');
+  {let opts='';for(let i=0;i<=MESE_MAX_ABS;i++){const{anno,mese}=annoMese(i);opts+=`<option value="${i}"${i===TIT_mese?' selected':''}>${MESI[mese]} ${anno}</option>`}sel.innerHTML=opts;}
   sel.onchange=()=>{TIT_mese=parseInt(sel.value);renderTitMese()};
   document.getElementById('tit-prec').onclick=()=>{if(TIT_mese>0){TIT_mese--;sel.value=TIT_mese;renderTitMese()}};
-  document.getElementById('tit-succ').onclick=()=>{if(TIT_mese<11){TIT_mese++;sel.value=TIT_mese;renderTitMese()}};
+  document.getElementById('tit-succ').onclick=()=>{if(TIT_mese<MESE_MAX_ABS){TIT_mese++;sel.value=TIT_mese;renderTitMese()}};
 }
 
 function fmtTitN(v){const n=parseFloat(v)||0;return n>0?(n%1===0?n:n.toFixed(1)):'—'}
 
 // Tabella del mese
 function renderTitMese(){
-  const ms=pad(TIT_mese+1);
-  const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(`${ANNO}-${ms}`));
+  const{anno:titAnno,mese:titMeseLoc}=annoMese(TIT_mese);
+  const pref=titAnno+'-'+pad(titMeseLoc+1);
+  const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(pref));
   const tbody=document.getElementById('tit-tbody');
   if(!righe.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessuna attività registrata per questo mese.</td></tr>';return}
   let html='',lastData='';
@@ -3038,10 +3089,11 @@ async function salvaRigaTit(){
   };
   TIT_CAMPI_N.forEach(k=>{dati[k]=parseFloat(document.getElementById('tit-'+k).value)||0});
   if(!dati.descrizione||!dati.data){al.innerHTML='<div class="alert-box alert-err">Inserisci almeno descrizione e data.</div>';return}
-  if(!dati.data.startsWith(String(ANNO))){al.innerHTML='<div class="alert-box alert-err">La data deve appartenere all’anno '+ANNO+'.</div>';return}
+  const annoRiga=parseInt(String(dati.data).split('-')[0])||ANNO;
+  if(annoRiga<ANNO||annoRiga>ANNO+1){al.innerHTML='<div class="alert-box alert-err">La data deve appartenere all’anno '+ANNO+' o '+(ANNO+1)+'.</div>';return}
   const prevRiga=TIT_editId?TIT_righe.find(x=>x.id===TIT_editId):null;
   try{
-    const coll=db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe');
+    const coll=db.collection('titolari_attivita').doc(String(annoRiga)).collection('utenti').doc(TIT_target).collection('righe');
     let rigaId;
     if(TIT_editId){
       dati.modificatoDa=ADM.username;dati.modificatoIl=new Date().toISOString();
@@ -3060,8 +3112,8 @@ async function salvaRigaTit(){
     await syncRigaTitBC(rigaId,prevRiga,dati);
     TIT_righe.sort((a,b)=>(String(a.data||'')).localeCompare(String(b.data||'')));
     chiudiFormTit();
-    // Naviga al mese della riga salvata
-    TIT_mese=parseInt(dati.data.split('-')[1])-1;
+    // Naviga al mese della riga salvata (indice assoluto — copre anche ANNO+1)
+    TIT_mese=meseAbsDaData(dati.data);
     document.getElementById('tit-sel-mese').value=TIT_mese;
     renderTitMese();renderTitRiepilogo();
   }catch(e){al.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
@@ -3096,7 +3148,8 @@ async function eliminaRigaTit(id){
   const r=TIT_righe.find(x=>x.id===id);if(!r)return;
   if(!confirm('Eliminare la riga "'+(r.descrizione||'')+'" del '+fmtD(r.data)+'?'))return;
   try{
-    await db.collection('titolari_attivita').doc(String(ANNO)).collection('utenti').doc(TIT_target).collection('righe').doc(id).delete();
+    const annoRigaDel=parseInt(String(r.data||'').split('-')[0])||ANNO;
+    await db.collection('titolari_attivita').doc(String(annoRigaDel)).collection('utenti').doc(TIT_target).collection('righe').doc(id).delete();
     if(r.commessa&&(parseFloat(r.oreCommessa)||0)>0){
       await db.collection('commesse').doc(r.commessa).collection('righe').doc('tit_'+id).delete().catch(()=>{});
     }
