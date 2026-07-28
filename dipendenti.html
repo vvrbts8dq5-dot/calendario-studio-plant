@@ -93,6 +93,9 @@ a{text-decoration:none;color:inherit}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--white);color:var(--ink2);transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap}
 .btn:hover{background:var(--paper2)}
+.filtri{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.btn-filtro{padding:5px 12px;border-radius:10px;font-size:12px;font-weight:500;background:var(--white);color:var(--ink4);border:.5px solid var(--border);cursor:pointer;font-family:'Inter',monospace;transition:all .15s}
+.btn-filtro.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 .btn-blu{background:var(--blu);color:#fff;border-color:var(--blu-dark)}
 .btn-blu:hover{background:var(--blu-dark)}
 .btn-verde{background:var(--verde);color:#fff;border-color:#145c37}
@@ -591,6 +594,7 @@ tbody tr:last-child{border-bottom:none}
           <div class="page-title">📇 Rubrica Commesse</div>
           <input class="field-input" id="rub-search-dip" type="text" style="max-width:280px" placeholder="Cerca per numero o nome..." oninput="renderRubricaDip()">
         </div>
+        <div class="filtri" id="rubrica-anni-wrap-dip" style="margin-bottom:14px"></div>
         <div id="rubrica-lista-dip"><div class="empty-state">Caricamento...</div></div>
       </div>
 
@@ -1709,11 +1713,43 @@ function makeSearchable(selectEl,placeholder){
 }
 
 // ── RUBRICA COMMESSE (sola consultazione: ricerca per numero/nome, note in sola lettura) ──
+let RUBDIP_anno='tutti';
+function rubDipSetAnno(v,btn){
+  RUBDIP_anno=v;
+  document.querySelectorAll('#rubrica-anni-wrap-dip .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderRubricaDip();
+}
+function renderRubricaAnniBarDip(){
+  const wrap=document.getElementById('rubrica-anni-wrap-dip');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${RUBDIP_anno==='tutti'?'active':''}" onclick="rubDipSetAnno('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(RUBDIP_anno)===String(a)?'active':''}" onclick="rubDipSetAnno(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${RUBDIP_anno==='nd'?'active':''}" onclick="rubDipSetAnno('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function rubDipOrdinaPerAnno(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
 function renderRubricaDip(){
+  renderRubricaAnniBarDip();
   const el=document.getElementById('rubrica-lista-dip');
   if(!el)return;
   const f=(document.getElementById('rub-search-dip')?.value||'').trim().toLowerCase();
-  const list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUBDIP_anno==='tutti')return true;
+    if(RUBDIP_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUBDIP_anno);
+  });
+  list=rubDipOrdinaPerAnno(list);
   if(!list.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata.</div>';return}
   el.innerHTML=list.map(c=>`
     <div class="commessa-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px">

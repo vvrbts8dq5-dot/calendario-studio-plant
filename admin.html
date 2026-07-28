@@ -668,6 +668,7 @@ tbody tr:hover{background:var(--paper)}
             <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
           </div>
         </div>
+        <div class="filtri" id="bc-anni-wrap" style="margin-bottom:14px"></div>
         <div id="lista-commesse"><div class="empty-state">Caricamento...</div></div>
       </div>
 
@@ -678,6 +679,7 @@ tbody tr:hover{background:var(--paper)}
           <input class="fi" id="rub-search" type="text" style="max-width:320px" placeholder="Cerca per numero o nome..." oninput="renderRubrica()">
         </div>
         <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">Elenco sempre aggiornato con le commesse create in Budget Contract. Le note sono modificabili qui e si salvano da sole.</div>
+        <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
         <div id="rubrica-import-wrap"></div>
         <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -3337,12 +3339,44 @@ function makeAutocomplete(inputEl,getItems,placeholder){
 }
 
 // ── RUBRICA COMMESSE (ricerca per numero/nome, note modificabili) ──
+let RUB_anno='tutti';
+function rubSetAnno(v,btn){
+  RUB_anno=v;
+  document.querySelectorAll('#rubrica-anni-wrap .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderRubrica();
+}
+function renderRubricaAnniBar(){
+  const wrap=document.getElementById('rubrica-anni-wrap');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${RUB_anno==='tutti'?'active':''}" onclick="rubSetAnno('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(RUB_anno)===String(a)?'active':''}" onclick="rubSetAnno(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${RUB_anno==='nd'?'active':''}" onclick="rubSetAnno('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function rubOrdinaPerAnno(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
 function renderRubrica(){
   renderRubricaImportBanner();
+  renderRubricaAnniBar();
   const el=document.getElementById('rubrica-lista');
   if(!el)return;
   const f=(document.getElementById('rub-search')?.value||'').trim().toLowerCase();
-  const list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUB_anno==='tutti')return true;
+    if(RUB_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUB_anno);
+  });
+  list=rubOrdinaPerAnno(list);
   if(!list.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata.</div>';return}
   el.innerHTML=list.map(c=>`
     <div class="commessa-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:10px">
@@ -3422,11 +3456,43 @@ async function loadCommesse(forza){
   }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
 }
 
+let BC_listAnno='tutti';
+function bcSetAnnoList(v,btn){
+  BC_listAnno=v;
+  document.querySelectorAll('#bc-anni-wrap .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderListaCommesse();
+}
+function renderBcAnniBar(){
+  const wrap=document.getElementById('bc-anni-wrap');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${BC_listAnno==='tutti'?'active':''}" onclick="bcSetAnnoList('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(BC_listAnno)===String(a)?'active':''}" onclick="bcSetAnnoList(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${BC_listAnno==='nd'?'active':''}" onclick="bcSetAnnoList('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function bcOrdinaPerAnno(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
 function renderListaCommesse(){
   const el=document.getElementById('lista-commesse');
+  renderBcAnniBar();
   if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa creata. Usa "+ Nuova Commessa" per iniziare.</div>';return}
   const f=(document.getElementById('bc-list-search')?.value||'').trim().toLowerCase();
-  const listaBC=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  let listaBC=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  listaBC=listaBC.filter(c=>{
+    if(BC_listAnno==='tutti')return true;
+    if(BC_listAnno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(BC_listAnno);
+  });
+  listaBC=bcOrdinaPerAnno(listaBC);
   if(!listaBC.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata per la ricerca.</div>';return}
   el.innerHTML=listaBC.map(c=>`
     <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
