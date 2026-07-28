@@ -72,6 +72,7 @@ function renderContabilita(){
       return `<tr class="${rowCls}">
         <td>${r.anno||''}</td>
         <td style="font-family:'Inter',monospace;font-weight:600">${r.codiceCommessa||''}</td>
+        <td style="font-family:'Inter',monospace">${r.codiceOfferta||''}</td>
         <td>${r.clienteDebitore||''}</td>
         <td>${r.descrizione||''}${bcLink}</td>
         <td class="td-r">${ceur(r.importoPreventivo)}</td>
