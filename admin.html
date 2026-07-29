@@ -8,8 +8,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="xlsx-style.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <style>
 :root{
   --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
@@ -392,6 +394,9 @@ tbody tr:hover{background:var(--paper)}
         <span class="nav-icon">📒</span> Registro Titolare
         <span class="nav-badge" id="badge-titolare">0</span>
       </button>
+      <button class="nav-item" data-page="statistiche" onclick="goPage('statistiche',this)">
+        <span class="nav-icon">📊</span> Statistiche
+      </button>
     </div>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">
@@ -458,8 +463,8 @@ tbody tr:hover{background:var(--paper)}
             <div class="page-title" id="det-nome-title"></div>
           </div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-verde btn-sm" onclick="esportaDetExcel()">📥 Excel</button>
-            <button class="btn btn-rosso btn-sm" onclick="esportaDetPDF()">📄 PDF</button>
+            <button class="btn btn-verde btn-sm" onclick="esportaDetPeriodo('excel')">📅 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="esportaDetPeriodo('pdf')">📅 PDF</button>
             <button class="btn btn-sm" onclick="stampFoglio()">📋 Foglio Firma</button>
           </div>
         </div>
@@ -676,7 +681,11 @@ tbody tr:hover{background:var(--paper)}
       <div class="page" id="page-rubrica">
         <div class="page-header">
           <div class="page-title">📇 Rubrica Commesse</div>
-          <input class="fi" id="rub-search" type="text" style="max-width:320px" placeholder="Cerca per numero o nome..." oninput="renderRubrica()">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="fi" id="rub-search" type="text" style="max-width:280px" placeholder="Cerca per numero o nome..." oninput="renderRubrica()">
+            <button class="btn btn-verde btn-sm" onclick="rubricaEsportaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="rubricaEsportaPDF()">📄 PDF</button>
+          </div>
         </div>
         <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">Elenco sempre aggiornato con le commesse create in Budget Contract. Le note sono modificabili qui e si salvano da sole.</div>
         <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
@@ -788,6 +797,8 @@ tbody tr:hover{background:var(--paper)}
           <div class="page-title">🧾 Monitoraggio Contabilità</div>
           <div style="display:flex;gap:8px">
             <button class="btn" onclick="loadContabilita(true)">🔄 Aggiorna</button>
+            <button class="btn btn-verde btn-sm" onclick="contabEsportaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="contabEsportaPDF()">📄 PDF</button>
             <button class="btn btn-ink" onclick="contabApriForm(null)">+ Nuova Riga</button>
           </div>
         </div>
@@ -853,7 +864,8 @@ tbody tr:hover{background:var(--paper)}
           <div class="page-title" id="tit-title">Registro Titolare</div>
           <div style="display:flex;gap:8px;align-items:center">
             <select class="f-select" id="tit-sel-titolare" style="display:none;font-size:12px" onchange="cambiaTitolare()"></select>
-            <button class="btn btn-verde btn-sm" onclick="esportaTitExcel()">📥 Excel</button>
+            <button class="btn btn-verde btn-sm" onclick="esportaTitPeriodo('excel')">📅 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="esportaTitPeriodo('pdf')">📅 PDF</button>
           </div>
         </div>
 
@@ -911,6 +923,93 @@ tbody tr:hover{background:var(--paper)}
         </div>
       </div>
 
+      <!-- STATISTICHE -->
+      <div class="page" id="page-statistiche">
+        <div class="page-header">
+          <div class="page-title">📊 Statistiche</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:12px;color:var(--ink4)" id="stat-periodo-label">Anno corrente</span>
+            <button class="btn btn-ink btn-sm" onclick="statCambiaPeriodo()">📅 Cambia periodo</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">Andamento aggregato su tutti i dipendenti e titolari per il periodo selezionato. Il calcolo può richiedere qualche secondo.</div>
+        <div id="stat-loading" class="empty-state" style="display:none">⏳ Calcolo statistiche in corso...</div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="page-header" style="margin-bottom:10px">
+            <div class="section-title">Ore per tipologia (per mese)</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-verde btn-sm" onclick="statEsportaTipologiaExcel()">📥 Excel</button>
+              <button class="btn btn-rosso btn-sm" onclick="statEsportaTipologiaPDF()">📄 PDF</button>
+            </div>
+          </div>
+          <div style="max-height:320px"><canvas id="stat-tipologia-canvas" height="90"></canvas></div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Mese</th><th class="td-r">Ordinarie</th><th class="td-r">Ferie</th><th class="td-r">Festività/Malattia</th><th class="td-r">Permessi</th><th class="td-r">Recuperi</th></tr></thead>
+              <tbody id="stat-tipologia-tbody"><tr><td colspan="6" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="page-header" style="margin-bottom:10px">
+            <div class="section-title">Assenze approvate (Ferie · Permessi · ROL · Malattia)</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-verde btn-sm" onclick="statEsportaAssenzeExcel()">📥 Excel</button>
+              <button class="btn btn-rosso btn-sm" onclick="statEsportaAssenzePDF()">📄 PDF</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Dipendente</th><th class="td-r">Ferie (h)</th><th class="td-r">Permessi (h)</th><th class="td-r">ROL (h)</th><th class="td-r">Malattia (giorni)</th></tr></thead>
+              <tbody id="stat-assenze-tbody"><tr><td colspan="5" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="page-header" style="margin-bottom:10px">
+            <div class="section-title">Ore lavorate per commessa (top 15)</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-verde btn-sm" onclick="statEsportaCommesseExcel()">📥 Excel</button>
+              <button class="btn btn-rosso btn-sm" onclick="statEsportaCommessePDF()">📄 PDF</button>
+            </div>
+          </div>
+          <div style="max-height:340px"><canvas id="stat-commesse-canvas" height="110"></canvas></div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Commessa</th><th>Committente</th><th class="td-r">Ore</th><th class="td-r">Km</th></tr></thead>
+              <tbody id="stat-commesse-tbody"><tr><td colspan="4" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SELEZIONE PERIODO (esportazione) -->
+<div class="modal-overlay" id="modal-periodo">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title" id="periodo-titolo">Seleziona periodo da esportare</div>
+    <div class="modal-sub">Scegli una scorciatoia oppure un intervallo personalizzato.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" onclick="periodoScegli('corrente')">📅 Anno corrente</button>
+      <button class="btn" onclick="periodoScegli('scorso')">📅 Anno scorso</button>
+      <button class="btn" onclick="periodoScegli('storico')">🗂️ Tutto lo storico</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:8px;font-weight:600">— oppure intervallo personalizzato —</div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div><label class="fl">Da mese</label><select class="fi" id="periodo-da-mese"></select></div>
+      <div><label class="fl">Da anno</label><select class="fi" id="periodo-da-anno"></select></div>
+      <div><label class="fl">A mese</label><select class="fi" id="periodo-a-mese"></select></div>
+      <div><label class="fl">A anno</label><select class="fi" id="periodo-a-anno"></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="chiudiSelettorePeriodo()">Annulla</button>
+      <button class="btn btn-ink" onclick="periodoConferma()">✓ Esporta questo intervallo</button>
     </div>
   </div>
 </div>
@@ -1501,7 +1600,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1513,6 +1612,7 @@ function goPage(pid,btn){
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
   if(pid==='rubrica')loadCommesse().then(renderRubrica);
+  if(pid==='statistiche')initStatistiche();
 }
 
 // DASHBOARD
@@ -2367,26 +2467,229 @@ async function eliminaDip(username,nome){
 }
 
 // EXPORT EXCEL DASHBOARD
+// ── SELETTORE PERIODO CONDIVISO (esportazioni Excel/PDF) ──────────────
+const PERIODO_ANNO_MIN=2022;
+let PERIODO_CB=null;
+function apriSelettorePeriodo(cb,opts){
+  PERIODO_CB=cb;
+  document.getElementById('periodo-titolo').textContent=(opts&&opts.titolo)||'Seleziona periodo da esportare';
+  const annoMin=(opts&&opts.annoMin)||PERIODO_ANNO_MIN;
+  let optsAnno='';for(let y=ANNO;y>=annoMin;y--)optsAnno+=`<option value="${y}">${y}</option>`;
+  const selDaA=document.getElementById('periodo-da-anno'),selAA=document.getElementById('periodo-a-anno');
+  selDaA.innerHTML=optsAnno;selAA.innerHTML=optsAnno;
+  const optsMese=MESI.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+  document.getElementById('periodo-da-mese').innerHTML=optsMese;
+  document.getElementById('periodo-a-mese').innerHTML=optsMese;
+  selDaA.value=ANNO;selAA.value=ANNO;
+  document.getElementById('periodo-da-mese').value=0;
+  document.getElementById('periodo-a-mese').value=new Date().getMonth();
+  document.getElementById('modal-periodo').classList.add('open');
+}
+function chiudiSelettorePeriodo(){document.getElementById('modal-periodo').classList.remove('open');PERIODO_CB=null}
+function periodoScegli(tipo){
+  let annoIni,meseIni,annoFin,meseFin;
+  if(tipo==='corrente'){annoIni=ANNO;meseIni=0;annoFin=ANNO;meseFin=11}
+  else if(tipo==='scorso'){annoIni=ANNO-1;meseIni=0;annoFin=ANNO-1;meseFin=11}
+  else{annoIni=PERIODO_ANNO_MIN;meseIni=0;annoFin=ANNO;meseFin=11}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoConferma(){
+  const annoIni=parseInt(document.getElementById('periodo-da-anno').value);
+  const meseIni=parseInt(document.getElementById('periodo-da-mese').value);
+  const annoFin=parseInt(document.getElementById('periodo-a-anno').value);
+  const meseFin=parseInt(document.getElementById('periodo-a-mese').value);
+  if(annoIni*12+meseIni>annoFin*12+meseFin){alert('L\'inizio del periodo deve precedere la fine.');return}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoLabel(p){
+  if(p.annoIni===p.annoFin){
+    if(p.meseIni===0&&p.meseFin===11)return String(p.annoIni);
+    return MESI[p.meseIni]+'–'+MESI[p.meseFin]+' '+p.annoIni;
+  }
+  return MESI[p.meseIni]+' '+p.annoIni+' – '+MESI[p.meseFin]+' '+p.annoFin;
+}
+function periodoFile(p){return periodoLabel(p).replace(/\s+/g,'_').replace(/[^\w\-]/g,'')}
+function periodoInRange(dataStr,p){
+  if(!dataStr)return false;
+  const y=parseInt(String(dataStr).substring(0,4)),m=parseInt(String(dataStr).substring(5,7))-1;
+  if(isNaN(y)||isNaN(m))return false;
+  const key=y*12+m,kIni=p.annoIni*12+p.meseIni,kFin=p.annoFin*12+p.meseFin;
+  return key>=kIni&&key<=kFin;
+}
+function periodoAnni(p){const a=[];for(let y=p.annoIni;y<=p.annoFin;y++)a.push(y);return a}
+
+// ══════════════════ STILE UNIFORME ESPORTAZIONI (Excel + PDF) ══════════════════
+// Palette identica all'app (--blu / --blu-dark) + intestazione "PLANT INGEGNERIA" + data/ora esportazione + colonne a larghezza leggibile
+const EXP_BLU=[122,158,142];        // rgb di var(--blu)
+const EXP_BLU_HEX='7A9E8E';
+const EXP_BLU_DARK_HEX='5E7F70';
+const EXP_TOT_BG_HEX='EAF2ED';      // var(--blu-light)
+function expDataOra(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function expLarghezzeColonne(headerRow,bodyRows,footRow){
+  const nCols=headerRow.length,cols=[];
+  for(let c=0;c<nCols;c++){
+    let maxLen=String(headerRow[c]??'').length;
+    bodyRows.forEach(r=>{const v=r?r[c]:null;if(v!=null){const l=String(v).length;if(l>maxLen)maxLen=l;}});
+    if(footRow&&footRow[c]!=null){const l=String(footRow[c]).length;if(l>maxLen)maxLen=l;}
+    cols.push({wch:Math.min(Math.max(maxLen+3,10),60)});
+  }
+  return cols;
+}
+// Foglio Excel "tabellare": intestazione PLANT INGEGNERIA + titolo + data, poi header colorato + righe + eventuale riga totale
+function expFoglioExcel(titoloReport,sottotitolo,headerRow,bodyRows,footRow){
+  const nCols=headerRow.length;
+  const aoa=[['PLANT INGEGNERIA'],[titoloReport],[sottotitolo||''],['Esportato il '+expDataOra()],[],headerRow,...bodyRows];
+  if(footRow)aoa.push(footRow);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[0,1,2,3].map(r=>({s:{r,c:0},e:{r,c:Math.max(nCols-1,0)}}));
+  const st=(addr,s)=>{if(ws[addr])ws[addr].s=s};
+  st('A1',{font:{bold:true,sz:16,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center'}});
+  st('A2',{font:{bold:true,sz:12,color:{rgb:'222222'}},alignment:{horizontal:'center'}});
+  st('A3',{font:{sz:10,italic:true,color:{rgb:'6B7280'}},alignment:{horizontal:'center'}});
+  st('A4',{font:{sz:9,color:{rgb:'9CA3AF'}},alignment:{horizontal:'center'}});
+  ws['!rows']=[{hpt:22},{hpt:18},{hpt:15},{hpt:14},{hpt:6}];
+  const headerRowIdx=5;
+  for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:headerRowIdx,c}),{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center',wrapText:true}});
+  if(footRow){
+    const footIdx=aoa.length-1;
+    for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:footIdx,c}),{font:{bold:true},fill:{fgColor:{rgb:EXP_TOT_BG_HEX}}});
+  }
+  ws['!cols']=expLarghezzeColonne(headerRow,bodyRows,footRow);
+  return ws;
+}
+// Foglio Excel "libero" (elenco etichetta:valore, senza header di colonna) — usa comunque intestazione + colonne leggibili
+function expFoglioExcelLibero(titoloReport,sottotitolo,aoaRows){
+  const nCols=Math.max(1,...aoaRows.map(r=>r.length));
+  const aoa=[['PLANT INGEGNERIA'],[titoloReport],[sottotitolo||''],['Esportato il '+expDataOra()],[],...aoaRows];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[0,1,2,3].map(r=>({s:{r,c:0},e:{r,c:Math.max(nCols-1,0)}}));
+  const st=(addr,s)=>{if(ws[addr])ws[addr].s=s};
+  st('A1',{font:{bold:true,sz:16,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center'}});
+  st('A2',{font:{bold:true,sz:12,color:{rgb:'222222'}},alignment:{horizontal:'center'}});
+  st('A3',{font:{sz:10,italic:true,color:{rgb:'6B7280'}},alignment:{horizontal:'center'}});
+  st('A4',{font:{sz:9,color:{rgb:'9CA3AF'}},alignment:{horizontal:'center'}});
+  ws['!rows']=[{hpt:22},{hpt:18},{hpt:15},{hpt:14},{hpt:6}];
+  const cols=[];
+  for(let c=0;c<nCols;c++){
+    let maxLen=0;
+    aoaRows.forEach(r=>{const v=r?r[c]:null;if(v!=null){const l=String(v).length;if(l>maxLen)maxLen=l;}});
+    cols.push({wch:Math.min(Math.max(maxLen+3,10),60)});
+  }
+  ws['!cols']=cols;
+  return ws;
+}
+// Intestazione standard su un documento jsPDF: PLANT INGEGNERIA + titolo + sottotitolo + data esportazione. Ritorna la Y da cui partire con autoTable.
+function expIntestazionePDF(doc,titoloReport,sottotitolo){
+  const pageW=doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(94,127,112);
+  doc.text('PLANT INGEGNERIA',14,14);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(34,34,34);
+  doc.text(titoloReport,14,21);
+  if(sottotitolo){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);doc.text(sottotitolo,14,27);}
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(156,163,175);
+  doc.text('Esportato il '+expDataOra(),pageW-14,14,{align:'right'});
+  doc.setDrawColor(122,158,142);doc.setLineWidth(0.4);doc.line(14,30,pageW-14,30);
+  doc.setTextColor(0,0,0);
+  return 35;
+}
+const EXP_PDF_HEAD_STYLE={fillColor:EXP_BLU,textColor:[255,255,255],fontStyle:'bold'};
+const EXP_PDF_FOOT_STYLE={fillColor:[234,242,237],textColor:[20,20,20],fontStyle:'bold'};
+const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
+
 function esportaTuttiExcel(){
   const wb=XLSX.utils.book_new();
   // Riepilogo
   const hh=['Dipendente',...CN.map(c=>c.l)];
   const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0)]});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Riepilogo');
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Riepilogo Ore Dipendenti','Anno '+ANNO,hh,rr),'Riepilogo');
   // Saldo ferie
   const richPerUser=ADM_richPerUser;
-  const sh=[['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato']];
+  const shHH=['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato'];
+  const shRows=[];
   dipList.forEach(emp=>{
-    const oreGiorno=oreGiornoDip(emp);
     let fu=0,pu=0,ru=0;
     (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')fu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
-    sh.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
+    shRows.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
   });
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sh),'Saldi Ferie');
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Saldi Ferie/Permessi/ROL','Anno '+ANNO,shHH,shRows),'Saldi Ferie');
   XLSX.writeFile(wb,`Timesheets_Tutti_${ANNO}.xlsx`);
 }
 
-// EXPORT EXCEL DETTAGLIO - usa cache per velocità
+// Esportazione periodica ore dipendente (Excel / PDF) — chiede il periodo e interroga Firestore anno per anno
+function esportaDetPeriodo(formato){
+  const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
+  const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
+  const tariffe=emp.tariffe||{};
+  apriSelettorePeriodo(async(p)=>{
+    let all={};
+    for(const y of periodoAnni(p)){
+      try{
+        const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(detUser).collection('giorni').get();
+        snap.forEach(d=>{all[d.id]=d.data()});
+      }catch(e){}
+    }
+    const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
+    if(formato==='excel')generaDetExcelPeriodo(nome,tariffe,all,giorni,p);else generaDetPDFPeriodo(nome,tariffe,all,giorni,p);
+  },{titolo:'Esporta Ore — '+nome});
+}
+function generaDetExcelPeriodo(nome,tariffe,all,giorni,p){
+  const wb=XLSX.utils.book_new();
+  const hdr=['Campo','Totale','Tariffa €','Costo Totale €'];
+  const righeRiep=CN.map(c=>{
+    const tot=giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0);
+    const tariffa=tariffe[c.k]||0;
+    return[c.l,tot,tariffa>0?tariffa:'—',tariffa>0?(tot*tariffa).toFixed(2):'—'];
+  });
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,periodoLabel(p),hdr,righeRiep),'Riepilogo');
+  const perMese={};
+  giorni.forEach(ds=>{const ym=ds.substring(0,7);if(!perMese[ym])perMese[ym]=[];perMese[ym].push(ds)});
+  Object.keys(perMese).sort().forEach(ym=>{
+    const gg=perMese[ym].sort();
+    const[y,m]=ym.split('-');
+    const hh=['Data',...CN.map(c=>c.l),'Totale Ore','Costo €'];
+    const rr=gg.map(ds=>{
+      const d=all[ds];const[yy,mo,g]=ds.split('-');
+      const ore=totGiorno(d);
+      const costo=CN.reduce((s,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return s+v*t},0)+(parseFloat(d.speseExtra)||0);
+      return[`${g}/${mo}/${yy}`,...CN.map(c=>parseFloat(d[c.k])||0),ore,costo>0?costo.toFixed(2):''];
+    });
+    const totOre=gg.reduce((s,ds)=>s+totGiorno(all[ds]),0);
+    const totCosto=gg.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
+    const footRow=['TOTALE',...CN.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre,totCosto>0?totCosto.toFixed(2):''];
+    const nomeFoglio=(MESI[parseInt(m)-1]+' '+y).substring(0,31);
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nomeFoglio);
+  });
+  XLSX.writeFile(wb,`Timesheet_${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
+}
+function generaDetPDFPeriodo(nome,tariffe,all,giorni,p){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,`Riepilogo Ore — ${nome}`,periodoLabel(p));
+  const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
+  const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
+  doc.autoTable({
+    startY,
+    head:[['Data',...CN.slice(0,8).map(c=>c.l),'Tot.h']],
+    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totGiorno(d)>0?totGiorno(d):'']}),
+    foot:[['TOTALE',...CN.slice(0,8).map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre]],
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,
+    theme:'striped'
+  });
+  const yEnd=(doc.lastAutoTable&&doc.lastAutoTable.finalY||startY)+8;
+  doc.setFont('helvetica','bold');doc.setFontSize(9);
+  doc.text(`Totale ore periodo: ${totOre}h`,14,yEnd);
+  if(totCosto>0)doc.text(`Totale costo periodo: €${totCosto.toFixed(2)}`,14,yEnd+6);
+  doc.save(`Timesheet_${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
+}
+
+// EXPORT EXCEL DETTAGLIO - usa cache per velocità (non più collegato a un pulsante, sostituito dal periodico)
 function esportaDetExcel(){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
@@ -2588,8 +2891,7 @@ async function esportaCostiExcel(){
   // Riga totali
   const totRow=['TOTALE MENSILE'];
   for(let mi=0;mi<=12;mi++){totRow.push(rows.reduce((s,r)=>s+(r[mi+1]||0),0).toFixed(2))}
-  rows.push(totRow);
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rows]),'Costi '+anno);
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Costi Dipendenti','Anno '+anno,hh,rows,totRow),'Costi '+anno);
   // Un foglio per mese con dettaglio dipendente
   MESI.forEach((mese,mi)=>{
     const ms=pad(mi+1);
@@ -2602,7 +2904,7 @@ async function esportaCostiExcel(){
       const costoT=CN.reduce((s,c)=>(s+totaliC[c.k]*(tariffe[c.k]||0)),0)+(totaliC.speseExtra||0);
       return[`${emp.nome||''} ${emp.cognome||''}`.trim(),...CN.map(c=>totaliC[c.k]||0),oreT,costoT>0?parseFloat(costoT.toFixed(2)):0];
     });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([mhh,...mrows]),mese);
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel('Costi Dipendenti — Dettaglio',mese+' '+anno,mhh,mrows),mese);
   });
   XLSX.writeFile(wb,`Costi_${anno}.xlsx`);
 }
@@ -2668,23 +2970,26 @@ function stampFoglio(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   // Intestazione
-  doc.setFont('helvetica','bold');doc.setFontSize(16);
-  doc.text('FOGLIO PRESENZE MENSILE',105,20,{align:'center'});
-  doc.setFont('helvetica','normal');doc.setFontSize(10);
-  doc.text(`Studio di Ingegneria`,105,28,{align:'center'});
-  doc.setLineWidth(0.5);doc.line(14,32,196,32);
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(94,127,112);
+  doc.text('PLANT INGEGNERIA',105,15,{align:'center'});
+  doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(34,34,34);
+  doc.text('FOGLIO PRESENZE MENSILE',105,23,{align:'center'});
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(156,163,175);
+  doc.text('Esportato il '+expDataOra(),196,10,{align:'right'});
+  doc.setTextColor(0,0,0);
+  doc.setDrawColor(122,158,142);doc.setLineWidth(0.5);doc.line(14,28,196,28);
   doc.setFontSize(11);doc.setFont('helvetica','bold');
-  doc.text(`Dipendente: ${nome}`,14,40);
+  doc.text(`Dipendente: ${nome}`,14,37);
   doc.setFont('helvetica','normal');
-  doc.text(`Periodo: ${MESI[fgMese]} ${fgAnno}`,14,47);
-  doc.text(`Orario: ${oreGiornoDip(emp)}h/giorno`,14,54);
-  if(emp.tipoContratto)doc.text(`Contratto: ${emp.tipoContratto}`,120,47);
-  doc.line(14,58,196,58);
+  doc.text(`Periodo: ${MESI[fgMese]} ${fgAnno}`,14,44);
+  doc.text(`Orario: ${oreGiornoDip(emp)}h/giorno`,14,51);
+  if(emp.tipoContratto)doc.text(`Contratto: ${emp.tipoContratto}`,120,44);
+  doc.line(14,55,196,55);
   // Tabella giorni
-  let y=65;
+  let y=62;
   const colDate=22,colOre=28,colStraord=28,colKm=18,colNote=40,colFirma=26;
   doc.setFont('helvetica','bold');doc.setFontSize(8);
-  doc.setFillColor(26,86,219);doc.rect(14,y,182,6,'F');
+  doc.setFillColor(122,158,142);doc.rect(14,y,182,6,'F');
   doc.setTextColor(255,255,255);
   doc.text('DATA',15,y+4);
   doc.text('ORE LAV.',15+colDate,y+4);
@@ -2810,7 +3115,7 @@ async function esportaStraordExcel(){
   const wb=XLSX.utils.book_new();
   const hh=['Dipendente','Data','H Straord. Elettrici','H Straord. Meccanici','Totale','Commessa','Note','Stato'];
   const rows=tuttiStraord.map(s=>[s.nomeCompleto,s.data,s.straEl||0,s.straMec||0,s.totale,s.commessa||'',s.note||'',s.stato==='autorizzati'?'Autorizzati':s.stato==='non_autorizzati'?'Non autorizzati':'Da convalidare']);
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rows]),'Straordinari '+ANNO);
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Straordinari','Anno '+ANNO,hh,rows),'Straordinari '+ANNO);
   XLSX.writeFile(wb,'Straordinari_'+ANNO+'.xlsx');
 }
 
@@ -2831,9 +3136,9 @@ async function eseguiBackup(){
     a.download='Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
     const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Username','Nome','Cognome','Orario','Monte Ferie','Monte Permessi','Monte ROL','Assunzione','Contratto','Note'],...backup.dipendenti.map(d=>[d.id,d.nome||'',d.cognome||'',oreGiornoDip(d)+'h/giorno',d.monteFerie||0,d.montePermesso||0,d.monteRol||0,d.dataAssunzione||'',d.tipoContratto||'',d.noteInterne||''])]),'Dipendenti');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Tipo','Inizio','Fine','Ore','Stato','Note'],...backup.richieste_assenza.map(r=>[r.nomeCompleto||r.username,r.tipo,r.dataInizio,r.dataFine,r.oreRichieste||0,r.stato,r.note||''])]),'Richieste');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Dipendente','Inizio','Fine','Giorni Lav.','Note'],...backup.malattie.map(m=>[m.nomeCompleto||m.username,m.dataInizio,m.dataFine,m.giorniLavorativi||0,m.note||''])]),'Malattie');
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel('Backup Dipendenti','Anno '+ANNO,['Username','Nome','Cognome','Orario','Monte Ferie','Monte Permessi','Monte ROL','Assunzione','Contratto','Note'],backup.dipendenti.map(d=>[d.id,d.nome||'',d.cognome||'',oreGiornoDip(d)+'h/giorno',d.monteFerie||0,d.montePermesso||0,d.monteRol||0,d.dataAssunzione||'',d.tipoContratto||'',d.noteInterne||''])),'Dipendenti');
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel('Backup Richieste Assenza','Anno '+ANNO,['Dipendente','Tipo','Inizio','Fine','Ore','Stato','Note'],backup.richieste_assenza.map(r=>[r.nomeCompleto||r.username,r.tipo,r.dataInizio,r.dataFine,r.oreRichieste||0,r.stato,r.note||''])),'Richieste');
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel('Backup Malattie','Anno '+ANNO,['Dipendente','Inizio','Fine','Giorni Lav.','Note'],backup.malattie.map(m=>[m.nomeCompleto||m.username,m.dataInizio,m.dataFine,m.giorniLavorativi||0,m.note||''])),'Malattie');
     XLSX.writeFile(wb,'Backup_CalendarioOre_'+ANNO+'_'+new Date().toISOString().split('T')[0]+'.xlsx');
     alert('Backup completato!\n- '+backup.dipendenti.length+' dipendenti\n- '+backup.richieste_assenza.length+' richieste\n- '+backup.malattie.length+' malattie\nFile scaricati: JSON + Excel');
   }catch(e){alert('Errore backup: '+e.message)}
@@ -2847,7 +3152,7 @@ async function esportaFerieExcel(){
   const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']),
     ...tutteMalattie.map(r=>[r.nomeCompleto||r.username,'Malattia',r.dataInizio,r.dataFine,(r.giorniLavorativi||0)+' gg','Registrata',r.note||'',''])];
   const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),'Ferie e Assenze');
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Ferie e Assenze','Anno '+ANNO,hh,rr),'Ferie e Assenze');
   XLSX.writeFile(wb,`Ferie_Assenze_${ANNO}.xlsx`);
 }
 
@@ -3207,7 +3512,68 @@ async function notificaTit(azione,riga){
   }catch(e){console.log('Notifica errore:',e.message)}
 }
 
-// Export Excel registro titolare (replica il foglio dei titolari)
+// Esportazione periodica Registro Titolare (Excel / PDF) — chiede il periodo e interroga Firestore anno per anno
+function esportaTitPeriodo(formato){
+  if(!TIT_target){alert('Nessun titolare selezionato.');return}
+  apriSelettorePeriodo(async(p)=>{
+    let righe=[];
+    for(const y of periodoAnni(p)){
+      try{
+        const snap=await db.collection('titolari_attivita').doc(String(y)).collection('utenti').doc(TIT_target).collection('righe').get();
+        righe=righe.concat(snap.docs.map(d=>({id:d.id,...d.data()})));
+      }catch(e){}
+    }
+    righe=righe.filter(r=>periodoInRange(r.data,p)).sort((a,b)=>String(a.data||'').localeCompare(String(b.data||'')));
+    if(formato==='excel')generaTitExcelPeriodo(righe,p);else generaTitPDFPeriodo(righe,p);
+  },{titolo:'Esporta Registro Titolare — '+nomeTit(TIT_target)});
+}
+function generaTitExcelPeriodo(righe,p){
+  const tot=k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const somma=soc+com+ind+off;
+  const pct=v=>somma>0?Math.round(v/somma*100)+'%':'';
+  const wb=XLSX.utils.book_new();
+  const riep=[
+    ['Ore utilizzate per scopi SOCIETARI:',soc],
+    ['Ore utilizzate per lavoro diretto su COMMESSE:',com],
+    ['Ore utilizzate per lavoro indiretto (organizzazione interna, riunioni, corsi, formazione):',ind],
+    ['Ore utilizzate per attività commerciale (Offerte, contratti, ecc):',off],
+    ['Altro:',altro],
+    ['Strada percorsa (km):',km],
+    [],
+    ['Somma totale delle ore spese:',somma],
+    [],
+    ['Percentuale tempo utilizzato per scopi SOCIETARI:',pct(soc)],
+    ['Percentuale tempo per lavoro diretto su COMMESSE:',pct(com)],
+    ['Percentuale tempo per lavoro indiretto:',pct(ind)],
+    ['Percentuale tempo per attività commerciale:',pct(off)],
+  ];
+  XLSX.utils.book_append_sheet(wb,expFoglioExcelLibero('Registro Titolare — Riepilogo',nomeTit(TIT_target)+' — '+periodoLabel(p),riep),'Riepilogo');
+  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R'];
+  const rr=righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m&&y?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',r.oreSocietarie||0,r.oreCommessa||0,r.oreIndirette||0,r.oreOfferte||0,r.oreAltro||0,r.kmAR||0]});
+  const footRow=['TOTALE','','',soc,com,ind,off,altro,km];
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Registro Titolare — Dettaglio',nomeTit(TIT_target)+' — '+periodoLabel(p),hh,rr,footRow),'Dettaglio');
+  XLSX.writeFile(wb,`Registro_Titolare_${nomeTit(TIT_target).replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
+}
+function generaTitPDFPeriodo(righe,p){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,`Registro Titolare — ${nomeTit(TIT_target)}`,periodoLabel(p));
+  const tot=k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
+  doc.autoTable({
+    startY,
+    head:[['Data','Attività','Commessa','Societ.','Commessa','Indirette','Offerte','Altro','Km']],
+    body:righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',fmtTitN(r.oreSocietarie),fmtTitN(r.oreCommessa),fmtTitN(r.oreIndirette),fmtTitN(r.oreOfferte),fmtTitN(r.oreAltro),fmtTitN(r.kmAR)]}),
+    foot:[['TOTALE','','',fmtTitN(tot('oreSocietarie')),fmtTitN(tot('oreCommessa')),fmtTitN(tot('oreIndirette')),fmtTitN(tot('oreOfferte')),fmtTitN(tot('oreAltro')),fmtTitN(tot('kmAR'))]],
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,
+    theme:'striped'
+  });
+  doc.save(`Registro_Titolare_${nomeTit(TIT_target).replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
+}
+
+// Export Excel registro titolare (replica il foglio dei titolari) — non più collegato a un pulsante, sostituito dal periodico
 function esportaTitExcel(){
   const tot=k=>TIT_righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
   const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
@@ -3364,6 +3730,42 @@ function rubOrdinaPerAnno(list){
     return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
   });
 }
+// ── ESPORTAZIONE RUBRICA COMMESSE (Excel / PDF) — rispetta ricerca + filtro anno correnti ──
+function rubricaListaFiltrata(){
+  const f=(document.getElementById('rub-search')?.value||'').trim().toLowerCase();
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUB_anno==='tutti')return true;
+    if(RUB_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUB_anno);
+  });
+  return rubOrdinaPerAnno(list);
+}
+function rubricaEtichettaPeriodo(){return RUB_anno==='tutti'?'Tutti gli anni':(RUB_anno==='nd'?'Anno non definito':String(RUB_anno))}
+function rubricaEsportaExcel(){
+  const list=rubricaListaFiltrata();
+  const hh=['Anno','Numero Commessa','Committente','Progetto','Note'];
+  const rr=list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Rubrica Commesse',`${rubricaEtichettaPeriodo()} · ${list.length} commesse`,hh,rr),'Rubrica');
+  XLSX.writeFile(wb,`Rubrica_Commesse_${rubricaEtichettaPeriodo().replace(/\s+/g,'_')}.xlsx`);
+}
+function rubricaEsportaPDF(){
+  const list=rubricaListaFiltrata();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Rubrica Commesse',`${rubricaEtichettaPeriodo()} · ${list.length} commesse`);
+  doc.autoTable({
+    startY,
+    head:[['Anno','Numero','Committente','Progetto','Note']],
+    body:list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']),
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    theme:'striped'
+  });
+  doc.save(`Rubrica_Commesse_${rubricaEtichettaPeriodo().replace(/\s+/g,'_')}.pdf`);
+}
+
 function renderRubrica(){
   renderRubricaImportBanner();
   renderRubricaAnniBar();
@@ -3923,6 +4325,199 @@ async function eliminaStampaBC(id){
   await bcCaricaStampe(BC_current);
   const c=BC_commesse.find(x=>x.numero===BC_current);
   bcRenderTutto(c);
+}
+
+// ══════════════════════════ STATISTICHE PERIODICHE ══════════════════════════
+let STAT_periodo=null,STAT_tipologia=[],STAT_assenze=[],STAT_commesse=[];
+let STAT_chartTip=null,STAT_chartComm=null;
+
+function initStatistiche(){
+  if(!STAT_periodo){
+    const oggi=new Date();
+    STAT_periodo={annoIni:ANNO,meseIni:0,annoFin:ANNO,meseFin:oggi.getFullYear()===ANNO?oggi.getMonth():11};
+  }
+  document.getElementById('stat-periodo-label').textContent=periodoLabel(STAT_periodo);
+  statCalcolaTutto();
+}
+function statCambiaPeriodo(){
+  apriSelettorePeriodo((p)=>{
+    STAT_periodo=p;
+    document.getElementById('stat-periodo-label').textContent=periodoLabel(p);
+    statCalcolaTutto();
+  },{titolo:'Periodo statistiche'});
+}
+
+async function statCalcolaTutto(){
+  const p=STAT_periodo;if(!p)return;
+  document.getElementById('stat-loading').style.display='';
+  try{
+    await Promise.all([statCalcolaTipologia(p),statCalcolaAssenze(p),statCalcolaCommesse(p)]);
+  }catch(e){console.error('Errore statistiche:',e)}
+  document.getElementById('stat-loading').style.display='none';
+}
+
+// ── 1) Ore per tipologia, aggregate su tutti i dipendenti, per mese ──
+const STAT_TIPI=[
+  {k:'ordinarie',l:'Ordinarie',c:'#7A9E8E',campi:['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico','oreAttivitaGenerali']},
+  {k:'ferie',l:'Ferie',c:'#4F8A5B',campi:['oreFerie']},
+  {k:'festMal',l:'Festività/Malattia',c:'#A855F7',campi:['oreFestivitaMalattia']},
+  {k:'permessi',l:'Permessi',c:'#F59E0B',campi:['orePermesso']},
+  {k:'recuperi',l:'Recuperi',c:'#6B7280',campi:['oreRecuperoElettrico','oreRecuperoMeccanico']},
+];
+async function statCalcolaTipologia(p){
+  const perMese={}; // 'YYYY-MM' -> {ordinarie,ferie,festMal,permessi,recuperi}
+  for(const y of periodoAnni(p)){
+    for(const emp of (dipList||[])){
+      try{
+        const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+        snap.forEach(d=>{
+          const ds=d.id;if(!periodoInRange(ds,p))return;
+          const dd=d.data();const ym=ds.substring(0,7);
+          if(!perMese[ym])perMese[ym]={ordinarie:0,ferie:0,festMal:0,permessi:0,recuperi:0};
+          STAT_TIPI.forEach(t=>{perMese[ym][t.k]+=t.campi.reduce((s,k)=>s+(parseFloat(dd[k])||0),0)});
+        });
+      }catch(e){}
+    }
+  }
+  const mesi=Object.keys(perMese).sort();
+  STAT_tipologia=mesi.map(ym=>{const[y,m]=ym.split('-');return{ym,label:MB[parseInt(m)-1]+' '+y,...perMese[ym]}});
+  statRenderTipologia();
+}
+function statRenderTipologia(){
+  const tbody=document.getElementById('stat-tipologia-tbody');
+  if(!STAT_tipologia.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Nessun dato per il periodo selezionato</td></tr>';}
+  else{
+    tbody.innerHTML=STAT_tipologia.map(r=>`<tr><td>${r.label}</td><td class="td-r">${fmtTitN(r.ordinarie)}</td><td class="td-r">${fmtTitN(r.ferie)}</td><td class="td-r">${fmtTitN(r.festMal)}</td><td class="td-r">${fmtTitN(r.permessi)}</td><td class="td-r">${fmtTitN(r.recuperi)}</td></tr>`).join('')
+      +`<tr class="td-bold"><td>TOTALE</td>${STAT_TIPI.map(t=>`<td class="td-r">${fmtTitN(STAT_tipologia.reduce((s,r)=>s+r[t.k],0))}</td>`).join('')}</tr>`;
+  }
+  if(typeof Chart==='undefined')return;
+  const ctx=document.getElementById('stat-tipologia-canvas');if(!ctx)return;
+  if(STAT_chartTip)STAT_chartTip.destroy();
+  STAT_chartTip=new Chart(ctx,{
+    type:'bar',
+    data:{labels:STAT_tipologia.map(r=>r.label),datasets:STAT_TIPI.map(t=>({label:t.l,backgroundColor:t.c,data:STAT_tipologia.map(r=>r[t.k])}))},
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}}}
+  });
+}
+function statEsportaTipologiaExcel(){
+  const hh=['Mese',...STAT_TIPI.map(t=>t.l)];
+  const rr=STAT_tipologia.map(r=>[r.label,...STAT_TIPI.map(t=>r[t.k])]);
+  const footRow=['TOTALE',...STAT_TIPI.map(t=>STAT_tipologia.reduce((s,r)=>s+r[t.k],0))];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Statistiche — Ore per tipologia',periodoLabel(STAT_periodo),hh,rr,footRow),'Ore per tipologia');
+  XLSX.writeFile(wb,`Statistiche_Ore_Tipologia_${periodoFile(STAT_periodo)}.xlsx`);
+}
+function statEsportaTipologiaPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Statistiche — Ore per tipologia',periodoLabel(STAT_periodo));
+  doc.autoTable({
+    startY,
+    head:[['Mese',...STAT_TIPI.map(t=>t.l)]],
+    body:STAT_tipologia.map(r=>[r.label,...STAT_TIPI.map(t=>fmtTitN(r[t.k]))]),
+    foot:[['TOTALE',...STAT_TIPI.map(t=>fmtTitN(STAT_tipologia.reduce((s,r)=>s+r[t.k],0)))]],
+    styles:EXP_PDF_BODY_STYLE,headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,theme:'striped'
+  });
+  doc.save(`Statistiche_Ore_Tipologia_${periodoFile(STAT_periodo)}.pdf`);
+}
+
+// ── 2) Assenze approvate, per dipendente ──
+async function statCalcolaAssenze(p){
+  const perUser={};
+  const assicura=(u,nome)=>{if(!perUser[u])perUser[u]={nome,ferie:0,permessi:0,rol:0,malattiaGiorni:0};return perUser[u]};
+  (tutteR||[]).forEach(r=>{
+    if(r.stato!=='approvata')return;
+    if(!periodoInRange(r.dataInizio,p))return;
+    const u=assicura(r.username,r.nomeCompleto||r.username);
+    const ore=parseFloat(r.oreRichieste)||0;
+    if(r.tipo==='ferie')u.ferie+=ore;else if(r.tipo==='permesso')u.permessi+=ore;else if(r.tipo==='rol')u.rol+=ore;
+  });
+  (tutteMalattie||[]).forEach(m=>{
+    if(!periodoInRange(m.dataInizio,p))return;
+    const u=assicura(m.username,m.nomeCompleto||m.username);
+    u.malattiaGiorni+=parseFloat(m.giorniLavorativi)||0;
+  });
+  STAT_assenze=Object.values(perUser).sort((a,b)=>a.nome.localeCompare(b.nome));
+  statRenderAssenze();
+}
+function statRenderAssenze(){
+  const tbody=document.getElementById('stat-assenze-tbody');
+  if(!STAT_assenze.length){tbody.innerHTML='<tr><td colspan="5" class="empty-state">Nessuna assenza approvata nel periodo selezionato</td></tr>';return}
+  tbody.innerHTML=STAT_assenze.map(r=>`<tr><td>${r.nome}</td><td class="td-r">${fmtTitN(r.ferie)}</td><td class="td-r">${fmtTitN(r.permessi)}</td><td class="td-r">${fmtTitN(r.rol)}</td><td class="td-r">${fmtTitN(r.malattiaGiorni)}</td></tr>`).join('')
+    +`<tr class="td-bold"><td>TOTALE</td><td class="td-r">${fmtTitN(STAT_assenze.reduce((s,r)=>s+r.ferie,0))}</td><td class="td-r">${fmtTitN(STAT_assenze.reduce((s,r)=>s+r.permessi,0))}</td><td class="td-r">${fmtTitN(STAT_assenze.reduce((s,r)=>s+r.rol,0))}</td><td class="td-r">${fmtTitN(STAT_assenze.reduce((s,r)=>s+r.malattiaGiorni,0))}</td></tr>`;
+}
+function statEsportaAssenzeExcel(){
+  const hh=['Dipendente','Ferie (h)','Permessi (h)','ROL (h)','Malattia (giorni)'];
+  const rr=STAT_assenze.map(r=>[r.nome,r.ferie,r.permessi,r.rol,r.malattiaGiorni]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Statistiche — Assenze approvate',periodoLabel(STAT_periodo),hh,rr),'Assenze');
+  XLSX.writeFile(wb,`Statistiche_Assenze_${periodoFile(STAT_periodo)}.xlsx`);
+}
+function statEsportaAssenzePDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Statistiche — Assenze approvate',periodoLabel(STAT_periodo));
+  doc.autoTable({
+    startY,
+    head:[['Dipendente','Ferie (h)','Permessi (h)','ROL (h)','Malattia (giorni)']],
+    body:STAT_assenze.map(r=>[r.nome,fmtTitN(r.ferie),fmtTitN(r.permessi),fmtTitN(r.rol),fmtTitN(r.malattiaGiorni)]),
+    styles:EXP_PDF_BODY_STYLE,headStyles:EXP_PDF_HEAD_STYLE,theme:'striped'
+  });
+  doc.save(`Statistiche_Assenze_${periodoFile(STAT_periodo)}.pdf`);
+}
+
+// ── 3) Ore lavorate per commessa ──
+async function statCalcolaCommesse(p){
+  if(!BC_commesse.length){try{await loadCommesse()}catch(e){}}
+  const commesseRilevanti=BC_commesse.filter(c=>c.anno==null||c.anno===''||(Number(c.anno)>=p.annoIni&&Number(c.anno)<=p.annoFin));
+  const perComm={};
+  for(const c of commesseRilevanti){
+    try{
+      const snap=await db.collection('commesse').doc(c.numero).collection('righe').get();
+      let ore=0,km=0,trovato=false;
+      snap.forEach(d=>{const r=d.data();if(!periodoInRange(r.data,p))return;trovato=true;ore+=parseFloat(r.ore)||0;km+=parseFloat(r.km)||0});
+      if(trovato)perComm[c.numero]={numero:c.numero,committente:c.committente||'',ore,km};
+    }catch(e){}
+  }
+  STAT_commesse=Object.values(perComm).sort((a,b)=>b.ore-a.ore);
+  statRenderCommesse();
+}
+function statRenderCommesse(){
+  const tbody=document.getElementById('stat-commesse-tbody');
+  if(!STAT_commesse.length){tbody.innerHTML='<tr><td colspan="4" class="empty-state">Nessuna ora registrata su commesse nel periodo selezionato</td></tr>';}
+  else{
+    tbody.innerHTML=STAT_commesse.map(r=>`<tr><td style="font-family:'Inter',monospace;font-weight:600">${r.numero}</td><td>${r.committente}</td><td class="td-r">${fmtTitN(r.ore)}</td><td class="td-r">${fmtTitN(r.km)}</td></tr>`).join('')
+      +`<tr class="td-bold"><td colspan="2">TOTALE</td><td class="td-r">${fmtTitN(STAT_commesse.reduce((s,r)=>s+r.ore,0))}</td><td class="td-r">${fmtTitN(STAT_commesse.reduce((s,r)=>s+r.km,0))}</td></tr>`;
+  }
+  if(typeof Chart==='undefined')return;
+  const ctx=document.getElementById('stat-commesse-canvas');if(!ctx)return;
+  if(STAT_chartComm)STAT_chartComm.destroy();
+  const top=STAT_commesse.slice(0,15);
+  STAT_chartComm=new Chart(ctx,{
+    type:'bar',
+    data:{labels:top.map(r=>r.numero),datasets:[{label:'Ore',backgroundColor:'#7A9E8E',data:top.map(r=>r.ore)}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',scales:{x:{beginAtZero:true}},plugins:{legend:{display:false}}}
+  });
+}
+function statEsportaCommesseExcel(){
+  const hh=['Commessa','Committente','Ore','Km'];
+  const rr=STAT_commesse.map(r=>[r.numero,r.committente,r.ore,r.km]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Statistiche — Ore per commessa',periodoLabel(STAT_periodo),hh,rr),'Ore per commessa');
+  XLSX.writeFile(wb,`Statistiche_Ore_Commesse_${periodoFile(STAT_periodo)}.xlsx`);
+}
+function statEsportaCommessePDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Statistiche — Ore per commessa',periodoLabel(STAT_periodo));
+  doc.autoTable({
+    startY,
+    head:[['Commessa','Committente','Ore','Km']],
+    body:STAT_commesse.map(r=>[r.numero,r.committente,fmtTitN(r.ore),fmtTitN(r.km)]),
+    styles:EXP_PDF_BODY_STYLE,headStyles:EXP_PDF_HEAD_STYLE,theme:'striped'
+  });
+  doc.save(`Statistiche_Ore_Commesse_${periodoFile(STAT_periodo)}.pdf`);
 }
 </script>
 <script src="contab_module.js" defer></script>

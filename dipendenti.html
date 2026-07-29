@@ -9,7 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="xlsx-style.min.js"></script>
 <style>
 :root{
   --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
@@ -163,6 +164,12 @@ a{text-decoration:none;color:inherit}
 .field-input{padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;width:100%}
 .field-input:focus{border-color:var(--blu);background:var(--white)}
 .field-textarea{resize:vertical;min-height:72px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2);max-height:calc(100vh - 48px);overflow-y:auto}
+.modal-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
+.modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .totale-giorno{margin-top:16px;padding:12px 14px;background:var(--blu-light);border-radius:8px;display:flex;justify-content:space-between;align-items:center}
 .totale-giorno-label{font-family:'Inter',monospace;font-size:11px;color:var(--blu-dark)}
 .totale-giorno-val{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:var(--blu)}
@@ -559,8 +566,8 @@ tbody tr:last-child{border-bottom:none}
           <div class="page-title">Riepilogo Mensile</div>
           <div style="display:flex;gap:8px">
             <select class="f-select" id="sel-mese-riepilogo" style="width:auto;padding:7px 12px;font-size:13px"></select>
-            <button class="btn btn-verde" onclick="esportaExcel()">📥 Excel</button>
-            <button class="btn btn-rosso" onclick="esportaPDF()">📄 PDF</button>
+            <button class="btn btn-verde" onclick="esportaPeriodoDip('excel')">📅 Excel</button>
+            <button class="btn btn-rosso" onclick="esportaPeriodoDip('pdf')">📅 PDF</button>
           </div>
         </div>
         <div class="stat-row" id="stat-row-riepilogo"></div>
@@ -592,7 +599,11 @@ tbody tr:last-child{border-bottom:none}
       <div class="page" id="page-rubrica">
         <div class="page-header">
           <div class="page-title">📇 Rubrica Commesse</div>
-          <input class="field-input" id="rub-search-dip" type="text" style="max-width:280px" placeholder="Cerca per numero o nome..." oninput="renderRubricaDip()">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="field-input" id="rub-search-dip" type="text" style="max-width:240px" placeholder="Cerca per numero o nome..." oninput="renderRubricaDip()">
+            <button class="btn btn-verde btn-sm" onclick="rubricaDipEsportaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="rubricaDipEsportaPDF()">📄 PDF</button>
+          </div>
         </div>
         <div class="filtri" id="rubrica-anni-wrap-dip" style="margin-bottom:14px"></div>
         <div id="rubrica-lista-dip"><div class="empty-state">Caricamento...</div></div>
@@ -682,6 +693,30 @@ tbody tr:last-child{border-bottom:none}
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SELEZIONE PERIODO (esportazione) -->
+<div class="modal-overlay" id="modal-periodo">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title" id="periodo-titolo">Seleziona periodo da esportare</div>
+    <div class="modal-sub">Scegli una scorciatoia oppure un intervallo personalizzato.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" onclick="periodoScegli('corrente')">📅 Anno corrente</button>
+      <button class="btn" onclick="periodoScegli('scorso')">📅 Anno scorso</button>
+      <button class="btn" onclick="periodoScegli('storico')">🗂️ Tutto lo storico</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:8px;font-weight:600">— oppure intervallo personalizzato —</div>
+    <div class="fields-grid">
+      <div class="field-group"><label class="field-label">Da mese</label><select class="field-input" id="periodo-da-mese"></select></div>
+      <div class="field-group"><label class="field-label">Da anno</label><select class="field-input" id="periodo-da-anno"></select></div>
+      <div class="field-group"><label class="field-label">A mese</label><select class="field-input" id="periodo-a-mese"></select></div>
+      <div class="field-group"><label class="field-label">A anno</label><select class="field-input" id="periodo-a-anno"></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="chiudiSelettorePeriodo()">Annulla</button>
+      <button class="btn btn-blu" onclick="periodoConferma()">✓ Esporta questo intervallo</button>
     </div>
   </div>
 </div>
@@ -1541,7 +1576,168 @@ function loadRiepilogoMese(meseAbs){
   }catch(e){console.error('Errore riepilogo mensile:',e)}
 }
 
-// EXPORT EXCEL
+// ── SELETTORE PERIODO CONDIVISO (esportazioni Excel/PDF) ──────────────
+const PERIODO_ANNO_MIN=2022;
+let PERIODO_CB=null;
+function apriSelettorePeriodo(cb,opts){
+  PERIODO_CB=cb;
+  document.getElementById('periodo-titolo').textContent=(opts&&opts.titolo)||'Seleziona periodo da esportare';
+  const annoMin=(opts&&opts.annoMin)||PERIODO_ANNO_MIN;
+  let optsAnno='';for(let y=ANNO;y>=annoMin;y--)optsAnno+=`<option value="${y}">${y}</option>`;
+  const selDaA=document.getElementById('periodo-da-anno'),selAA=document.getElementById('periodo-a-anno');
+  selDaA.innerHTML=optsAnno;selAA.innerHTML=optsAnno;
+  const optsMese=MESI.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+  document.getElementById('periodo-da-mese').innerHTML=optsMese;
+  document.getElementById('periodo-a-mese').innerHTML=optsMese;
+  selDaA.value=ANNO;selAA.value=ANNO;
+  document.getElementById('periodo-da-mese').value=0;
+  document.getElementById('periodo-a-mese').value=new Date().getMonth();
+  document.getElementById('modal-periodo').classList.add('open');
+}
+function chiudiSelettorePeriodo(){document.getElementById('modal-periodo').classList.remove('open');PERIODO_CB=null}
+function periodoScegli(tipo){
+  let annoIni,meseIni,annoFin,meseFin;
+  if(tipo==='corrente'){annoIni=ANNO;meseIni=0;annoFin=ANNO;meseFin=11}
+  else if(tipo==='scorso'){annoIni=ANNO-1;meseIni=0;annoFin=ANNO-1;meseFin=11}
+  else{annoIni=PERIODO_ANNO_MIN;meseIni=0;annoFin=ANNO;meseFin=11}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoConferma(){
+  const annoIni=parseInt(document.getElementById('periodo-da-anno').value);
+  const meseIni=parseInt(document.getElementById('periodo-da-mese').value);
+  const annoFin=parseInt(document.getElementById('periodo-a-anno').value);
+  const meseFin=parseInt(document.getElementById('periodo-a-mese').value);
+  if(annoIni*12+meseIni>annoFin*12+meseFin){alert('L\'inizio del periodo deve precedere la fine.');return}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoLabel(p){
+  if(p.annoIni===p.annoFin){
+    if(p.meseIni===0&&p.meseFin===11)return String(p.annoIni);
+    return MESI[p.meseIni]+'–'+MESI[p.meseFin]+' '+p.annoIni;
+  }
+  return MESI[p.meseIni]+' '+p.annoIni+' – '+MESI[p.meseFin]+' '+p.annoFin;
+}
+function periodoFile(p){return periodoLabel(p).replace(/\s+/g,'_').replace(/[^\w\-]/g,'')}
+function periodoInRange(dataStr,p){
+  if(!dataStr)return false;
+  const y=parseInt(String(dataStr).substring(0,4)),m=parseInt(String(dataStr).substring(5,7))-1;
+  if(isNaN(y)||isNaN(m))return false;
+  const key=y*12+m,kIni=p.annoIni*12+p.meseIni,kFin=p.annoFin*12+p.meseFin;
+  return key>=kIni&&key<=kFin;
+}
+function periodoAnni(p){const a=[];for(let y=p.annoIni;y<=p.annoFin;y++)a.push(y);return a}
+
+// ══════════════════ STILE UNIFORME ESPORTAZIONI (Excel + PDF) ══════════════════
+// Palette identica all'app (--blu / --blu-dark) + intestazione "PLANT INGEGNERIA" + data/ora esportazione + colonne a larghezza leggibile
+const EXP_BLU=[122,158,142];        // rgb di var(--blu)
+const EXP_BLU_HEX='7A9E8E';
+const EXP_TOT_BG_HEX='EAF2ED';      // var(--blu-light)
+function expDataOra(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function expLarghezzeColonne(headerRow,bodyRows,footRow){
+  const nCols=headerRow.length,cols=[];
+  for(let c=0;c<nCols;c++){
+    let maxLen=String(headerRow[c]??'').length;
+    bodyRows.forEach(r=>{const v=r?r[c]:null;if(v!=null){const l=String(v).length;if(l>maxLen)maxLen=l;}});
+    if(footRow&&footRow[c]!=null){const l=String(footRow[c]).length;if(l>maxLen)maxLen=l;}
+    cols.push({wch:Math.min(Math.max(maxLen+3,10),60)});
+  }
+  return cols;
+}
+function expFoglioExcel(titoloReport,sottotitolo,headerRow,bodyRows,footRow){
+  const nCols=headerRow.length;
+  const aoa=[['PLANT INGEGNERIA'],[titoloReport],[sottotitolo||''],['Esportato il '+expDataOra()],[],headerRow,...bodyRows];
+  if(footRow)aoa.push(footRow);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[0,1,2,3].map(r=>({s:{r,c:0},e:{r,c:Math.max(nCols-1,0)}}));
+  const st=(addr,s)=>{if(ws[addr])ws[addr].s=s};
+  st('A1',{font:{bold:true,sz:16,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center'}});
+  st('A2',{font:{bold:true,sz:12,color:{rgb:'222222'}},alignment:{horizontal:'center'}});
+  st('A3',{font:{sz:10,italic:true,color:{rgb:'6B7280'}},alignment:{horizontal:'center'}});
+  st('A4',{font:{sz:9,color:{rgb:'9CA3AF'}},alignment:{horizontal:'center'}});
+  ws['!rows']=[{hpt:22},{hpt:18},{hpt:15},{hpt:14},{hpt:6}];
+  const headerRowIdx=5;
+  for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:headerRowIdx,c}),{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center',wrapText:true}});
+  if(footRow){
+    const footIdx=aoa.length-1;
+    for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:footIdx,c}),{font:{bold:true},fill:{fgColor:{rgb:EXP_TOT_BG_HEX}}});
+  }
+  ws['!cols']=expLarghezzeColonne(headerRow,bodyRows,footRow);
+  return ws;
+}
+function expIntestazionePDF(doc,titoloReport,sottotitolo){
+  const pageW=doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(94,127,112);
+  doc.text('PLANT INGEGNERIA',14,14);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(34,34,34);
+  doc.text(titoloReport,14,21);
+  if(sottotitolo){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);doc.text(sottotitolo,14,27);}
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(156,163,175);
+  doc.text('Esportato il '+expDataOra(),pageW-14,14,{align:'right'});
+  doc.setDrawColor(122,158,142);doc.setLineWidth(0.4);doc.line(14,30,pageW-14,30);
+  doc.setTextColor(0,0,0);
+  return 35;
+}
+const EXP_PDF_HEAD_STYLE={fillColor:EXP_BLU,textColor:[255,255,255],fontStyle:'bold'};
+const EXP_PDF_FOOT_STYLE={fillColor:[234,242,237],textColor:[20,20,20],fontStyle:'bold'};
+const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
+
+// Esportazione periodica delle proprie ore (Excel / PDF) — interroga Firestore anno per anno
+function esportaPeriodoDip(formato){
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  apriSelettorePeriodo(async(p)=>{
+    let all={};
+    for(const y of periodoAnni(p)){
+      try{
+        const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(U.username).collection('giorni').get();
+        snap.forEach(d=>{all[d.id]=d.data()});
+      }catch(e){}
+    }
+    const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
+    if(formato==='excel')generaExcelPeriodoDip(nome,all,giorni,p);else generaPDFPeriodoDip(nome,all,giorni,p);
+  },{titolo:'Esporta le mie ore'});
+}
+function generaExcelPeriodoDip(nome,all,giorni,p){
+  const wb=XLSX.utils.book_new();
+  const hdr=['Campo','Totale'];
+  const righeRiep=CN.map(c=>[c.l,giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)]);
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,periodoLabel(p),hdr,righeRiep),'Riepilogo');
+  const perMese={};
+  giorni.forEach(ds=>{const ym=ds.substring(0,7);if(!perMese[ym])perMese[ym]=[];perMese[ym].push(ds)});
+  Object.keys(perMese).sort().forEach(ym=>{
+    const gg=perMese[ym].sort();
+    const[y,m]=ym.split('-');
+    const hh=['Data',...CN.map(c=>c.l),'Totale Ore'];
+    const rr=gg.map(ds=>{const d=all[ds];const[yy,mo,g]=ds.split('-');return[`${g}/${mo}/${yy}`,...CN.map(c=>parseFloat(d[c.k])||0),totaleGiorno(d)]});
+    const footRow=['TOTALE',...CN.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiorno(all[ds]),0)];
+    const nomeFoglio=(MESI[parseInt(m)-1]+' '+y).substring(0,31);
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nomeFoglio);
+  });
+  XLSX.writeFile(wb,`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
+}
+function generaPDFPeriodoDip(nome,all,giorni,p){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,`Riepilogo Ore — ${nome}`,periodoLabel(p));
+  const totOre=giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0);
+  doc.autoTable({
+    startY,
+    head:[['Data',...CN.slice(0,8).map(c=>c.l),'Tot.h']],
+    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiorno(d)>0?totaleGiorno(d):'']}),
+    foot:[['TOTALE',...CN.slice(0,8).map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre]],
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,
+    theme:'striped'
+  });
+  doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
+}
+
+// EXPORT EXCEL (mese corrente in vista — non più collegato a un pulsante, sostituito dal periodico)
 function esportaExcel(){
   const meseAbs=parseInt(document.getElementById('sel-mese-riepilogo').value);
   const{anno,mese}=annoMese(meseAbs);
@@ -1738,6 +1934,42 @@ function rubDipOrdinaPerAnno(list){
     return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
   });
 }
+// ── ESPORTAZIONE RUBRICA COMMESSE (Excel / PDF) — rispetta ricerca + filtro anno correnti ──
+function rubricaDipListaFiltrata(){
+  const f=(document.getElementById('rub-search-dip')?.value||'').trim().toLowerCase();
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUBDIP_anno==='tutti')return true;
+    if(RUBDIP_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUBDIP_anno);
+  });
+  return rubDipOrdinaPerAnno(list);
+}
+function rubricaDipEtichettaPeriodo(){return RUBDIP_anno==='tutti'?'Tutti gli anni':(RUBDIP_anno==='nd'?'Anno non definito':String(RUBDIP_anno))}
+function rubricaDipEsportaExcel(){
+  const list=rubricaDipListaFiltrata();
+  const hh=['Anno','Numero Commessa','Committente','Progetto','Note'];
+  const rr=list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Rubrica Commesse',`${rubricaDipEtichettaPeriodo()} · ${list.length} commesse`,hh,rr),'Rubrica');
+  XLSX.writeFile(wb,`Rubrica_Commesse_${rubricaDipEtichettaPeriodo().replace(/\s+/g,'_')}.xlsx`);
+}
+function rubricaDipEsportaPDF(){
+  const list=rubricaDipListaFiltrata();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Rubrica Commesse',`${rubricaDipEtichettaPeriodo()} · ${list.length} commesse`);
+  doc.autoTable({
+    startY,
+    head:[['Anno','Numero','Committente','Progetto','Note']],
+    body:list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']),
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    theme:'striped'
+  });
+  doc.save(`Rubrica_Commesse_${rubricaDipEtichettaPeriodo().replace(/\s+/g,'_')}.pdf`);
+}
+
 function renderRubricaDip(){
   renderRubricaAnniBarDip();
   const el=document.getElementById('rubrica-lista-dip');
