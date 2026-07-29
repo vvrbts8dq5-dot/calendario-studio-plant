@@ -397,6 +397,10 @@ tbody tr:hover{background:var(--paper)}
       <button class="nav-item" data-page="statistiche" onclick="goPage('statistiche',this)">
         <span class="nav-icon">📊</span> Statistiche
       </button>
+      <button class="nav-item" data-page="cestino" onclick="goPage('cestino',this)">
+        <span class="nav-icon">🗑️</span> Cestino
+        <span class="nav-badge" id="badge-cestino">0</span>
+      </button>
     </div>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">
@@ -846,6 +850,25 @@ tbody tr:hover{background:var(--paper)}
         </div>
       </div>
 
+      <!-- CESTINO -->
+      <div class="page" id="page-cestino">
+        <div class="page-header">
+          <div class="page-title">🗑️ Cestino</div>
+          <button class="btn" onclick="loadCestino()">🔄 Aggiorna</button>
+        </div>
+        <div class="alert-box" style="background:var(--paper2);margin-bottom:14px">
+          Ogni elemento cancellato dall'app (dipendenti, ferie, righe di lavoro, commesse, contabilità...) finisce qui prima di sparire per sempre. Solo chi accede a questa area amministrativa può vederlo e ripristinarlo. "Elimina definitivamente" è l'unica azione di questa pagina senza rete di sicurezza.
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Tipo</th><th>Descrizione</th><th>Cancellato da</th><th>Quando</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="cestino-tbody"><tr><td colspan="5" class="empty-state">Caricamento...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ARCHIVIO ANNI -->
       <div class="page" id="page-archivio">
         <div class="page-header">
@@ -1248,6 +1271,114 @@ const auth=firebase.auth();
 auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>console.log('Persistenza auth:',e.message));
 const db=firebase.firestore();
 
+// ══════════════════════════ CESTINO (soft-delete) ══════════════════════════
+// Ogni cancellazione dell'app, invece di sparire per sempre, viene prima copiata
+// in db.collection('cestino') con i dati completi originali + percorso per poterla
+// ricreare esattamente dov'era. Solo dopo il salvataggio nel cestino il documento
+// originale viene davvero eliminato. Sezione visibile SOLO in admin.html.
+let CESTINO_all=[];
+const CESTINO_LABELS={dipendente:'👤 Dipendente',chiusura:'📅 Chiusura ufficio',richiesta_assenza:'🏖️ Ferie/Permesso/ROL',riga_tit:'📒 Riga Registro Titolare',commessa:'📁 Commessa (completa)',riga_bc:'📋 Riga lavoro Budget Contract',stampa_bc:'🖨️ Riga stampa Budget Contract',contabilita:'🧾 Riga contabilità'};
+
+// percorso: array che alterna nome-collezione/id, es. ['dipendenti','mrossi'] oppure
+// ['commesse','2024-015','righe','abc123']. dati: contenuto completo del documento
+// (o oggetto composito per le cancellazioni "a cascata" come una commessa intera).
+async function spostaNelCestino(tipo,percorso,dati,etichetta,cancellatoDa,extra){
+  try{
+    await db.collection('cestino').add(Object.assign({
+      tipo,percorso,dati,etichetta:etichetta||'',
+      cancellatoDa:cancellatoDa||'',
+      cancellatoIl:new Date().toISOString()
+    },extra||{}));
+    const b=document.getElementById('badge-cestino');
+    if(b)b.textContent=String((parseInt(b.textContent)||0)+1);
+  }catch(e){console.error('Impossibile salvare nel cestino:',e.message)}
+}
+
+async function loadCestino(){
+  const tb=document.getElementById('cestino-tbody');
+  if(tb)tb.innerHTML='<tr><td colspan="5" class="empty-state">Caricamento...</td></tr>';
+  try{
+    const snap=await db.collection('cestino').orderBy('cancellatoIl','desc').limit(500).get();
+    CESTINO_all=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){
+    if(tb)tb.innerHTML='<tr><td colspan="5" class="empty-state">Errore: '+e.message+'</td></tr>';
+    return;
+  }
+  const b=document.getElementById('badge-cestino');
+  if(b)b.textContent=String(CESTINO_all.length);
+  renderCestino();
+}
+
+function renderCestino(){
+  const tb=document.getElementById('cestino-tbody');
+  if(!tb)return;
+  if(!CESTINO_all.length){tb.innerHTML='<tr><td colspan="5" class="empty-state">Il cestino è vuoto.</td></tr>';return}
+  tb.innerHTML=CESTINO_all.map(c=>{
+    const quando=c.cancellatoIl?new Date(c.cancellatoIl).toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    return `<tr>
+      <td>${CESTINO_LABELS[c.tipo]||c.tipo}</td>
+      <td>${c.etichetta||'—'}</td>
+      <td style="font-size:12px;color:var(--ink4)">${c.cancellatoDa||'—'}</td>
+      <td style="font-size:12px;color:var(--ink4)">${quando}</td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-verde btn-sm" onclick="ripristinaDalCestino('${c.id}')">♻️ Ripristina</button>
+        <button class="btn btn-rosso btn-sm" onclick="eliminaDefinitivoCestino('${c.id}')">❌ Elimina def.</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// Ricrea il/i documento/i esattamente dove si trovavano prima della cancellazione,
+// poi rimuove il record dal cestino. Due casi speciali (commessa intera, riga titolare
+// con sync sul Budget Contract) ricreano più di un documento; tutti gli altri tipi
+// seguono il percorso generico salvato al momento della cancellazione.
+async function ripristinaDalCestino(id){
+  const c=CESTINO_all.find(x=>x.id===id);
+  if(!c)return;
+  if(!confirm('Ripristinare "'+(c.etichetta||c.tipo)+'"?'))return;
+  try{
+    if(c.tipo==='commessa'){
+      const numero=c.percorso[1];
+      await db.collection('commesse').doc(numero).set(c.dati.commessa);
+      let batch=db.batch(),n=0;
+      (c.dati.righe||[]).forEach(r=>{batch.set(db.collection('commesse').doc(numero).collection('righe').doc(r.id),r.dati);n++});
+      (c.dati.stampe||[]).forEach(s=>{batch.set(db.collection('commesse').doc(numero).collection('stampe').doc(s.id),s.dati);n++});
+      if(n>0)await batch.commit();
+    }else if(c.tipo==='riga_tit'){
+      let ref=db;
+      for(let i=0;i<c.percorso.length;i+=2)ref=ref.collection(c.percorso[i]).doc(c.percorso[i+1]);
+      await ref.set(c.dati.rigaTit);
+      if(c.dati.rigaCommessaSync&&c.percorsoSync){
+        let refS=db;
+        for(let i=0;i<c.percorsoSync.length;i+=2)refS=refS.collection(c.percorsoSync[i]).doc(c.percorsoSync[i+1]);
+        await refS.set(c.dati.rigaCommessaSync);
+      }
+    }else{
+      let ref=db;
+      for(let i=0;i<c.percorso.length;i+=2)ref=ref.collection(c.percorso[i]).doc(c.percorso[i+1]);
+      await ref.set(c.dati);
+    }
+    await db.collection('cestino').doc(id).delete();
+    CESTINO_all=CESTINO_all.filter(x=>x.id!==id);
+    renderCestino();
+    const b=document.getElementById('badge-cestino');
+    if(b)b.textContent=String(CESTINO_all.length);
+    alert('Ripristinato. Ricarica la pagina interessata per vederlo di nuovo nell\'elenco.');
+  }catch(e){alert('Errore nel ripristino: '+e.message)}
+}
+
+async function eliminaDefinitivoCestino(id){
+  if(!confirm('Eliminare DEFINITIVAMENTE questo elemento dal cestino? Non sarà più recuperabile in alcun modo.'))return;
+  if(!confirm('Sei sicuro? Questa è l\'unica cancellazione senza rete di sicurezza in tutta l\'app.'))return;
+  try{
+    await db.collection('cestino').doc(id).delete();
+    CESTINO_all=CESTINO_all.filter(x=>x.id!==id);
+    renderCestino();
+    const b=document.getElementById('badge-cestino');
+    if(b)b.textContent=String(CESTINO_all.length);
+  }catch(e){alert('Errore: '+e.message)}
+}
+
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
@@ -1600,7 +1731,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1613,6 +1744,7 @@ function goPage(pid,btn){
   if(pid==='contabilita')loadContabilita();
   if(pid==='rubrica')loadCommesse().then(renderRubrica);
   if(pid==='statistiche')initStatistiche();
+  if(pid==='cestino')loadCestino();
 }
 
 // DASHBOARD
@@ -2044,6 +2176,8 @@ async function salvaChiusura(){
 async function eliminaChiusura(id){
   if(!confirm('Eliminare questa chiusura ufficio?'))return;
   try{
+    const rec=chiusureUfficio.find(c=>c.id===id);
+    if(rec){const{id:_id,...dati}=rec;await spostaNelCestino('chiusura',['chiusure',id],dati,'Chiusura ufficio: '+(dati.motivo||'')+' ('+fmtD(dati.dataInizio)+')',ADM.username);}
     await db.collection('chiusure').doc(id).delete();
     chiusureUfficio=chiusureUfficio.filter(c=>c.id!==id);
     renderCalendarioFerie();
@@ -2056,6 +2190,7 @@ async function calClickGiorno(anno,mese,giorno){
   try{
     if(mio){
       if(!confirm('Rimuovere la ferie del '+dataStr+'?'))return;
+      {const{id:_id,...dati}=mio;await spostaNelCestino('richiesta_assenza',['richieste_assenza',mio.id],dati,'Ferie titolare: '+ADM.username+' '+dataStr,ADM.username);}
       await db.collection('richieste_assenza').doc(mio.id).delete();
       tutteR=tutteR.filter(r=>r.id!==mio.id);
     }else{
@@ -2457,6 +2592,8 @@ async function eliminaDip(username,nome){
   if(!confirm('Eliminare il profilo di "'+nome+'"?'))return;
   const ad=document.getElementById('alert-dip');
   try{
+    const emp=dipList.find(e=>e.username===username);
+    if(emp){const{username:_u,...dati}=emp;await spostaNelCestino('dipendente',['dipendenti',username],dati,'Dipendente: '+nome+' ('+username+')',ADM.username);}
     await db.collection('dipendenti').doc(username).delete();
     dipList=dipList.filter(e=>e.username!==username);
     delete dipDataCache[username];
@@ -3486,6 +3623,15 @@ async function eliminaRigaTit(id){
   if(!confirm('Eliminare la riga "'+(r.descrizione||'')+'" del '+fmtD(r.data)+'?'))return;
   try{
     const annoRigaDel=parseInt(String(r.data||'').split('-')[0])||ANNO;
+    const percorsoTit=['titolari_attivita',String(annoRigaDel),'utenti',TIT_target,'righe',id];
+    const{id:_id,...datiTit}=r;
+    let rigaCommessaSync=null,percorsoSync=null;
+    if(r.commessa&&(parseFloat(r.oreCommessa)||0)>0){
+      percorsoSync=['commesse',r.commessa,'righe','tit_'+id];
+      const syncSnap=await db.collection('commesse').doc(r.commessa).collection('righe').doc('tit_'+id).get();
+      if(syncSnap.exists)rigaCommessaSync=syncSnap.data();
+    }
+    await spostaNelCestino('riga_tit',percorsoTit,{rigaTit:datiTit,rigaCommessaSync},'Registro Titolare: '+(r.descrizione||'')+' del '+fmtD(r.data),ADM.username,percorsoSync?{percorsoSync}:null);
     await db.collection('titolari_attivita').doc(String(annoRigaDel)).collection('utenti').doc(TIT_target).collection('righe').doc(id).delete();
     if(r.commessa&&(parseFloat(r.oreCommessa)||0)>0){
       await db.collection('commesse').doc(r.commessa).collection('righe').doc('tit_'+id).delete().catch(()=>{});
@@ -4151,6 +4297,11 @@ async function eliminaCommessaBC(){
       db.collection('commesse').doc(BC_current).collection('righe').get(),
       db.collection('commesse').doc(BC_current).collection('stampe').get()
     ]);
+    const cCache=BC_commesse.find(x=>x.numero===BC_current);
+    const{numero:_n,...datiCommessa}=cCache||{numero:BC_current};
+    const righeDati=righeSnap.docs.map(d=>({id:d.id,dati:d.data()}));
+    const stampeDati=stampeSnap.docs.map(d=>({id:d.id,dati:d.data()}));
+    await spostaNelCestino('commessa',['commesse',BC_current],{commessa:datiCommessa,righe:righeDati,stampe:stampeDati},'Commessa '+BC_current+(cCache&&cCache.descrizione?' — '+cCache.descrizione:''),ADM.username);
     const batch=db.batch();
     righeSnap.docs.forEach(d=>batch.delete(d.ref));
     stampeSnap.docs.forEach(d=>batch.delete(d.ref));
@@ -4282,6 +4433,8 @@ async function salvaRigaBC(){
 
 async function eliminaRigaBC(id){
   if(!confirm('Eliminare questa riga di lavoro?'))return;
+  const r=BC_righe.find(x=>x.id===id);
+  if(r){const{id:_id,...dati}=r;await spostaNelCestino('riga_bc',['commesse',BC_current,'righe',id],dati,'Riga lavoro '+BC_current+': '+(dati.nomeCompleto||'')+' '+fmtD(dati.data),ADM.username);}
   await db.collection('commesse').doc(BC_current).collection('righe').doc(id).delete();
   await bcCaricaRighe(BC_current);
   const c=BC_commesse.find(x=>x.numero===BC_current);
@@ -4321,6 +4474,8 @@ async function salvaStampaBC(){
 
 async function eliminaStampaBC(id){
   if(!confirm('Eliminare questa riga stampa?'))return;
+  const s=BC_stampe.find(x=>x.id===id);
+  if(s){const{id:_id,...dati}=s;await spostaNelCestino('stampa_bc',['commesse',BC_current,'stampe',id],dati,'Stampa '+BC_current+': '+(dati.voce||'')+' x'+(dati.copie||0),ADM.username);}
   await db.collection('commesse').doc(BC_current).collection('stampe').doc(id).delete();
   await bcCaricaStampe(BC_current);
   const c=BC_commesse.find(x=>x.numero===BC_current);

@@ -230,6 +230,8 @@ async function contabEliminaRiga(){
   if(!CONTAB_editId)return;
   if(!confirm('Eliminare questa riga di contabilità? Operazione non reversibile.'))return;
   try{
+    const row=CONTAB_all.find(x=>x.id===CONTAB_editId);
+    if(row){const{id:_id,...dati}=row;await spostaNelCestino('contabilita',['contabilita',CONTAB_editId],dati,'Contabilità: '+(dati.codiceCommessa||'')+' — '+(dati.clienteDebitore||''),ADM.username);}
     await db.collection('contabilita').doc(CONTAB_editId).delete();
     document.getElementById('modal-contab-riga').classList.remove('open');
     await loadContabilita();
