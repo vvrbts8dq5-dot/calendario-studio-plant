@@ -1508,13 +1508,13 @@ function renderListaAssenze(tipo,lista){
         ${r.note?`<div class="r-nota">${r.note}</div>`:''}
         ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}
       </div>
-      ${r.stato==='in_attesa'?`<button class="btn btn-rosso btn-sm" onclick="eliminaRichiesta('${r.id}')">Elimina</button>`:''}
+      <button class="btn btn-rosso btn-sm" title="Elimina richiesta" onclick="eliminaRichiesta('${r.id}')">🗑️ Elimina</button>
     </div>`;
   }).join('')+'</div>';
 }
 
 async function eliminaRichiesta(id){
-  if(!confirm('Eliminare questa richiesta?'))return;
+  if(!confirm('Eliminare questa richiesta? Verrà spostata nel Cestino, come se non fosse mai stata inviata.'))return;
   const r=ALL_ASSENZE.find(x=>x.id===id);
   if(r){const{id:_id,...dati}=r;await spostaNelCestino('richiesta_assenza',['richieste_assenza',id],dati,'Richiesta '+(dati.tipo||'')+': '+U.username,U.username);}
   await db.collection('richieste_assenza').doc(id).delete();
@@ -1555,9 +1555,20 @@ function loadMalattie(){
         <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
         ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
       </div>
-      <span class="badge badge-malattia">Malattia</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge badge-malattia">Malattia</span>
+        <button class="btn btn-rosso btn-sm" title="Elimina malattia" onclick="eliminaMalattiaDip('${r.id}')">🗑️</button>
+      </div>
     </div>
   `).join('');
+}
+async function eliminaMalattiaDip(id){
+  if(!confirm('Eliminare questa malattia? Verrà spostata nel Cestino, come se non fosse mai stata registrata.'))return;
+  const r=ALL_MALATTIE.find(x=>x.id===id);
+  if(r){const{id:_id,...dati}=r;await spostaNelCestino('malattia',['malattie',id],dati,'Malattia: '+U.username+' '+(dati.dataInizio||''),U.username);}
+  await db.collection('malattie').doc(id).delete();
+  ALL_MALATTIE=ALL_MALATTIE.filter(x=>x.id!==id);
+  loadMalattie();aggiornaRiepilogoSaldi();
 }
 
 

@@ -1277,7 +1277,7 @@ const db=firebase.firestore();
 // ricreare esattamente dov'era. Solo dopo il salvataggio nel cestino il documento
 // originale viene davvero eliminato. Sezione visibile SOLO in admin.html.
 let CESTINO_all=[];
-const CESTINO_LABELS={dipendente:'👤 Dipendente',chiusura:'📅 Chiusura ufficio',richiesta_assenza:'🏖️ Ferie/Permesso/ROL',riga_tit:'📒 Riga Registro Titolare',commessa:'📁 Commessa (completa)',riga_bc:'📋 Riga lavoro Budget Contract',stampa_bc:'🖨️ Riga stampa Budget Contract',contabilita:'🧾 Riga contabilità'};
+const CESTINO_LABELS={dipendente:'👤 Dipendente',chiusura:'📅 Chiusura ufficio',richiesta_assenza:'🏖️ Ferie/Permesso/ROL',malattia:'🤒 Malattia',riga_tit:'📒 Riga Registro Titolare',commessa:'📁 Commessa (completa)',riga_bc:'📋 Riga lavoro Budget Contract',stampa_bc:'🖨️ Riga stampa Budget Contract',contabilita:'🧾 Riga contabilità'};
 
 // percorso: array che alterna nome-collezione/id, es. ['dipendenti','mrossi'] oppure
 // ['commesse','2024-015','righe','abc123']. dati: contenuto completo del documento
@@ -2275,7 +2275,7 @@ function renderFerie(){
       <td class="td-r">${r.giorniLavorativi||0} gg lav.</td>
       <td><span class="badge badge-malattia">Registrata</span></td>
       <td style="font-size:12px;color:var(--ink4)">${r.note||'—'}</td>
-      <td>—</td>
+      <td><button class="btn btn-sm" style="color:var(--rosso)" title="Elimina (cestino)" onclick="eliminaMalattiaAdmin('${r.id}')">🗑️</button></td>
     </tr>`).join('');
     return;
   }
@@ -2296,7 +2296,10 @@ function renderFerie(){
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
       <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
-      <td>${r.daTitolare?'<span style="font-size:11px;color:var(--ink4)">👑 auto</span>':`<button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button>`}</td>
+      <td style="display:flex;gap:6px;align-items:center">
+        ${r.daTitolare?'<span style="font-size:11px;color:var(--ink4)">👑 auto</span>':`<button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button>`}
+        <button class="btn btn-sm" style="color:var(--rosso)" title="Elimina (cestino)" onclick="eliminaRichiestaAdmin('${r.id}')">🗑️</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2328,6 +2331,34 @@ async function decidi(stato){
   const idx=tutteR.findIndex(r=>r.id===modalRichiestaId);
   if(idx>-1)tutteR[idx]={...tutteR[idx],stato,notaAdmin:nota,decisionAt};
   chiudiModal();loadRichieste();loadRichiesteCount();
+}
+
+// Elimina definitivamente una richiesta ferie/permesso/ROL (sposta nel cestino) — visibile e usabile
+// solo dall'amministrazione, indipendentemente dallo stato (in attesa, approvata o rifiutata)
+async function eliminaRichiestaAdmin(id){
+  if(!confirm('Eliminare questa richiesta? Verrà spostata nel Cestino e sparirà anche dal portale del dipendente.'))return;
+  const r=tutteR.find(x=>x.id===id);
+  if(r){
+    const{id:_id,...dati}=r;
+    await spostaNelCestino('richiesta_assenza',['richieste_assenza',id],dati,'Richiesta '+(TL[dati.tipo]||dati.tipo||'')+': '+(dati.nomeCompleto||dati.username||''),ADM.username);
+  }
+  await db.collection('richieste_assenza').doc(id).delete();
+  tutteR=tutteR.filter(x=>x.id!==id);
+  if(r&&ADM_richPerUser[r.username])ADM_richPerUser[r.username]=ADM_richPerUser[r.username].filter(x=>x.id!==id);
+  loadRichieste();loadRichiesteCount();
+}
+// Elimina definitivamente una malattia registrata (sposta nel cestino) — solo amministrazione
+async function eliminaMalattiaAdmin(id){
+  if(!confirm('Eliminare questa malattia? Verrà spostata nel Cestino e sparirà anche dal portale del dipendente.'))return;
+  const r=tutteMalattie.find(x=>x.id===id);
+  if(r){
+    const{id:_id,...dati}=r;
+    await spostaNelCestino('malattia',['malattie',id],dati,'Malattia: '+(dati.nomeCompleto||dati.username||'')+' '+(dati.dataInizio||''),ADM.username);
+  }
+  await db.collection('malattie').doc(id).delete();
+  tutteMalattie=tutteMalattie.filter(x=>x.id!==id);
+  if(r&&ADM_malPerUser[r.username])ADM_malPerUser[r.username]=ADM_malPerUser[r.username].filter(x=>x.id!==id);
+  loadRichieste();loadRichiesteCount();
 }
 
 // DIPENDENTI
