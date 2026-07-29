@@ -1516,6 +1516,28 @@ const ANNO_PREC_MODIFICABILE=(oggi_check.getMonth()===0); // gennaio=0
 // Festività nazionali — calcolate su ANNO e ANNO+1 (copre l'intera finestra mobile di 12 mesi)
 const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
 
+// Espande un intervallo di date nei singoli giorni lavorativi (esclude weekend e festività) come array 'YYYY-MM-DD'
+function espandiGiorniLavorativi(dal,al){
+  const out=[];
+  if(!dal||!al)return out;
+  const d=new Date(dal),fine=new Date(al);
+  while(d<=fine){
+    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))out.push(ds);
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+// Calcola le ore ferie usate = giorni delle richieste ferie approvate + giorni di chiusura ufficio
+// (le chiusure ufficio vengono scalate automaticamente dalle ferie di TUTTI i dipendenti), senza
+// contare due volte lo stesso giorno se coincide con una richiesta ferie personale già approvata.
+function oreFerieConChiusure(richiesteFerieApprovate,oreGiorno){
+  const giorni=new Set();
+  (richiesteFerieApprovate||[]).forEach(r=>{espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorni.add(d))});
+  chiusureUfficio.forEach(c=>{espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorni.add(d))});
+  return giorni.size*oreGiorno;
+}
+
 function startApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
@@ -1818,14 +1840,17 @@ function renderDashboardFromCache(){
   tbodySaldi.innerHTML=dipList.map(emp=>{
     const oreGiorno=oreGiornoDip(emp);
     const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
-    let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
+    let permessiUsati=0,rolUsato=0,giorniMal=0;
+    const richFerieApprovate=[];
     (richPerUser[emp.username]||[]).forEach(r=>{
       if(r.stato==='approvata'){
-        if(r.tipo==='ferie')ferieUsate+=parseFloat(r.oreRichieste)||0;
+        if(r.tipo==='ferie')richFerieApprovate.push(r);
         if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
         if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
       }
     });
+    // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
+    const ferieUsate=oreFerieConChiusure(richFerieApprovate,oreGiorno);
     (malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
     const ferieRes=monteFerie-ferieUsate;
     const cls=ferieRes>monteFerie*0.3?'color:var(--verde)':ferieRes>0?'color:var(--amber)':'color:var(--rosso);font-weight:700';
@@ -1889,15 +1914,18 @@ async function apriDettaglio(username){
 function caricaDetSaldi(emp){
   const oreGiorno=oreGiornoDip(emp);
   const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
-  let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMal=0;
+  let permessiUsati=0,rolUsato=0,giorniMal=0;
+  const richFerieApprovate=[];
   // Legge dalla cache globale — ZERO query Firestore
   (ADM_richPerUser[emp.username]||[]).forEach(r=>{
     if(r.stato==='approvata'){
-      if(r.tipo==='ferie')ferieUsate+=parseFloat(r.oreRichieste)||0;
+      if(r.tipo==='ferie')richFerieApprovate.push(r);
       if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
       if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
     }
   });
+  // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
+  const ferieUsate=oreFerieConChiusure(richFerieApprovate,oreGiorno);
   (ADM_malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
   const ferieRes=monteFerie-ferieUsate,permRes=montePermesso-permessiUsati,rolRes=monteRol-rolUsato;
   function cls(res,tot){return res>tot*0.3?'ok':res>0?'warn':'danger'}
@@ -2749,8 +2777,11 @@ function esportaTuttiExcel(){
   const shHH=['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato'];
   const shRows=[];
   dipList.forEach(emp=>{
-    let fu=0,pu=0,ru=0;
-    (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')fu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
+    let pu=0,ru=0;
+    const richFerieApprovate=[];
+    (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')richFerieApprovate.push(r);if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
+    // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
+    const fu=oreFerieConChiusure(richFerieApprovate,oreGiornoDip(emp));
     shRows.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
   });
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Saldi Ferie/Permessi/ROL','Anno '+ANNO,shHH,shRows),'Saldi Ferie');

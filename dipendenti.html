@@ -809,6 +809,27 @@ function giorniLavorativi(dal,al){
   }
   return cnt;
 }
+// Espande un intervallo di date nei singoli giorni lavorativi (esclude weekend e festività) come array 'YYYY-MM-DD'
+function espandiGiorniLavorativi(dal,al){
+  const out=[];
+  if(!dal||!al)return out;
+  const d=new Date(dal),fine=new Date(al);
+  while(d<=fine){
+    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))out.push(ds);
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+// Calcola le ore ferie usate = giorni delle richieste ferie approvate + giorni di chiusura ufficio
+// (le chiusure ufficio vengono scalate automaticamente dalle ferie di TUTTI i dipendenti), senza
+// contare due volte lo stesso giorno se coincide con una richiesta ferie personale già approvata.
+function oreFerieConChiusure(richiesteFerieApprovate,oreGiorno){
+  const giorni=new Set();
+  (richiesteFerieApprovate||[]).forEach(r=>{espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorni.add(d))});
+  chiusureUfficio.forEach(c=>{espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorni.add(d))});
+  return giorni.size*oreGiorno;
+}
 // Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
 // con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
 function oreGiornoDip(o){
@@ -1067,14 +1088,17 @@ function aggiornaRiepilogoSaldi(){
   const oreGiorno=oreGiornoDip(profilo);
 
   // Calcola ore usate da cache locale — ZERO query Firestore
-  let ferieUsate=0,permessiUsati=0,rolUsato=0,giorniMalattia=0;
+  let permessiUsati=0,rolUsato=0,giorniMalattia=0;
+  const richiesteFerieApprovate=[];
   ALL_ASSENZE.forEach(r=>{
     if(r.stato==='approvata'){
-      if(r.tipo==='ferie'){const gg=giorniLavorativi(r.dataInizio,r.dataFine);ferieUsate+=gg*oreGiorno}
+      if(r.tipo==='ferie'){richiesteFerieApprovate.push(r)}
       if(r.tipo==='permesso'){permessiUsati+=parseFloat(r.oreRichieste)||0}
       if(r.tipo==='rol'){rolUsato+=parseFloat(r.oreRichieste)||0}
     }
   });
+  // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
+  const ferieUsate=oreFerieConChiusure(richiesteFerieApprovate,oreGiorno);
   // Malattie
   ALL_MALATTIE.forEach(r=>{
     giorniMalattia+=giorniLavorativi(r.dataInizio,r.dataFine);
