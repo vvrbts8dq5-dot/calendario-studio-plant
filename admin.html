@@ -121,6 +121,9 @@ input,select,textarea{font-family:'Inter',sans-serif}
 .alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
 .alert-ok{background:var(--verde-light);color:var(--verde)}
 .alert-err{background:var(--rosso-light);color:var(--rosso)}
+.alert-warn{background:var(--amber-light);color:var(--amber)}
+.imp-row-skip{opacity:.45}
+.imp-row-review{background:var(--amber-light)}
 .empty-state{text-align:center;padding:32px;color:var(--ink4);font-size:13px}
 
 /* TABLE */
@@ -394,6 +397,9 @@ tbody tr:hover{background:var(--paper)}
       </button>
       <button class="nav-item" data-page="archivio" onclick="goPage('archivio',this)">
         <span class="nav-icon">🗂️</span> Archivio Anni
+      </button>
+      <button class="nav-item" data-page="importa" onclick="goPage('importa',this)">
+        <span class="nav-icon">📤</span> Importa Storico
       </button>
       <button class="nav-item" data-page="titolare" id="nav-titolare" style="display:none" onclick="goPage('titolare',this)">
         <span class="nav-icon">📒</span> Registro Titolare
@@ -686,6 +692,45 @@ tbody tr:hover{background:var(--paper)}
             </tr></thead>
             <tbody id="fest-tbody"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- IMPORTA STORICO -->
+      <div class="page" id="page-importa">
+        <div class="page-header">
+          <div class="page-title">📤 Importa Storico</div>
+        </div>
+        <div style="font-size:12px;color:var(--ink4);margin-bottom:16px;max-width:760px">
+          Importa i fogli Excel storici (uno per dipendente, un foglio per mese) nel calendario personale dell'app. Le ore lavorate vanno nel calendario del dipendente, ferie/permessi diventano richieste già approvate visibili in "Ferie & Assenze", le malattie in "Malattie". Numero commessa e note del file <strong>non</strong> vengono importati. Nessuna scrittura avviene finché non confermi l'anteprima.
+        </div>
+        <div class="table-wrap" style="padding:16px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:640px">
+            <div>
+              <label style="font-size:11px;color:var(--ink4);display:block;margin-bottom:4px">Dipendente</label>
+              <select class="f-select" id="imp-dip"><option value="">— seleziona —</option></select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--ink4);display:block;margin-bottom:4px">File Excel (.xlsx)</label>
+              <input class="fi" type="file" id="imp-file" accept=".xlsx" style="padding:6px">
+            </div>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <button class="btn btn-ink btn-sm" onclick="impAnalizzaFile()">🔍 Analizza file</button>
+            <button class="btn btn-verde btn-sm" id="imp-btn-conferma" style="display:none" onclick="impEseguiImportazione()">✓ Conferma e importa</button>
+          </div>
+          <div id="imp-alert" style="margin-top:12px"></div>
+        </div>
+        <div id="imp-riepilogo" style="display:none">
+          <div class="stat-row" id="imp-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px"></div>
+          <div style="font-size:11px;color:var(--ink4);margin-bottom:8px">Deseleziona una riga per escluderla dall'importazione. Le righe in giallo sono da verificare manualmente prima di confermare.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:28px"></th><th>Data</th><th>Classificazione</th><th>Dettaglio</th><th>Attività (dal file, sola lettura)</th>
+              </tr></thead>
+              <tbody id="imp-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1797,7 +1842,7 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',festivita:'Festività',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',festivita:'Festività',costi:'Costi Mensili',archivio:'Archivio Anni',importa:'Importa Storico',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
@@ -1806,6 +1851,7 @@ function goPage(pid,btn){
   if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
+  if(pid==='importa')initImportStorico();
   if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
@@ -3235,6 +3281,184 @@ async function esportaFestivitaPDF(){
     theme:'striped'
   });
   doc.save(`Festivita_${MESI[meseIdx]}_${anno}.pdf`);
+}
+
+// ── IMPORTA STORICO ──────────────────────────────────────────────────
+// Importa i fogli Excel storici (un file per dipendente, tutti i mesi nello stesso foglio o
+// su fogli separati) nel calendario personale dell'app. Colonne fisse attese, verificate per
+// parola chiave prima di importare — se la struttura non corrisponde il foglio viene ignorato
+// e segnalato, per non rischiare di scrivere dati sbagliati. Numero commessa e note del file
+// NON vengono mai importati (né come campo 'commessa'/'note' né come testo su altri record).
+const IMP_COL={data:1,giorno:2,attivita:3,oreElectriciMD:4,oreStraordinariElettrico:5,oreMeccaniciMA:6,revit:7,oreStraordinariMeccanico:8,oreAttivitaGenerali:9,oreFerie:10,orePermesso:11,oreFestivitaMalattia:12,oreRecuperoElettrico:13,oreRecuperoMeccanico:14,kmPercorsi:15,speseExtra:16,note:17};
+const IMP_CAT_LABEL={lavoro:'💼 Ore lavorate',ferie:'🏖️ Ferie',permesso:'🕐 Permesso',malattia:'🤒 Malattia',festivita_auto:'🎉 Festività (automatica)',chiusura:'🔒 Chiusura ufficio'};
+let impOperazioni=[];
+
+function initImportStorico(){
+  const sel=document.getElementById('imp-dip');
+  sel.innerHTML='<option value="">— seleziona —</option>'+dipList.map(d=>`<option value="${d.username}">${(`${d.nome||''} ${d.cognome||''}`.trim())||d.username}</option>`).join('');
+  document.getElementById('imp-file').value='';
+  document.getElementById('imp-alert').innerHTML='';
+  document.getElementById('imp-riepilogo').style.display='none';
+  document.getElementById('imp-btn-conferma').style.display='none';
+  impOperazioni=[];
+}
+function impNum(v){const n=parseFloat(v);return isNaN(n)?0:n}
+// SheetJS (cellDates:true) costruisce le date su base UTC: leggere i componenti UTC evita
+// lo sfasamento di un giorno che si avrebbe usando i getter in ora locale.
+function impDsUTC(d){const p2=n=>String(n).padStart(2,'0');return `${d.getUTCFullYear()}-${p2(d.getUTCMonth()+1)}-${p2(d.getUTCDate())}`}
+
+async function impAnalizzaFile(){
+  const al=document.getElementById('imp-alert');al.innerHTML='';
+  const username=document.getElementById('imp-dip').value;
+  const fileInput=document.getElementById('imp-file');
+  document.getElementById('imp-riepilogo').style.display='none';
+  document.getElementById('imp-btn-conferma').style.display='none';
+  impOperazioni=[];
+  if(!username){al.innerHTML='<div class="alert-box alert-err">Seleziona prima il dipendente.</div>';return}
+  if(!fileInput.files.length){al.innerHTML='<div class="alert-box alert-err">Carica un file Excel (.xlsx).</div>';return}
+  al.innerHTML='<div class="alert-box" style="background:var(--amber-light);color:var(--amber)">Analisi in corso...</div>';
+  try{
+    const buf=await fileInput.files[0].arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const emp=dipList.find(d=>d.username===username);
+    // Dati già presenti su Firestore per questo dipendente, per segnalare eventuali sovrascritture
+    const giorniSnap=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(username).collection('giorni').get();
+    const giorniEsistenti={};giorniSnap.forEach(d=>{giorniEsistenti[d.id]=d.data()});
+    const richiesteEsistenti=new Set(tutteR.filter(r=>r.username===username).map(r=>r.tipo+'|'+r.dataInizio));
+    const malattieEsistenti=new Set(tutteMalattie.filter(r=>r.username===username).map(r=>r.dataInizio));
+
+    let righe=[],errori=[];
+    wb.SheetNames.forEach(sn=>{
+      const ws=wb.Sheets[sn];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+      let headerIdx=-1;
+      for(let r=0;r<Math.min(aoa.length,20);r++){
+        const row=aoa[r]||[];
+        if(String(row[IMP_COL.data]||'').trim().toLowerCase()==='data'&&String(row[IMP_COL.giorno]||'').trim().toLowerCase()==='giorno'){headerIdx=r;break}
+      }
+      if(headerIdx===-1){errori.push(`Foglio "${sn}": intestazione (colonne Data/Giorno) non trovata — foglio ignorato.`);return}
+      const header=aoa[headerIdx];
+      const checkKw=(idx,kw)=>String(header[idx]||'').toLowerCase().includes(kw);
+      const controlli=[[IMP_COL.oreElectriciMD,'elettrici'],[IMP_COL.oreMeccaniciMA,'meccanici'],[IMP_COL.oreAttivitaGenerali,'attivit'],[IMP_COL.oreFerie,'ferie'],[IMP_COL.orePermesso,'permesso'],[IMP_COL.oreFestivitaMalattia,'festiv'],[IMP_COL.oreRecuperoElettrico,'recupero']];
+      const nonOk=controlli.filter(([idx,kw])=>!checkKw(idx,kw));
+      if(nonOk.length){errori.push(`Foglio "${sn}": struttura colonne diversa da quella attesa — foglio ignorato, verifica manualmente.`);return}
+      for(let r=headerIdx+1;r<aoa.length;r++){
+        const row=aoa[r]||[];
+        const dcell=row[IMP_COL.data];
+        if(!(dcell instanceof Date))continue; // salta intestazioni mese, totali parziali, riepiloghi, righe vuote
+        const ds=impDsUTC(dcell);
+        if(!ds.startsWith(String(ANNO)+'-'))continue; // importa solo l'anno attivo dell'app
+        const attivita=String(row[IMP_COL.attivita]||'').trim();
+        const note=String(row[IMP_COL.note]||'').trim();
+        const campi={
+          oreElectriciMD:impNum(row[IMP_COL.oreElectriciMD]),
+          oreStraordinariElettrico:impNum(row[IMP_COL.oreStraordinariElettrico]),
+          oreMeccaniciMA:impNum(row[IMP_COL.oreMeccaniciMA]),
+          oreStraordinariMeccanico:impNum(row[IMP_COL.oreStraordinariMeccanico]),
+          oreAttivitaGenerali:impNum(row[IMP_COL.oreAttivitaGenerali])+impNum(row[IMP_COL.revit]),
+          oreRecuperoElettrico:impNum(row[IMP_COL.oreRecuperoElettrico]),
+          oreRecuperoMeccanico:impNum(row[IMP_COL.oreRecuperoMeccanico]),
+          kmPercorsi:impNum(row[IMP_COL.kmPercorsi]),
+          speseExtra:impNum(row[IMP_COL.speseExtra]),
+        };
+        const oreFerieVal=impNum(row[IMP_COL.oreFerie]);
+        const orePermessoVal=impNum(row[IMP_COL.orePermesso]);
+        const oreFestMalVal=impNum(row[IMP_COL.oreFestivitaMalattia]);
+        const festivoNazionale=isFestivo(ds);
+        const chiusuraRilevata=/chiusura/i.test(attivita)||/chiusura/i.test(note);
+
+        const haLavoro=Object.values(campi).some(v=>v>0);
+        if(haLavoro){
+          const esiste=!!(giorniEsistenti[ds]&&CN.some(c=>c.k!=='note'&&(parseFloat(giorniEsistenti[ds][c.k])||0)>0));
+          righe.push({ds,cat:'lavoro',dettaglio:CN.filter(c=>campi[c.k]>0).map(c=>c.l+': '+campi[c.k]).join(', '),attivita,campi,checked:!esiste,review:esiste,motivoReview:esiste?'Il giorno ha già dei valori nel calendario: confermando verranno SOVRASCRITTI con quelli del file.':''});
+        }
+        if(oreFerieVal>0){
+          const dup=richiesteEsistenti.has('ferie|'+ds);
+          righe.push({ds,cat:'ferie',dettaglio:oreFerieVal+'h',attivita,ore:oreFerieVal,checked:!dup,review:dup,motivoReview:dup?'Esiste già una richiesta ferie per questa data.':''});
+        }
+        if(orePermessoVal>0){
+          const dup=richiesteEsistenti.has('permesso|'+ds);
+          righe.push({ds,cat:'permesso',dettaglio:orePermessoVal+'h',attivita,ore:orePermessoVal,checked:!dup,review:dup,motivoReview:dup?'Esiste già una richiesta permesso per questa data.':''});
+        }
+        if(oreFestMalVal>0){
+          if(festivoNazionale){
+            righe.push({ds,cat:'festivita_auto',dettaglio:oreFestMalVal+'h (già conteggiata automaticamente in Festività)',attivita,checked:false,review:false,nonImportabile:true});
+          }else if(chiusuraRilevata){
+            righe.push({ds,cat:'chiusura',dettaglio:oreFestMalVal+'h — sembra chiusura ufficio, non assenza personale',attivita,checked:false,review:true,nonImportabile:true,motivoReview:'Non importata. Se la Chiusura Ufficio non è già registrata, creala da Ferie & Assenze.'});
+          }else{
+            const dup=malattieEsistenti.has(ds);
+            righe.push({ds,cat:'malattia',dettaglio:oreFestMalVal+'h',attivita,campiMalattia:{oreFestivitaMalattia:oreFestMalVal},checked:!dup,review:dup||!attivita,motivoReview:dup?'Malattia già registrata per questa data.':(!attivita?'Nessuna indicazione chiara nel file: importata come malattia di default — verifica.':'')});
+          }
+        }
+      }
+    });
+    righe.sort((a,b)=>a.ds.localeCompare(b.ds)||a.cat.localeCompare(b.cat));
+    impOperazioni=righe.map((r,i)=>({...r,idx:i,username,nomeCompleto:`${emp.nome||''} ${emp.cognome||''}`.trim()||username}));
+    impRenderPreview();
+    al.innerHTML=errori.map(e=>`<div class="alert-box alert-warn">${e}</div>`).join('')+(impOperazioni.length?'':'<div class="alert-box alert-err">Nessun dato riconosciuto nel file.</div>');
+  }catch(e){al.innerHTML=`<div class="alert-box alert-err">Errore lettura file: ${e.message}</div>`}
+}
+
+function impRenderPreview(){
+  const wrap=document.getElementById('imp-riepilogo');
+  wrap.style.display=impOperazioni.length?'block':'none';
+  document.getElementById('imp-btn-conferma').style.display=impOperazioni.some(r=>r.checked)?'':'none';
+  const tbody=document.getElementById('imp-tbody');
+  if(!impOperazioni.length){tbody.innerHTML='<tr><td colspan="5" class="empty-state">Nessun dato riconosciuto nel file.</td></tr>';return}
+  tbody.innerHTML=impOperazioni.map(r=>`<tr class="${r.review?'imp-row-review':(r.nonImportabile?'imp-row-skip':'')}">
+    <td>${r.nonImportabile?'—':`<input type="checkbox" ${r.checked?'checked':''} onchange="impToggleRiga(${r.idx},this.checked)">`}</td>
+    <td style="font-family:'Inter',monospace;font-size:11px">${fmtD(r.ds)}</td>
+    <td>${IMP_CAT_LABEL[r.cat]||r.cat}</td>
+    <td>${r.dettaglio}${r.motivoReview?`<div style="font-size:11px;color:var(--amber);margin-top:2px">⚠️ ${r.motivoReview}</div>`:''}</td>
+    <td style="font-size:12px;color:var(--ink4);max-width:220px">${r.attivita||'—'}</td>
+  </tr>`).join('');
+  const kpi=document.getElementById('imp-kpi-row');
+  const conta=cat=>impOperazioni.filter(r=>r.cat===cat&&r.checked).length;
+  const stat=(l,v)=>`<div style="background:var(--paper);border-radius:8px;padding:10px 12px"><div style="font-size:10px;color:var(--ink4);text-transform:uppercase">${l}</div><div style="font-size:18px;font-weight:700;margin-top:2px">${v}</div></div>`;
+  kpi.innerHTML=stat('Giorni con ore',conta('lavoro'))+stat('Ferie',conta('ferie'))+stat('Permessi',conta('permesso'))+stat('Malattie',conta('malattia'))+stat('Da rivedere',impOperazioni.filter(r=>r.review).length)+stat('Festività auto (escluse)',impOperazioni.filter(r=>r.cat==='festivita_auto').length);
+}
+function impToggleRiga(idx,val){const r=impOperazioni.find(x=>x.idx===idx);if(r)r.checked=val;document.getElementById('imp-btn-conferma').style.display=impOperazioni.some(r=>r.checked)?'':'none'}
+
+async function impEseguiImportazione(){
+  const selezionate=impOperazioni.filter(r=>r.checked);
+  if(!selezionate.length)return;
+  const nome=selezionate[0].nomeCompleto,username=selezionate[0].username;
+  if(!confirm(`Importare ${selezionate.length} elementi nel calendario di ${nome}? L'operazione scrive direttamente su Firestore.`))return;
+  const al=document.getElementById('imp-alert');
+  al.innerHTML='<div class="alert-box" style="background:var(--amber-light);color:var(--amber)">Importazione in corso...</div>';
+  try{
+    const giorniDaScrivere={};
+    selezionate.filter(r=>r.cat==='lavoro').forEach(r=>{giorniDaScrivere[r.ds]={...(giorniDaScrivere[r.ds]||{}),...r.campi}});
+    selezionate.filter(r=>r.cat==='ferie').forEach(r=>{giorniDaScrivere[r.ds]={...(giorniDaScrivere[r.ds]||{}),oreFerie:r.ore}});
+    selezionate.filter(r=>r.cat==='permesso').forEach(r=>{giorniDaScrivere[r.ds]={...(giorniDaScrivere[r.ds]||{}),orePermesso:r.ore}});
+    selezionate.filter(r=>r.cat==='malattia').forEach(r=>{giorniDaScrivere[r.ds]={...(giorniDaScrivere[r.ds]||{}),...r.campiMalattia}});
+
+    const ops=[];
+    Object.entries(giorniDaScrivere).forEach(([ds,campi])=>{
+      ops.push({ref:db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(username).collection('giorni').doc(ds),
+        data:{...campi,username,data:ds,importatoStorico:true,updatedAt:new Date().toISOString()},opts:{merge:true}});
+    });
+    selezionate.filter(r=>r.cat==='ferie'||r.cat==='permesso').forEach(r=>{
+      ops.push({ref:db.collection('richieste_assenza').doc(),
+        data:{username,nomeCompleto:nome,tipo:r.cat,dataInizio:r.ds,dataFine:r.ds,stato:'approvata',oreRichieste:r.ore,giorniLavorativi:1,daTitolare:false,note:'',importatoStorico:true,createdAt:new Date().toISOString()},opts:{}});
+    });
+    selezionate.filter(r=>r.cat==='malattia').forEach(r=>{
+      ops.push({ref:db.collection('malattie').doc(),
+        data:{username,nomeCompleto:nome,dataInizio:r.ds,dataFine:r.ds,giorniLavorativi:1,note:'',importatoStorico:true,createdAt:new Date().toISOString()},opts:{}});
+    });
+
+    for(let i=0;i<ops.length;i+=450){
+      const batch=db.batch();
+      ops.slice(i,i+450).forEach(o=>batch.set(o.ref,o.data,o.opts));
+      await batch.commit();
+    }
+    al.innerHTML=`<div class="alert-box alert-ok">✓ Importazione completata per ${nome}: ${ops.length} scritture su Firestore.</div>`;
+    document.getElementById('imp-btn-conferma').style.display='none';
+    impOperazioni=[];
+    document.getElementById('imp-riepilogo').style.display='none';
+    await loadDashboard();
+    loadRichieste();
+  }catch(e){al.innerHTML=`<div class="alert-box alert-err">Errore durante l'importazione: ${e.message}</div>`}
 }
 
 // ── ARCHIVIO ANNI ─────────────────────────────────────────────────────
