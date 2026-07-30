@@ -438,6 +438,7 @@ tbody tr:hover{background:var(--paper)}
           </div>
         </div>
         <div id="storico-import-wrap"></div>
+        <div id="dup-cleanup-wrap"></div>
         <div class="kpi-row" id="kpi-row"></div>
         <div class="section-title">Saldi Ferie & Assenze per Dipendente</div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -556,17 +557,17 @@ tbody tr:hover{background:var(--paper)}
 
         <!-- FESTIVITÀ (ex ferie) — conteggio separato, unito qui a Ferie & Assenze -->
         <div class="section-title" style="margin-top:24px">🎉 Festività (ex ferie)</div>
-        <div style="font-size:12px;color:var(--ink4);margin-bottom:14px;max-width:720px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <span>Conteggio automatico delle giornate festive (segnate in verde a calendario) che cadono in un giorno lavorativo, calcolate come ore giornaliere di contratto di ciascun dipendente. È un conteggio separato: non scala il monte ferie, permessi o ROL.</span>
-          <span style="display:flex;gap:8px;align-items:center">
-            <select class="f-select" id="fest-anno" style="font-size:12px" onchange="loadFestivita()"></select>
-            <select class="f-select" id="fest-mese" style="font-size:12px" onchange="loadFestivita()"></select>
-            <button class="btn btn-verde btn-sm" onclick="esportaFestivitaExcel()">📥 Excel</button>
-            <button class="btn btn-rosso btn-sm" onclick="esportaFestivitaPDF()">📄 PDF</button>
-          </span>
+        <div style="font-size:12px;color:var(--ink4);margin-bottom:14px;max-width:720px">
+          Conteggio automatico delle giornate festive (segnate in verde a calendario) che cadono in un giorno lavorativo, calcolate come ore giornaliere di contratto di ciascun dipendente. È un conteggio separato: non scala il monte ferie, permessi o ROL.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+          <select class="f-select" id="fest-anno" style="font-size:12px" onchange="loadFestivita()"></select>
+          <select class="f-select" id="fest-mese" style="font-size:12px" onchange="loadFestivita()"></select>
+          <button class="btn btn-verde btn-sm" onclick="esportaFestivitaExcel()">📥 Excel</button>
+          <button class="btn btn-rosso btn-sm" onclick="esportaFestivitaPDF()">📄 PDF</button>
         </div>
         <div class="stat-row" id="fest-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
-        <div class="table-wrap" style="margin-bottom:24px">
+        <div class="table-wrap" style="margin-bottom:20px">
           <table>
             <thead><tr>
               <th>Dipendente</th><th class="td-r">Ore/giorno contratto</th>
@@ -684,6 +685,7 @@ tbody tr:hover{background:var(--paper)}
         </div>
       </div>
 
+      <!-- FESTIVITÀ (ex ferie) — conteggio separato, non scala i monte ferie -->
       <!-- COSTI MENSILI -->
       <div class="page" id="page-costi">
         <div class="page-header">
@@ -1749,7 +1751,7 @@ async function aggiornaGlobale(){
     // rientrava nell'app: loadDashboard() è l'unica funzione che rifà davvero le query.
     await loadDashboard();
     if(pid==='dettaglio'&&detUser)await loadDetMese();
-    else if(pid==='ferie')loadRichieste();
+    else if(pid==='ferie'){loadRichieste();loadFestivita();}
     else if(pid==='dipendenti')loadDipendenti();
     else if(pid==='straordinari')loadStraordinari();
     else if(pid==='costi')await loadCostiMensili();
@@ -1848,6 +1850,7 @@ async function loadDashboard(){
 
   renderDashboardFromCache();
   if(typeof renderStoricoImportBanner==='function')renderStoricoImportBanner();
+  if(typeof renderDupCleanupBanner==='function')renderDupCleanupBanner();
 }
 
 function renderDashboardFromCache(){
@@ -4877,5 +4880,6 @@ function statEsportaCommessePDF(){
 </script>
 <script src="contab_module.js" defer></script>
 <script src="importa_storico_orario.js" defer></script>
+<script src="pulizia_duplicati.js" defer></script>
 </body>
 </html>
