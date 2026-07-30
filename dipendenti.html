@@ -801,7 +801,6 @@ const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
 const TIPI_CONGEDO={parentale:'Congedo parentale',lutto:'Lutto o grave infermità',matrimoniale:'Congedo matrimoniale',formativo:'Congedo formativo/studio'};
 
 const CAMPI=[
-  {k:'commessa',l:'N° Commessa',t:'text',ph:'es. 2026-001'},
   {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'number'},
   {k:'oreStraordinariElettrico',l:'Ore Straord. Elettrici',t:'number'},
   {k:'oreMeccaniciMA',l:'Ore Meccanici M.A.',t:'number'},
@@ -1542,7 +1541,7 @@ async function inviaRichiesta(tipo){
 
 function loadTutteAssenze(){
   // Legge dalla cache locale — ZERO query Firestore
-  assenzeProprie=[...ALL_ASSENZE].sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  assenzeProprie=[...ALL_ASSENZE].sort((a,b)=>(a.dataInizio||'').localeCompare(b.dataInizio||''));
   ['ferie','permesso','rol','congedo'].forEach(tipo=>{
     const lista=assenzeProprie.filter(r=>r.tipo===tipo);
     renderListaAssenze(tipo,lista);

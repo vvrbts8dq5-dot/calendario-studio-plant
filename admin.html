@@ -593,6 +593,7 @@ tbody tr:hover{background:var(--paper)}
           <button class="btn-filtro" onclick="setFiltroTipo(this,'permesso')">🕐 Permesso</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'rol')">🔄 ROL</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'congedo')">🗂️ Congedi</button>
+          <input class="fi" id="ferie-search" type="text" placeholder="🔎 Cerca per nome..." style="max-width:220px;margin-left:auto" oninput="renderFerie()">
         </div>
         <div class="table-wrap">
           <table>
@@ -2310,11 +2311,15 @@ function setFiltroTipo(btn,t){
 
 function renderFerie(){
   const dipFiltro=document.getElementById('ferie-dip-filter')?.value||'';
+  const testoRicerca=(document.getElementById('ferie-search')?.value||'').trim().toLowerCase();
+  const ordinaPerData=(arr)=>[...arr].sort((a,b)=>(a.dataInizio||'').localeCompare(b.dataInizio||''));
   let lista;
   if(filtroTipoF==='malattia'){
     // Mostra malattie — non hanno uno "stato" di approvazione, solo il dipendente le registra
     let listaM=tutteMalattie;
     if(dipFiltro)listaM=listaM.filter(r=>r.username===dipFiltro);
+    if(testoRicerca)listaM=listaM.filter(r=>(r.nomeCompleto||r.username||'').toLowerCase().includes(testoRicerca));
+    listaM=ordinaPerData(listaM);
     const tbody=document.getElementById('tbody-ferie');
     if(!listaM.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna malattia registrata.</td></tr>';return}
     tbody.innerHTML=listaM.map(r=>`<tr style="cursor:default">
@@ -2332,6 +2337,8 @@ function renderFerie(){
   if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
   if(filtroTipoF!=='tutti')lista=lista.filter(r=>r.tipo===filtroTipoF);
   if(dipFiltro)lista=lista.filter(r=>r.username===dipFiltro);
+  if(testoRicerca)lista=lista.filter(r=>(r.nomeCompleto||r.username||'').toLowerCase().includes(testoRicerca));
+  lista=ordinaPerData(lista);
   const tbody=document.getElementById('tbody-ferie');
   if(!lista.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna richiesta.</td></tr>';return}
   tbody.innerHTML=lista.map(r=>{
