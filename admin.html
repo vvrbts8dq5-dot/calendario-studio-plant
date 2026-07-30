@@ -170,9 +170,7 @@ tbody tr:hover{background:var(--paper)}
 .cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
 .cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
 .cal-day.gc-congedo{background:var(--gc-congedo-bg);color:var(--gc-congedo);font-weight:600}
-.cal-day.gc-chiusura-festivo,.cal-ferie-cell.gc-chiusura-festivo{background:repeating-linear-gradient(45deg,var(--gc-chiusura-bg) 0 8px,var(--gc-festivo-bg) 8px 16px);color:var(--gc-chiusura);font-weight:600}
-.cal-day.gc-compilato{background:#F8FAFC;color:var(--ink4);opacity:.55}
-.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-chiusura-festivo.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-compilato.selected{background:var(--ink)!important;color:#fff!important;opacity:1}
+.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected{background:var(--ink)!important;color:#fff!important}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
 .tot-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
 .tot-row:last-child{border-bottom:none}
@@ -440,6 +438,7 @@ tbody tr:hover{background:var(--paper)}
           </div>
         </div>
         <div id="storico-import-wrap"></div>
+        <div id="correzione-storico-wrap"></div>
         <div id="dup-cleanup-wrap"></div>
         <div class="kpi-row" id="kpi-row"></div>
         <div class="section-title">Saldi Ferie & Assenze per Dipendente</div>
@@ -593,7 +592,6 @@ tbody tr:hover{background:var(--paper)}
           <button class="btn-filtro" onclick="setFiltroTipo(this,'permesso')">🕐 Permesso</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'rol')">🔄 ROL</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'congedo')">🗂️ Congedi</button>
-          <input class="fi" id="ferie-search" type="text" placeholder="🔎 Cerca per nome..." style="max-width:220px;margin-left:auto" oninput="renderFerie()">
         </div>
         <div class="table-wrap">
           <table>
@@ -1853,6 +1851,7 @@ async function loadDashboard(){
 
   renderDashboardFromCache();
   if(typeof renderStoricoImportBanner==='function')renderStoricoImportBanner();
+  if(typeof renderCorrezioneStoricoBanner==='function')renderCorrezioneStoricoBanner();
   if(typeof renderDupCleanupBanner==='function')renderDupCleanupBanner();
 }
 
@@ -2041,16 +2040,14 @@ function renderDetCal(){
     const chius=chiusuraDelGiorno(ds);
     const btn=document.createElement('button');
     let cls='cal-day';
-    // Priorità colore: chiusura+festivo (righe oblique rosse/verdi) > chiusura uffici > malattia > ferie > congedo > festivo > permesso > rol > compilato (grigio chiaro) > vuoto
-    if(chius&&festivo)cls+=' gc-chiusura-festivo';
-    else if(chius)cls+=' gc-chiusura';
+    // Priorità colore: chiusura uffici > malattia > ferie > congedo > festivo > permesso > rol > (tutto il resto: casella vuota)
+    if(chius)cls+=' gc-chiusura';
     else if(assenza==='malattia')cls+=' gc-malattia';
     else if(assenza==='ferie')cls+=' gc-ferie';
     else if(assenza==='congedo')cls+=' gc-congedo';
     else if(festivo)cls+=' gc-festivo';
     else if(assenza==='permesso')cls+=' gc-permesso';
     else if(assenza==='rol')cls+=' gc-rol';
-    else if(hasD(dati))cls+=' gc-compilato';
     if(detGiorno===ds)cls+=' selected';
     btn.className=cls;btn.textContent=day;
     btn.onclick=()=>{detGiorno=detGiorno===ds?null:ds;renderDetCal();renderDetGiorno()};
@@ -2194,9 +2191,8 @@ function renderCalendarioFerie(){
     const dow=new Date(anno,mese,g).getDay();
     const chius=chiusuraDelGiorno(ds);
     let bg='',tip='';
-    // Priorità colore: chiusura+festivo (righe oblique rosse/verdi) > chiusura uffici > festivo > (weekend/resto: nessun colore)
-    if(chius&&isFestivo(ds)){bg='background:repeating-linear-gradient(45deg,var(--gc-chiusura-bg) 0 8px,var(--gc-festivo-bg) 8px 16px)';tip=' title="🔒🎉 '+(chius.motivo||'Chiusura ufficio')+' — anche festività, non conteggiato"'}
-    else if(chius){bg='background:var(--gc-chiusura-bg)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
+    // Priorità colore: chiusura uffici > festivo > (weekend/resto: nessun colore)
+    if(chius){bg='background:var(--gc-chiusura-bg)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
     else if(isFestivo(ds)){bg='background:var(--gc-festivo-bg)'}
     html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}${clickable?' cal-ferie-click':''}" style="${bg}"${tip}${clickable?` onclick="calClickGiorno(${anno},${mese},${g})"`:''}>
       <div class="cal-ferie-num">${g}</div>
@@ -2311,15 +2307,11 @@ function setFiltroTipo(btn,t){
 
 function renderFerie(){
   const dipFiltro=document.getElementById('ferie-dip-filter')?.value||'';
-  const testoRicerca=(document.getElementById('ferie-search')?.value||'').trim().toLowerCase();
-  const ordinaPerData=(arr)=>[...arr].sort((a,b)=>(a.dataInizio||'').localeCompare(b.dataInizio||''));
   let lista;
   if(filtroTipoF==='malattia'){
     // Mostra malattie — non hanno uno "stato" di approvazione, solo il dipendente le registra
     let listaM=tutteMalattie;
     if(dipFiltro)listaM=listaM.filter(r=>r.username===dipFiltro);
-    if(testoRicerca)listaM=listaM.filter(r=>(r.nomeCompleto||r.username||'').toLowerCase().includes(testoRicerca));
-    listaM=ordinaPerData(listaM);
     const tbody=document.getElementById('tbody-ferie');
     if(!listaM.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna malattia registrata.</td></tr>';return}
     tbody.innerHTML=listaM.map(r=>`<tr style="cursor:default">
@@ -2337,8 +2329,6 @@ function renderFerie(){
   if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
   if(filtroTipoF!=='tutti')lista=lista.filter(r=>r.tipo===filtroTipoF);
   if(dipFiltro)lista=lista.filter(r=>r.username===dipFiltro);
-  if(testoRicerca)lista=lista.filter(r=>(r.nomeCompleto||r.username||'').toLowerCase().includes(testoRicerca));
-  lista=ordinaPerData(lista);
   const tbody=document.getElementById('tbody-ferie');
   if(!lista.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna richiesta.</td></tr>';return}
   tbody.innerHTML=lista.map(r=>{
@@ -4892,6 +4882,7 @@ function statEsportaCommessePDF(){
 </script>
 <script src="contab_module.js" defer></script>
 <script src="importa_storico_orario.js" defer></script>
+<script src="correzione_storico_orario.js" defer></script>
 <script src="pulizia_duplicati.js" defer></script>
 </body>
 </html>
