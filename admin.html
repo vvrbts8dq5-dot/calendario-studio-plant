@@ -3444,7 +3444,7 @@ function renderStraordinari(){
     const[y,m,g]=s.data.split('-');
     const sc=s.stato==='autorizzati'?'badge-approvata':s.stato==='non_autorizzati'?'badge-rifiutata':'badge-attesa';
     const sl=s.stato==='autorizzati'?'Autorizzati':s.stato==='non_autorizzati'?'Non autorizzati':'Da convalidare';
-    return `<tr><td style="font-weight:500">${s.nomeCompleto}</td><td style="font-family:'Inter',monospace;font-size:11px">${g} ${MESI[parseInt(m)-1]} ${y}</td><td class="td-r">${s.straEl>0?s.straEl+'h':'—'}</td><td class="td-r">${s.straMec>0?s.straMec+'h':'—'}</td><td class="td-r" style="font-weight:600">${s.totale}h</td><td style="font-size:12px;color:var(--ink4)">${s.commessa||'—'}</td><td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td><td><span class="badge ${sc}">${sl}</span></td><td><div style="display:flex;gap:4px">${s.stato!=='autorizzati'?`<button class="btn btn-verde btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','autorizzati')">✓</button>`:''} ${s.stato!=='non_autorizzati'?`<button class="btn btn-rosso btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','non_autorizzati')">✕</button>`:''} ${s.stato!=='da_convalidare'?`<button class="btn btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','da_convalidare')">↩</button>`:''}</div></td></tr>`;
+    return `<tr><td style="font-weight:500">${s.nomeCompleto}</td><td style="font-family:'Inter',monospace;font-size:11px">${g} ${MESI[parseInt(m)-1]} ${y}</td><td class="td-r">${s.straEl>0?s.straEl+'h':'—'}</td><td class="td-r">${s.straMec>0?s.straMec+'h':'—'}</td><td class="td-r" style="font-weight:600">${s.totale}h</td><td style="font-size:12px;color:var(--ink4)">${s.commessa||'—'}</td><td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td><td><span class="badge ${sc}">${sl}</span></td><td><div style="display:flex;gap:4px">${s.stato!=='autorizzati'?`<button class="btn btn-verde btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','autorizzati')">✓</button>`:''} ${s.stato!=='non_autorizzati'?`<button class="btn btn-rosso btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','non_autorizzati')">✕</button>`:''} ${s.stato!=='da_convalidare'?`<button class="btn btn-sm" onclick="convalidaStraord('${s.username}','${s.id}','da_convalidare')">↩</button>`:''} <button class="btn btn-sm" style="color:var(--rosso)" title="Elimina straordinario (cestino)" onclick="eliminaStraordinario('${s.username}','${s.id}')">🗑️</button></div></td></tr>`;
   }).join('');
 }
 
@@ -3468,6 +3468,43 @@ async function convalidaStraord(username,docId,stato){
     // Badge sidebar aggiornato dalla cache locale già aggiornata sopra — NIENTE nuova query
     // (prima chiamava aggiornaBadgeStraord() che rifaceva una query Firestore per OGNI dipendente
     // ad ogni click di convalida, stesso identico problema di lentezza del bug Sblocca/Blocca)
+    const badge=document.getElementById('badge-straord');
+    if(badge){const cnt=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'')}
+  }catch(e){alert('Errore: '+e.message)}
+}
+
+// Elimina (azzera) le ore di straordinario di un giorno — salva prima uno snapshot
+// nel Cestino per poterlo recuperare, poi rimuove i campi dal giorno in Firestore
+// e aggiorna sia tuttiStraord che dipDataCache così la riga sparisce subito.
+async function eliminaStraordinario(username,docId){
+  const s=tuttiStraord.find(x=>x.username===username&&x.id===docId);
+  if(!s){alert('Straordinario non trovato.');return}
+  if(!confirm(`Eliminare lo straordinario di ${s.nomeCompleto} del ${s.data} (${s.totale}h)?\nVerrà spostato nel Cestino.`))return;
+  try{
+    await spostaNelCestino('straordinario',
+      ['timesheets',String(ANNO),'dipendenti',username,'giorni',docId],
+      {oreStraordinariElettrico:s.straEl,oreStraordinariMeccanico:s.straMec,data:s.data,stato:s.stato},
+      `Straordinario: ${s.nomeCompleto} ${s.data} (${s.totale}h)`,
+      ADM.username);
+    await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(username).collection('giorni').doc(docId).update({
+      oreStraordinariElettrico:0,
+      oreStraordinariMeccanico:0,
+      hasStraordinari:false,
+      statoStraordinari:firebase.firestore.FieldValue.delete(),
+      convalidatoIl:firebase.firestore.FieldValue.delete(),
+      convalidatoDa:firebase.firestore.FieldValue.delete()
+    });
+    tuttiStraord=tuttiStraord.filter(x=>!(x.username===username&&x.id===docId));
+    if(dipDataCache[username]&&dipDataCache[username].days&&dipDataCache[username].days[docId]){
+      const d=dipDataCache[username].days[docId];
+      d.oreStraordinariElettrico=0;d.oreStraordinariMeccanico=0;d.hasStraordinari=false;
+      delete d.statoStraordinari;delete d.convalidatoIl;delete d.convalidatoDa;
+    }
+    renderStraordinari();
+    document.getElementById('cnt-straord-pend').textContent=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;
+    document.getElementById('cnt-straord-auth').textContent=tuttiStraord.filter(s=>s.stato==='autorizzati').length;
+    document.getElementById('cnt-straord-no').textContent=tuttiStraord.filter(s=>s.stato==='non_autorizzati').length;
+    document.getElementById('cnt-straord-all').textContent=tuttiStraord.length;
     const badge=document.getElementById('badge-straord');
     if(badge){const cnt=tuttiStraord.filter(s=>s.stato==='da_convalidare').length;badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'')}
   }catch(e){alert('Errore: '+e.message)}
