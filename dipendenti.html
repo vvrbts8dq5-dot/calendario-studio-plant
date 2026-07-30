@@ -27,6 +27,7 @@
   --gc-malattia:#8B5CF6;--gc-malattia-bg:#EDE9FE;
   --gc-permesso:#2563EB;--gc-permesso-bg:#DBEAFE;
   --gc-rol:#CA8A04;--gc-rol-bg:#FEF9C3;
+  --gc-congedo:#0891B2;--gc-congedo-bg:#CFFAFE;
   --sidebar-w:240px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -143,7 +144,8 @@ a{text-decoration:none;color:inherit}
 .cal-day.gc-malattia{background:var(--gc-malattia-bg);color:var(--gc-malattia);font-weight:600}
 .cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
 .cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
-.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected{background:var(--blu)!important;color:#fff!important}
+.cal-day.gc-congedo{background:var(--gc-congedo-bg);color:var(--gc-congedo);font-weight:600}
+.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-congedo.selected{background:var(--blu)!important;color:#fff!important}
 .cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
 .cal-day.selected::after{display:none}
 .cal-legenda{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-family:'Inter',monospace;font-size:10px;color:var(--ink4)}
@@ -419,6 +421,7 @@ tbody tr:last-child{border-bottom:none}
                 <span><span class="cal-legend-dot" style="background:var(--gc-malattia)"></span>Malattia</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
               </div>
             </div>
           </div>
@@ -455,6 +458,7 @@ tbody tr:last-child{border-bottom:none}
             <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
             <span>👑 Titolare</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-chiusura-bg);border:1px solid var(--gc-chiusura)"></span>Chiusura uffici</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-festivo-bg);border:1px solid var(--gc-festivo)"></span>Festivo</span>
@@ -466,6 +470,7 @@ tbody tr:last-child{border-bottom:none}
           <button class="ass-tab active" onclick="setAssTab(this,'ferie')">🏖️ Ferie</button>
           <button class="ass-tab" onclick="setAssTab(this,'permesso')">🕐 Permessi</button>
           <button class="ass-tab" onclick="setAssTab(this,'rol')">🔄 ROL</button>
+          <button class="ass-tab" onclick="setAssTab(this,'congedo')">🗂️ Congedi</button>
           <button class="ass-tab" onclick="setAssTab(this,'malattia')">🤒 Malattia</button>
         </div>
 
@@ -532,6 +537,36 @@ tbody tr:last-child{border-bottom:none}
             </div>
           </div>
           <div id="lista-rol"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB CONGEDI -->
+        <div class="ass-subtab" id="subtab-congedo">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Congedi</div>
+            <button class="btn btn-blu" id="btn-nuova-congedo">+ Richiedi Congedo</button>
+          </div>
+          <div class="form-richiesta" id="form-congedo">
+            <div id="alert-form-congedo"></div>
+            <div class="form-grid">
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Tipo di congedo</label>
+                <select class="f-input" style="margin:0" id="f-tipo-congedo">
+                  <option value="">— Seleziona —</option>
+                  <option value="parentale">Congedo parentale</option>
+                  <option value="lutto">Lutto o grave infermità</option>
+                  <option value="matrimoniale">Congedo matrimoniale</option>
+                  <option value="formativo">Congedo formativo/studio</option>
+                </select>
+              </div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-congedo"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-congedo"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-congedo" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('congedo')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('congedo')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-congedo"><div class="empty-state">Caricamento...</div></div>
         </div>
 
         <!-- TAB MALATTIA -->
@@ -759,6 +794,9 @@ function festivitaAnno(anno){
 }
 // Festività nazionali — calcolate su ANNO e ANNO+1 (copre l'intera finestra mobile di 12 mesi)
 const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
+
+// Tipi di congedo selezionabili nella richiesta e relative etichette (usate anche lato admin)
+const TIPI_CONGEDO={parentale:'Congedo parentale',lutto:'Lutto o grave infermità',matrimoniale:'Congedo matrimoniale',formativo:'Congedo formativo/studio'};
 
 const CAMPI=[
   {k:'commessa',l:'N° Commessa',t:'text',ph:'es. 2026-001'},
@@ -1067,7 +1105,7 @@ function setAssTab(btn,tab){
 }
 
 // BTN NUOVA RICHIESTA
-['ferie','permesso','rol'].forEach(tipo=>{
+['ferie','permesso','rol','congedo'].forEach(tipo=>{
   document.getElementById('btn-nuova-'+tipo).addEventListener('click',()=>{
     document.getElementById('form-'+tipo).classList.add('open');
     document.getElementById('btn-nuova-'+tipo).style.display='none';
@@ -1088,14 +1126,16 @@ function aggiornaRiepilogoSaldi(){
   const oreGiorno=oreGiornoDip(profilo);
 
   // Calcola ore usate da cache locale — ZERO query Firestore
-  let permessiUsati=0,rolUsato=0,giorniMalattia=0;
+  let permessiUsati=0,rolUsato=0,giorniMalattia=0,congediApprovati=0,congediInAttesa=0;
   const richiesteFerieApprovate=[];
   ALL_ASSENZE.forEach(r=>{
     if(r.stato==='approvata'){
       if(r.tipo==='ferie'){richiesteFerieApprovate.push(r)}
       if(r.tipo==='permesso'){permessiUsati+=parseFloat(r.oreRichieste)||0}
       if(r.tipo==='rol'){rolUsato+=parseFloat(r.oreRichieste)||0}
+      if(r.tipo==='congedo'){congediApprovati++}
     }
+    if(r.tipo==='congedo'&&r.stato==='in_attesa')congediInAttesa++;
   });
   // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
   const ferieUsate=oreFerieConChiusure(richiesteFerieApprovate,oreGiorno);
@@ -1140,6 +1180,10 @@ function aggiornaRiepilogoSaldi(){
     <div class="saldo-card">
       <div class="saldo-info"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati nel 2026</div></div>
       <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--viola)">${giorniMalattia}</div><div class="saldo-sub">giorni</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🗂️ Congedi</div><div class="saldo-dettaglio">${congediInAttesa>0?congediInAttesa+' in attesa di approvazione':'Nessuna richiesta in attesa'}</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--gc-congedo)">${congediApprovati}</div><div class="saldo-sub">approvati</div></div>
     </div>
   `;
   document.getElementById('saldi-cards').innerHTML=html;
@@ -1199,10 +1243,11 @@ function renderCal(m){
     const chius=chiusuraDelGiorno(ds);
     const btn=document.createElement('button');
     let cls='cal-day';
-    // Priorità colore: chiusura uffici > malattia > ferie > festivo > permesso > rol > (tutto il resto: casella vuota)
+    // Priorità colore: chiusura uffici > malattia > ferie > congedo > festivo > permesso > rol > (tutto il resto: casella vuota)
     if(chius)cls+=' gc-chiusura';
     else if(assenza==='malattia')cls+=' gc-malattia';
     else if(assenza==='ferie')cls+=' gc-ferie';
+    else if(assenza==='congedo')cls+=' gc-congedo';
     else if(festivo)cls+=' gc-festivo';
     else if(assenza==='permesso')cls+=' gc-permesso';
     else if(assenza==='rol')cls+=' gc-rol';
@@ -1395,7 +1440,7 @@ function segnalaAttivita(tipo){
 // CALENDARIO FERIE CONDIVISO (dipendenti + titolari) — sola lettura per i dipendenti
 let calFerieMese=new Date();calFerieMese.setDate(1);
 const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-const CAL_FERIE_LABEL={ferie:'Ferie',permesso:'Permesso',rol:'ROL'};
+const CAL_FERIE_LABEL={ferie:'Ferie',permesso:'Permesso',rol:'ROL',congedo:'Congedo'};
 function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
 function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
 function chiusuraDelGiorno(ds){
@@ -1409,7 +1454,7 @@ function renderCalendarioFerie(){
   const giorniMese=new Date(anno,mese+1,0).getDate();
   let offset=new Date(anno,mese,1).getDay();offset=offset===0?6:offset-1;
   const perGiorno={};
-  ALL_ASSENZE_TUTTI.filter(r=>r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol').forEach(r=>{
+  ALL_ASSENZE_TUTTI.filter(r=>r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol'||r.tipo==='congedo').forEach(r=>{
     if(!r.dataInizio||!r.dataFine)return;
     let d=new Date(r.dataInizio+'T00:00:00');
     const fine=new Date(r.dataFine+'T00:00:00');
@@ -1419,7 +1464,7 @@ function renderCalendarioFerie(){
       d.setDate(d.getDate()+1);guard++;
     }
   });
-  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)'};
+  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)',congedo:'var(--gc-congedo)'};
   const oggi=new Date();
   let html='';
   ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
@@ -1454,14 +1499,18 @@ async function inviaRichiesta(tipo){
   const note=document.getElementById(`f-note-${tipo}`).value;
   const oreEl=document.getElementById(`f-ore-${tipo}`);
   const ore=oreEl?parseFloat(oreEl.value)||0:0;
+  const tipoCongedoEl=tipo==='congedo'?document.getElementById('f-tipo-congedo'):null;
+  const tipoCongedo=tipoCongedoEl?tipoCongedoEl.value:'';
   const ad=document.getElementById(`alert-form-${tipo}`);ad.innerHTML='';
+  if(tipo==='congedo'&&!tipoCongedo){ad.innerHTML='<div class="alert-box alert-err">Seleziona il tipo di congedo.</div>';return}
   if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
   if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
   if((tipo==='permesso'||tipo==='rol')&&ore<=0){ad.innerHTML='<div class="alert-box alert-err">Inserisci le ore richieste.</div>';return}
   const oreGiorno=oreGiornoDip(profilo);
   const gg=giorniLavorativi(ini,fin);
-  const oreTotali=tipo==='ferie'?gg*oreGiorno:ore;
+  const oreTotali=(tipo==='ferie'||tipo==='congedo')?gg*oreGiorno:ore;
   try{
+    const extra=tipo==='congedo'?{tipoCongedo}:{};
     await db.collection('richieste_assenza').add({
       username:U.username,
       nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),
@@ -1470,16 +1519,18 @@ async function inviaRichiesta(tipo){
       giorniLavorativi:gg,
       stato:'in_attesa',
       createdAt:new Date().toISOString(),
+      ...extra,
     });
     segnalaAttivita('richiesta');
     // Aggiorna cache locale con la nuova richiesta
-    ALL_ASSENZE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),tipo,dataInizio:ini,dataFine:fin,note,oreRichieste:oreTotali,giorniLavorativi:gg,stato:'in_attesa',createdAt:new Date().toISOString()});
+    ALL_ASSENZE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),tipo,dataInizio:ini,dataFine:fin,note,oreRichieste:oreTotali,giorniLavorativi:gg,stato:'in_attesa',createdAt:new Date().toISOString(),...extra});
     chiudiForm(tipo);
     loadTutteAssenze();
     aggiornaRiepilogoSaldi();
     document.getElementById(`f-inizio-${tipo}`).value='';
     document.getElementById(`f-fine-${tipo}`).value='';
     if(oreEl)oreEl.value='';
+    if(tipoCongedoEl)tipoCongedoEl.value='';
     document.getElementById(`f-note-${tipo}`).value='';
   }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
 }
@@ -1487,7 +1538,7 @@ async function inviaRichiesta(tipo){
 function loadTutteAssenze(){
   // Legge dalla cache locale — ZERO query Firestore
   assenzeProprie=[...ALL_ASSENZE].sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-  ['ferie','permesso','rol'].forEach(tipo=>{
+  ['ferie','permesso','rol','congedo'].forEach(tipo=>{
     const lista=assenzeProprie.filter(r=>r.tipo===tipo);
     renderListaAssenze(tipo,lista);
   });
@@ -1501,9 +1552,11 @@ function renderListaAssenze(tipo,lista){
     const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
     const bl=r.stato==='in_attesa'?'In fase di approvazione':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
     const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
+    const tipoCongLbl=r.tipo==='congedo'&&r.tipoCongedo?`<div style="font-size:12px;font-weight:600;color:var(--gc-congedo);margin-top:2px">${TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo}</div>`:'';
     return `<div class="richiesta-row">
       <div>
         <div class="r-tipo"><span class="badge ${bc}">${bl}</span></div>
+        ${tipoCongLbl}
         <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h</div>
         ${r.note?`<div class="r-nota">${r.note}</div>`:''}
         ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}

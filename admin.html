@@ -28,6 +28,7 @@
   --gc-malattia:#8B5CF6;--gc-malattia-bg:#EDE9FE;
   --gc-permesso:#2563EB;--gc-permesso-bg:#DBEAFE;
   --gc-rol:#CA8A04;--gc-rol-bg:#FEF9C3;
+  --gc-congedo:#0891B2;--gc-congedo-bg:#CFFAFE;
   --giallo:#CA8A04;--giallo-light:#FEF9C3;
   --sidebar-w:260px;
 }
@@ -168,6 +169,7 @@ tbody tr:hover{background:var(--paper)}
 .cal-day.gc-malattia{background:var(--gc-malattia-bg);color:var(--gc-malattia);font-weight:600}
 .cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
 .cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
+.cal-day.gc-congedo{background:var(--gc-congedo-bg);color:var(--gc-congedo);font-weight:600}
 .cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected{background:var(--ink)!important;color:#fff!important}
 .cal-day.selected{background:var(--ink)!important;color:#fff!important;border-color:var(--ink2)!important}
 .tot-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:.5px solid var(--paper2)}
@@ -371,6 +373,9 @@ tbody tr:hover{background:var(--paper)}
         <span class="nav-icon">👥</span> Dipendenti
         <span class="nav-badge" id="badge-sblocco">0</span>
       </button>
+      <button class="nav-item" data-page="festivita" onclick="goPage('festivita',this)">
+        <span class="nav-icon">🎉</span> Festività
+      </button>
       <button class="nav-item" data-page="straordinari" onclick="goPage('straordinari',this)">
         <span class="nav-icon">⚡</span> Straordinari
         <span class="nav-badge" id="badge-straord">0</span>
@@ -543,6 +548,7 @@ tbody tr:hover{background:var(--paper)}
             <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
             <span>👑 Titolare</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-chiusura-bg);border:1px solid var(--gc-chiusura)"></span>Chiusura uffici</span>
             <span><span class="cal-legend-dot" style="background:var(--gc-festivo-bg);border:1px solid var(--gc-festivo)"></span>Festivo</span>
@@ -561,6 +567,7 @@ tbody tr:hover{background:var(--paper)}
           <button class="btn-filtro" onclick="setFiltroTipo(this,'malattia')">🤒 Malattia</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'permesso')">🕐 Permesso</button>
           <button class="btn-filtro" onclick="setFiltroTipo(this,'rol')">🔄 ROL</button>
+          <button class="btn-filtro" onclick="setFiltroTipo(this,'congedo')">🗂️ Congedi</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -651,6 +658,33 @@ tbody tr:hover{background:var(--paper)}
               <th>N° Commessa</th><th>Note</th><th>Stato</th><th>Azioni</th>
             </tr></thead>
             <tbody id="tbody-straord"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FESTIVITÀ (ex ferie) — conteggio separato, non scala i monte ferie -->
+      <div class="page" id="page-festivita">
+        <div class="page-header">
+          <div class="page-title">🎉 Festività (ex ferie)</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="fest-anno" style="font-size:12px" onchange="loadFestivita()"></select>
+            <select class="f-select" id="fest-mese" style="font-size:12px" onchange="loadFestivita()"></select>
+            <button class="btn btn-verde btn-sm" onclick="esportaFestivitaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="esportaFestivitaPDF()">📄 PDF</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ink4);margin-bottom:14px;max-width:720px">
+          Conteggio automatico delle giornate festive (segnate in verde a calendario) che cadono in un giorno lavorativo, calcolate come ore giornaliere di contratto di ciascun dipendente. È un conteggio separato: non scala il monte ferie, permessi o ROL.
+        </div>
+        <div class="stat-row" id="fest-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Dipendente</th><th class="td-r">Ore/giorno contratto</th>
+              <th class="td-r">Festività nel mese</th><th class="td-r">Ore nel mese</th>
+              <th class="td-r">Festività nell'anno</th><th class="td-r">Ore nell'anno</th>
+            </tr></thead>
+            <tbody id="fest-tbody"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1417,7 +1451,9 @@ const CAMPI=[
   {k:'note',l:'Note',t:'text'},
 ];
 const CN=CAMPI.filter(c=>c.t==='n');
-const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia'};
+const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia',congedo:'🗂️ Congedo'};
+// Etichette dei sottotipi di congedo (stesse chiavi usate nel portale dipendenti)
+const TIPI_CONGEDO={parentale:'Congedo parentale',lutto:'Lutto o grave infermità',matrimoniale:'Congedo matrimoniale',formativo:'Congedo formativo/studio'};
 
 let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa',filtroTipoF='tutti',chiusureUfficio=[];
 // Cache globale richieste/malattie per utente — riempita da loadDashboard
@@ -1575,6 +1611,14 @@ function startApp(){
   // Init selettori costi/archivio
   const costiAnno=document.getElementById('costi-anno');
   for(let y=ANNO;y>=2026;y--){const o=document.createElement('option');o.value=y;o.textContent=y;costiAnno.appendChild(o);}
+  // Init selettori Festività (anno + mese, mese corrente preselezionato)
+  const festAnno=document.getElementById('fest-anno'),festMese=document.getElementById('fest-mese');
+  if(festAnno&&!festAnno.options.length){
+    for(let y=ANNO+1;y>=2026;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===ANNO)o.selected=true;festAnno.appendChild(o);}
+  }
+  if(festMese&&!festMese.options.length){
+    MESI.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m;if(i===new Date().getMonth())o.selected=true;festMese.appendChild(o);});
+  }
 }
 
 const FESTIVITA_CHECK=FESTIVITA; // stesso calcolo automatico Pasqua/Pasquetta di FESTIVITA
@@ -1753,11 +1797,12 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',festivita:'Festività',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
   if(pid==='ferie')loadRichieste();
   if(pid==='dipendenti')loadDipendenti();
+  if(pid==='festivita')loadFestivita();
   if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
@@ -1968,7 +2013,7 @@ function loadDetMese(){
   });
   // Assenze approvate dalla cache
   (ADM_richPerUser[detUser]||[]).forEach(r=>{
-    if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')){
+    if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol'||r.tipo==='congedo')){
       const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
       while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
     }
@@ -1995,10 +2040,11 @@ function renderDetCal(){
     const chius=chiusuraDelGiorno(ds);
     const btn=document.createElement('button');
     let cls='cal-day';
-    // Priorità colore: chiusura uffici > malattia > ferie > festivo > permesso > rol > (tutto il resto: casella vuota)
+    // Priorità colore: chiusura uffici > malattia > ferie > congedo > festivo > permesso > rol > (tutto il resto: casella vuota)
     if(chius)cls+=' gc-chiusura';
     else if(assenza==='malattia')cls+=' gc-malattia';
     else if(assenza==='ferie')cls+=' gc-ferie';
+    else if(assenza==='congedo')cls+=' gc-congedo';
     else if(festivo)cls+=' gc-festivo';
     else if(assenza==='permesso')cls+=' gc-permesso';
     else if(assenza==='rol')cls+=' gc-rol';
@@ -2122,7 +2168,7 @@ function renderCalendarioFerie(){
   const giorniMese=new Date(anno,mese+1,0).getDate();
   let offset=new Date(anno,mese,1).getDay();offset=offset===0?6:offset-1; // lunedì=0
   const perGiorno={};
-  tutteR.filter(r=>r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol')).forEach(r=>{
+  tutteR.filter(r=>r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol'||r.tipo==='congedo')).forEach(r=>{
     if(!r.dataInizio||!r.dataFine)return;
     let d=new Date(r.dataInizio+'T00:00:00');
     const fine=new Date(r.dataFine+'T00:00:00');
@@ -2132,7 +2178,7 @@ function renderCalendarioFerie(){
       d.setDate(d.getDate()+1);guard++;
     }
   });
-  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)'};
+  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)',congedo:'var(--gc-congedo)'};
   const oggi=new Date();
   let html='';
   ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
@@ -2289,9 +2335,10 @@ function renderFerie(){
     const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
     const bl=r.stato==='in_attesa'?'⏳ In attesa':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
     const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
+    const sottotipo=r.tipo==='congedo'&&r.tipoCongedo?`<div style="font-size:11px;color:var(--ink4);margin-top:2px">${TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo}</div>`:'';
     return `<tr style="cursor:default">
       <td style="font-weight:500">${r.nomeCompleto||r.username}</td>
-      <td>${TL[r.tipo]||r.tipo}</td>
+      <td>${TL[r.tipo]||r.tipo}${sottotipo}</td>
       <td style="font-family:'Inter',monospace;font-size:11px">${per}</td>
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
       <td><span class="badge ${bc}">${bl}</span></td>
@@ -2307,7 +2354,8 @@ function renderFerie(){
 function apriModal(id){
   modalRichiestaId=id;
   const r=tutteR.find(r=>r.id===id);
-  document.getElementById('modal-title').textContent='Gestisci Richiesta — '+(TL[r.tipo]||r.tipo);
+  const sottotipoTitolo=r.tipo==='congedo'&&r.tipoCongedo?' ('+(TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo)+')':'';
+  document.getElementById('modal-title').textContent='Gestisci Richiesta — '+(TL[r.tipo]||r.tipo)+sottotipoTitolo;
   document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine} · ${r.oreRichieste||0}h`;
   const nd=document.getElementById('modal-nota-dip');
   if(r.note){nd.style.display='block';nd.textContent='💬 Nota dipendente: '+r.note}else{nd.style.display='none'}
@@ -3106,6 +3154,87 @@ async function esportaCostiExcel(){
     XLSX.utils.book_append_sheet(wb,expFoglioExcel('Costi Dipendenti — Dettaglio',mese+' '+anno,mhh,mrows),mese);
   });
   XLSX.writeFile(wb,`Costi_${anno}.xlsx`);
+}
+
+// ── FESTIVITÀ (ex ferie) ─────────────────────────────────────────────
+// Conteggio automatico, separato da ferie/permessi/ROL: per ogni festività nazionale
+// che cade in un giorno lavorativo (lun-ven) si contano le ore giornaliere di
+// contratto del dipendente (tipoOrario). Non scala nessun monte ore.
+function festivitaLavorativeAnno(anno){
+  return festivitaAnno(anno).filter(ds=>{
+    const dow=new Date(ds+'T00:00:00').getDay();
+    return dow!==0&&dow!==6;
+  }).sort();
+}
+function festCalcolaDati(){
+  const anno=parseInt(document.getElementById('fest-anno')?.value)||ANNO;
+  const mese=parseInt(document.getElementById('fest-mese')?.value);
+  const meseIdx=isNaN(mese)?new Date().getMonth():mese;
+  const festivitaAnnoLav=festivitaLavorativeAnno(anno);
+  const festivitaMeseLav=festivitaAnnoLav.filter(ds=>parseInt(ds.substring(5,7))-1===meseIdx);
+  const righe=dipList.map(emp=>{
+    const oreGiorno=oreGiornoDip(emp);
+    return{
+      nome:`${emp.nome||''} ${emp.cognome||''}`.trim()||emp.username,
+      oreGiorno,
+      ggMese:festivitaMeseLav.length,
+      oreMese:festivitaMeseLav.length*oreGiorno,
+      ggAnno:festivitaAnnoLav.length,
+      oreAnno:festivitaAnnoLav.length*oreGiorno,
+    };
+  });
+  return{anno,meseIdx,festivitaAnnoLav,festivitaMeseLav,righe};
+}
+function loadFestivita(){
+  const tbody=document.getElementById('fest-tbody');
+  if(!tbody)return;
+  if(!dipList.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Caricamento dipendenti...</td></tr>';loadDashboard().then(loadFestivita);return}
+  const{meseIdx,festivitaAnnoLav,festivitaMeseLav,righe}=festCalcolaDati();
+  const kpi=document.getElementById('fest-kpi-row');
+  const totOreMese=righe.reduce((s,r)=>s+r.oreMese,0),totOreAnno=righe.reduce((s,r)=>s+r.oreAnno,0);
+  kpi.innerHTML=[
+    {l:'Festività lavorative — '+MESI[meseIdx],v:festivitaMeseLav.length},
+    {l:'Festività lavorative — Anno',v:festivitaAnnoLav.length},
+    {l:'Ore totali azienda — '+MESI[meseIdx],v:totOreMese+'h'},
+    {l:'Ore totali azienda — Anno',v:totOreAnno+'h'},
+  ].map(k=>`<div class="stat-box"><div class="stat-label">${k.l}</div><div class="stat-val">${k.v}</div></div>`).join('');
+  if(!righe.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Nessun dipendente.</td></tr>';return}
+  tbody.innerHTML=righe.map(r=>`<tr>
+    <td style="font-weight:500">${r.nome}</td>
+    <td class="td-r">${r.oreGiorno}h</td>
+    <td class="td-r">${r.ggMese} gg</td>
+    <td class="td-r td-bold">${r.oreMese}h</td>
+    <td class="td-r">${r.ggAnno} gg</td>
+    <td class="td-r td-bold">${r.oreAnno}h</td>
+  </tr>`).join('');
+}
+async function esportaFestivitaExcel(){
+  if(!dipList.length){await loadDashboard();}
+  const{anno,meseIdx,festivitaAnnoLav,festivitaMeseLav,righe}=festCalcolaDati();
+  const wb=XLSX.utils.book_new();
+  const hh=['Dipendente','Ore/giorno contratto','Festività nel mese','Ore nel mese','Festività nell\'anno','Ore nell\'anno'];
+  const rows=righe.map(r=>[r.nome,r.oreGiorno,r.ggMese,r.oreMese,r.ggAnno,r.oreAnno]);
+  const foot=['TOTALE','',festivitaMeseLav.length,righe.reduce((s,r)=>s+r.oreMese,0),festivitaAnnoLav.length,righe.reduce((s,r)=>s+r.oreAnno,0)];
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Festività (ex ferie) — Conteggio separato',MESI[meseIdx]+' '+anno,hh,rows,foot),'Festività');
+  XLSX.writeFile(wb,`Festivita_${MESI[meseIdx]}_${anno}.xlsx`);
+}
+async function esportaFestivitaPDF(){
+  if(!dipList.length){await loadDashboard();}
+  const{anno,meseIdx,festivitaAnnoLav,festivitaMeseLav,righe}=festCalcolaDati();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Festività (ex ferie) — Conteggio separato',MESI[meseIdx]+' '+anno);
+  doc.autoTable({
+    startY,
+    head:[['Dipendente','Ore/giorno contratto','Festività nel mese','Ore nel mese',"Festività nell'anno","Ore nell'anno"]],
+    body:righe.map(r=>[r.nome,r.oreGiorno+'h',r.ggMese,r.oreMese+'h',r.ggAnno,r.oreAnno+'h']),
+    foot:[['TOTALE','',festivitaMeseLav.length,righe.reduce((s,r)=>s+r.oreMese,0)+'h',festivitaAnnoLav.length,righe.reduce((s,r)=>s+r.oreAnno,0)+'h']],
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,
+    theme:'striped'
+  });
+  doc.save(`Festivita_${MESI[meseIdx]}_${anno}.pdf`);
 }
 
 // ── ARCHIVIO ANNI ─────────────────────────────────────────────────────
