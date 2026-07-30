@@ -121,9 +121,6 @@ input,select,textarea{font-family:'Inter',sans-serif}
 .alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
 .alert-ok{background:var(--verde-light);color:var(--verde)}
 .alert-err{background:var(--rosso-light);color:var(--rosso)}
-.alert-warn{background:var(--amber-light);color:var(--amber)}
-.imp-row-skip{opacity:.45}
-.imp-row-review{background:var(--amber-light)}
 .empty-state{text-align:center;padding:32px;color:var(--ink4);font-size:13px}
 
 /* TABLE */
@@ -376,9 +373,6 @@ tbody tr:hover{background:var(--paper)}
         <span class="nav-icon">👥</span> Dipendenti
         <span class="nav-badge" id="badge-sblocco">0</span>
       </button>
-      <button class="nav-item" data-page="festivita" onclick="goPage('festivita',this)">
-        <span class="nav-icon">🎉</span> Festività
-      </button>
       <button class="nav-item" data-page="straordinari" onclick="goPage('straordinari',this)">
         <span class="nav-icon">⚡</span> Straordinari
         <span class="nav-badge" id="badge-straord">0</span>
@@ -559,6 +553,30 @@ tbody tr:hover{background:var(--paper)}
             <span id="cal-ferie-hint" style="display:none;color:var(--ink4)">Clicca un giorno per segnare/rimuovere le tue ferie</span>
           </div>
         </div>
+
+        <!-- FESTIVITÀ (ex ferie) — conteggio separato, unito qui a Ferie & Assenze -->
+        <div class="section-title" style="margin-top:24px">🎉 Festività (ex ferie)</div>
+        <div style="font-size:12px;color:var(--ink4);margin-bottom:14px;max-width:720px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Conteggio automatico delle giornate festive (segnate in verde a calendario) che cadono in un giorno lavorativo, calcolate come ore giornaliere di contratto di ciascun dipendente. È un conteggio separato: non scala il monte ferie, permessi o ROL.</span>
+          <span style="display:flex;gap:8px;align-items:center">
+            <select class="f-select" id="fest-anno" style="font-size:12px" onchange="loadFestivita()"></select>
+            <select class="f-select" id="fest-mese" style="font-size:12px" onchange="loadFestivita()"></select>
+            <button class="btn btn-verde btn-sm" onclick="esportaFestivitaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="esportaFestivitaPDF()">📄 PDF</button>
+          </span>
+        </div>
+        <div class="stat-row" id="fest-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
+        <div class="table-wrap" style="margin-bottom:24px">
+          <table>
+            <thead><tr>
+              <th>Dipendente</th><th class="td-r">Ore/giorno contratto</th>
+              <th class="td-r">Festività nel mese</th><th class="td-r">Ore nel mese</th>
+              <th class="td-r">Festività nell'anno</th><th class="td-r">Ore nell'anno</th>
+            </tr></thead>
+            <tbody id="fest-tbody"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
+          </table>
+        </div>
+
         <div class="filtri" id="filtri-stato-ferie">
           <button class="btn-filtro active" onclick="setFiltro(this,'in_attesa')">⏳ In attesa <span id="cnt-attesa">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'approvata')">✓ Approvate <span id="cnt-approvata">0</span></button>
@@ -662,33 +680,6 @@ tbody tr:hover{background:var(--paper)}
               <th>N° Commessa</th><th>Note</th><th>Stato</th><th>Azioni</th>
             </tr></thead>
             <tbody id="tbody-straord"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- FESTIVITÀ (ex ferie) — conteggio separato, non scala i monte ferie -->
-      <div class="page" id="page-festivita">
-        <div class="page-header">
-          <div class="page-title">🎉 Festività (ex ferie)</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select class="f-select" id="fest-anno" style="font-size:12px" onchange="loadFestivita()"></select>
-            <select class="f-select" id="fest-mese" style="font-size:12px" onchange="loadFestivita()"></select>
-            <button class="btn btn-verde btn-sm" onclick="esportaFestivitaExcel()">📥 Excel</button>
-            <button class="btn btn-rosso btn-sm" onclick="esportaFestivitaPDF()">📄 PDF</button>
-          </div>
-        </div>
-        <div style="font-size:12px;color:var(--ink4);margin-bottom:14px;max-width:720px">
-          Conteggio automatico delle giornate festive (segnate in verde a calendario) che cadono in un giorno lavorativo, calcolate come ore giornaliere di contratto di ciascun dipendente. È un conteggio separato: non scala il monte ferie, permessi o ROL.
-        </div>
-        <div class="stat-row" id="fest-kpi-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px"></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Dipendente</th><th class="td-r">Ore/giorno contratto</th>
-              <th class="td-r">Festività nel mese</th><th class="td-r">Ore nel mese</th>
-              <th class="td-r">Festività nell'anno</th><th class="td-r">Ore nell'anno</th>
-            </tr></thead>
-            <tbody id="fest-tbody"><tr><td colspan="6" class="empty-state">Caricamento...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1801,12 +1792,11 @@ function goPage(pid,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
   document.getElementById('page-'+pid).classList.add('active');
-  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',festivita:'Festività',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
+  const titles={dashboard:'Dashboard',dettaglio:'Dettaglio Dipendente',ferie:'Ferie & Assenze',dipendenti:'Dipendenti',costi:'Costi Mensili',archivio:'Archivio Anni',straordinari:'Straordinari',titolare:'Registro Titolare',budget:'Budget Contract','budget-dettaglio':'Commessa',contabilita:'Monitoraggio Contabilità',rubrica:'Rubrica Commesse',statistiche:'Statistiche',cestino:'Cestino'};
   document.getElementById('topbar-title').textContent=titles[pid]||'';
   document.getElementById('topbar-actions').innerHTML='';
-  if(pid==='ferie')loadRichieste();
+  if(pid==='ferie'){loadRichieste();loadFestivita();}
   if(pid==='dipendenti')loadDipendenti();
-  if(pid==='festivita')loadFestivita();
   if(pid==='straordinari')loadStraordinari();
   if(pid==='costi')loadCostiMensili();
   if(pid==='archivio')initArchivio();
@@ -2853,8 +2843,9 @@ const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
 function esportaTuttiExcel(){
   const wb=XLSX.utils.book_new();
   // Riepilogo
-  const hh=['Dipendente',...CN.map(c=>c.l)];
-  const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0)]});
+  const ggFestLavAnno=festivitaLavorativeAnno(ANNO).length;
+  const hh=['Dipendente',...CN.map(c=>c.l),'🎉 Festività (ex ferie)'];
+  const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0),ggFestLavAnno*oreGiornoDip(e)]});
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Riepilogo Ore Dipendenti','Anno '+ANNO,hh,rr),'Riepilogo');
   // Saldo ferie
   const richPerUser=ADM_richPerUser;
@@ -2877,6 +2868,7 @@ function esportaDetPeriodo(formato){
   const emp=dipList.find(e=>e.username===detUser);if(!emp)return;
   const nome=`${emp.nome||''} ${emp.cognome||''}`.trim()||detUser;
   const tariffe=emp.tariffe||{};
+  const oreGiorno=oreGiornoDip(emp);
   apriSelettorePeriodo(async(p)=>{
     let all={};
     for(const y of periodoAnni(p)){
@@ -2886,10 +2878,15 @@ function esportaDetPeriodo(formato){
       }catch(e){}
     }
     const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
-    if(formato==='excel')generaDetExcelPeriodo(nome,tariffe,all,giorni,p);else generaDetPDFPeriodo(nome,tariffe,all,giorni,p);
+    if(formato==='excel')generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno);else generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno);
   },{titolo:'Esporta Ore — '+nome});
 }
-function generaDetExcelPeriodo(nome,tariffe,all,giorni,p){
+// Giorni festivi nazionali (lun-ven) che cadono in un mese "YYYY-MM" — stessa logica di festivitaLavorativeAnno
+function festivitaLavorativeMese(ym){
+  const anno=parseInt(ym.substring(0,4));
+  return festivitaLavorativeAnno(anno).filter(ds=>ds.startsWith(ym));
+}
+function generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
   const wb=XLSX.utils.book_new();
   const hdr=['Campo','Totale','Tariffa €','Costo Totale €'];
   const righeRiep=CN.map(c=>{
@@ -2897,6 +2894,8 @@ function generaDetExcelPeriodo(nome,tariffe,all,giorni,p){
     const tariffa=tariffe[c.k]||0;
     return[c.l,tot,tariffa>0?tariffa:'—',tariffa>0?(tot*tariffa).toFixed(2):'—'];
   });
+  const festOrePeriodo=periodoAnni(p).reduce((s,y)=>s+festivitaLavorativeAnno(y).filter(ds=>periodoInRange(ds,p)).length,0)*oreGiorno;
+  if(festOrePeriodo>0)righeRiep.push(['🎉 Festività (ex ferie)',festOrePeriodo,'—','—']);
   XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,periodoLabel(p),hdr,righeRiep),'Riepilogo');
   const perMese={};
   giorni.forEach(ds=>{const ym=ds.substring(0,7);if(!perMese[ym])perMese[ym]=[];perMese[ym].push(ds)});
@@ -2910,6 +2909,8 @@ function generaDetExcelPeriodo(nome,tariffe,all,giorni,p){
       const costo=CN.reduce((s,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return s+v*t},0)+(parseFloat(d.speseExtra)||0);
       return[`${g}/${mo}/${yy}`,...CN.map(c=>parseFloat(d[c.k])||0),ore,costo>0?costo.toFixed(2):''];
     });
+    const festGgMese=festivitaLavorativeMese(ym).length;
+    if(festGgMese>0)rr.push([`🎉 Festività (ex ferie) — ${festGgMese} gg`,...CN.map(()=>''),festGgMese*oreGiorno,'']);
     const totOre=gg.reduce((s,ds)=>s+totGiorno(all[ds]),0);
     const totCosto=gg.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
     const footRow=['TOTALE',...CN.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre,totCosto>0?totCosto.toFixed(2):''];
@@ -2918,7 +2919,7 @@ function generaDetExcelPeriodo(nome,tariffe,all,giorni,p){
   });
   XLSX.writeFile(wb,`Timesheet_${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
 }
-function generaDetPDFPeriodo(nome,tariffe,all,giorni,p){
+function generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const startY=expIntestazionePDF(doc,`Riepilogo Ore — ${nome}`,periodoLabel(p));
@@ -2937,7 +2938,10 @@ function generaDetPDFPeriodo(nome,tariffe,all,giorni,p){
   const yEnd=(doc.lastAutoTable&&doc.lastAutoTable.finalY||startY)+8;
   doc.setFont('helvetica','bold');doc.setFontSize(9);
   doc.text(`Totale ore periodo: ${totOre}h`,14,yEnd);
-  if(totCosto>0)doc.text(`Totale costo periodo: €${totCosto.toFixed(2)}`,14,yEnd+6);
+  let yy=yEnd;
+  if(totCosto>0){yy+=6;doc.text(`Totale costo periodo: €${totCosto.toFixed(2)}`,14,yy);}
+  const festOrePeriodo=periodoAnni(p).reduce((s,y)=>s+festivitaLavorativeAnno(y).filter(ds=>periodoInRange(ds,p)).length,0)*oreGiorno;
+  if(festOrePeriodo>0){yy+=6;doc.text(`🎉 Festività (ex ferie) nel periodo: ${festOrePeriodo}h`,14,yy);}
   doc.save(`Timesheet_${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
 }
 
@@ -3241,7 +3245,6 @@ async function esportaFestivitaPDF(){
   });
   doc.save(`Festivita_${MESI[meseIdx]}_${anno}.pdf`);
 }
-
 
 // ── ARCHIVIO ANNI ─────────────────────────────────────────────────────
 async function initArchivio(){
