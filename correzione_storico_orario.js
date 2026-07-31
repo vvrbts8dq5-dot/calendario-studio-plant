@@ -61,44 +61,54 @@ async function correggiStoricoOrario(){
   if(!risolti.length){ alert('Nessun dipendente da correggere trovato.'); return; }
 
   const riepilogo=risolti.map(r=>`  • ${r.nomeCompleto} (${r.username}): ${r.azione==='swap_elettrico_meccanico'?'Meccanici → Elettrici (+ straordinari)':'Meccanici → Attività Generali'}`).join('\n');
-  if(!confirm(`Correzione storico orario ${ANNO}\n\n${riepilogo}\n\nQuesta operazione MODIFICA i documenti già presenti su Firestore in timesheets/${ANNO}/dipendenti/{username}/giorni/*. Confermi la scrittura?`)) return;
+  if(!confirm(`Correzione storico orario ${ANNO}-${ANNO+1}\n\n${riepilogo}\n\nQuesta operazione MODIFICA i documenti già presenti su Firestore in timesheets/${ANNO} e timesheets/${ANNO+1} (dipendenti/{username}/giorni/*). Confermi la scrittura?`)) return;
 
   const wrap=document.getElementById('correzione-storico-wrap');
   if(wrap)wrap.innerHTML='<div class="empty-state">Correzione in corso, non chiudere la pagina...</div>';
 
-  // 2) per ogni dipendente, leggi tutti i giorni e prepara le correzioni
+  // 2) per ogni dipendente, leggi tutti i giorni e prepara le correzioni.
+  // IMPORTANTE: la dashboard/calendario mostrano una finestra mobile di 12 mesi
+  // che copre sia timesheets/{ANNO} sia timesheets/{ANNO+1} (vedi loadDashboard()),
+  // quindi la correzione deve scrivere su ENTRAMBI gli anni, altrimenti i giorni
+  // che ricadono nel documento ANNO+1 restano sbagliati anche dopo la "correzione".
   let totCorretti=0;
   for(const r of risolti){
-    const giorniRef=db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(r.username).collection('giorni');
-    const snap=await giorniRef.get();
-    const batchOps=[];
-    snap.forEach(doc=>{
-      const d=doc.data();
-      let cambia=false, upd={};
-      if(r.azione==='swap_elettrico_meccanico'){
-        const oldE=parseFloat(d.oreElectriciMD)||0, oldM=parseFloat(d.oreMeccaniciMA)||0;
-        const oldSE=parseFloat(d.oreStraordinariElettrico)||0, oldSM=parseFloat(d.oreStraordinariMeccanico)||0;
-        if(oldE!==oldM||oldSE!==oldSM){
-          upd={oreElectriciMD:oldM, oreMeccaniciMA:oldE, oreStraordinariElettrico:oldSM, oreStraordinariMeccanico:oldSE};
-          cambia=true;
+    for(const annoDoc of [ANNO, ANNO+1]){
+      const giorniRef=db.collection('timesheets').doc(String(annoDoc)).collection('dipendenti').doc(r.username).collection('giorni');
+      const snap=await giorniRef.get();
+      const batchOps=[];
+      snap.forEach(doc=>{
+        const d=doc.data();
+        let cambia=false, upd={};
+        if(r.azione==='swap_elettrico_meccanico'){
+          const oldE=parseFloat(d.oreElectriciMD)||0, oldM=parseFloat(d.oreMeccaniciMA)||0;
+          const oldSE=parseFloat(d.oreStraordinariElettrico)||0, oldSM=parseFloat(d.oreStraordinariMeccanico)||0;
+          // Applica lo scambio SOLO se c'è ancora qualcosa da spostare via da Meccanici
+          // (oldM>0). Senza questo controllo, rilanciando la correzione una seconda
+          // volta su un giorno già corretto (oldM già a 0), lo scambio si applicherebbe
+          // di nuovo alla rovescia, ripristinando l'errore invece di lasciarlo com'è.
+          if(oldM>0&&(oldE!==oldM||oldSE!==oldSM)){
+            upd={oreElectriciMD:oldE+oldM, oreMeccaniciMA:0, oreStraordinariElettrico:oldSE+oldSM, oreStraordinariMeccanico:0};
+            cambia=true;
+          }
+        }else if(r.azione==='sposta_a_generali'){
+          const oldM=parseFloat(d.oreMeccaniciMA)||0, oldG=parseFloat(d.oreAttivitaGenerali)||0;
+          if(oldM>0){
+            upd={oreAttivitaGenerali:oldG+oldM, oreMeccaniciMA:0};
+            cambia=true;
+          }
         }
-      }else if(r.azione==='sposta_a_generali'){
-        const oldM=parseFloat(d.oreMeccaniciMA)||0, oldG=parseFloat(d.oreAttivitaGenerali)||0;
-        if(oldM>0){
-          upd={oreAttivitaGenerali:oldG+oldM, oreMeccaniciMA:0};
-          cambia=true;
-        }
+        if(cambia){ batchOps.push({ref:doc.ref,data:upd}); }
+      });
+      // 3) scrivi a batch da 450
+      for(let i=0;i<batchOps.length;i+=450){
+        const batch=db.batch();
+        batchOps.slice(i,i+450).forEach(op=>batch.update(op.ref,op.data));
+        await batch.commit();
       }
-      if(cambia){ batchOps.push({ref:doc.ref,data:upd}); }
-    });
-    // 3) scrivi a batch da 450
-    for(let i=0;i<batchOps.length;i+=450){
-      const batch=db.batch();
-      batchOps.slice(i,i+450).forEach(op=>batch.update(op.ref,op.data));
-      await batch.commit();
+      totCorretti+=batchOps.length;
+      console.log(`Corretti ${batchOps.length} giorni (anno ${annoDoc}) per ${r.nomeCompleto}`);
     }
-    totCorretti+=batchOps.length;
-    console.log(`Corretti ${batchOps.length} giorni per ${r.nomeCompleto}`);
   }
 
   alert(`✓ Correzione completata.\n\n${totCorretti} giorni aggiornati su Firestore.`);
