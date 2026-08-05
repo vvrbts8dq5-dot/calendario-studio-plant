@@ -1004,8 +1004,8 @@ tbody tr:hover{background:var(--paper)}
           <div style="max-height:320px"><canvas id="stat-tipologia-canvas" height="90"></canvas></div>
           <div class="table-wrap" style="margin-top:14px">
             <table>
-              <thead><tr><th>Mese</th><th class="td-r">Ordinarie</th><th class="td-r">Ferie</th><th class="td-r">Festività/Malattia</th><th class="td-r">Permessi</th><th class="td-r">Recuperi</th></tr></thead>
-              <tbody id="stat-tipologia-tbody"><tr><td colspan="6" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
+              <thead><tr><th>Mese</th><th class="td-r">Ordinarie</th><th class="td-r">Ferie</th><th class="td-r">Malattia</th><th class="td-r">Permessi</th><th class="td-r">ROL</th><th class="td-r">Recuperi</th></tr></thead>
+              <tbody id="stat-tipologia-tbody"><tr><td colspan="7" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1150,7 +1150,8 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">€/h Attività Generali</label><input class="fi" id="t-oreAttivitaGenerali" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/h Ferie</label><input class="fi" id="t-oreFerie" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/h Permesso</label><input class="fi" id="t-orePermesso" type="number" step="0.01" placeholder="0.00"></div>
-      <div><label class="fl">€/h Festività/Malattia</label><input class="fi" id="t-oreFestivitaMalattia" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h ROL</label><input class="fi" id="t-oreRol" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label class="fl">€/h Malattia</label><input class="fi" id="t-oreFestivitaMalattia" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/h Recupero Elettrici</label><input class="fi" id="t-oreRecuperoElettrico" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/h Recupero Meccanici</label><input class="fi" id="t-oreRecuperoMeccanico" type="number" step="0.01" placeholder="0.00"></div>
       <div><label class="fl">€/km Percorsi</label><input class="fi" id="t-kmPercorsi" type="number" step="0.001" placeholder="0.000"></div>
@@ -1444,7 +1445,8 @@ const CAMPI=[
   {k:'oreAttivitaGenerali',l:'Ore Attività Generali',t:'n'},
   {k:'oreFerie',l:'Ore Ferie',t:'n'},
   {k:'orePermesso',l:'Ore Permesso',t:'n'},
-  {k:'oreFestivitaMalattia',l:'Ore Festività/Malattia',t:'n'},
+  {k:'oreRol',l:'Ore ROL',t:'n'},
+  {k:'oreFestivitaMalattia',l:'Ore Malattia',t:'n'},
   {k:'oreRecuperoElettrico',l:'Ore Recupero Elettrici',t:'n'},
   {k:'oreRecuperoMeccanico',l:'Ore Recupero Meccanici',t:'n'},
   {k:'kmPercorsi',l:'Km Percorsi',t:'n'},
@@ -1573,6 +1575,44 @@ function oreFerieConChiusure(richiesteFerieApprovate,oreGiorno){
   (richiesteFerieApprovate||[]).forEach(r=>{espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorni.add(d))});
   chiusureUfficio.forEach(c=>{espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorni.add(d))});
   return giorni.size*oreGiorno;
+}
+
+// Inietta nei giorni del timesheet (solo in memoria, non su Firestore) le ore di Ferie/Permesso/ROL/Malattia
+// derivate dal sistema dedicato "Ferie & Assenze" (richieste approvate + chiusure ufficio + malattie),
+// sovrascrivendo gli eventuali valori residui su quei 4 campi — che restano l'unica fonte di verità per
+// tutti i report/costi. Va chiamata su un oggetto 'days' (chiave 'YYYY-MM-DD' -> dati del giorno) SUBITO
+// DOPO averlo popolato da Firestore e PRIMA di calcolare totali/costi. Non tocca gli altri campi del
+// giorno (ordinarie, straordinari, km, note, ecc.). I Congedi restano esclusi (nessun costo associato).
+function iniettaAssenzeInGiorni(days,username,oreGiorno){
+  const richieste=ADM_richPerUser[username]||[];
+  const malattie=ADM_malPerUser[username]||[];
+  const touched={}; // 'campo|data' -> già toccato in questa chiamata (per azzerare i valori manuali residui una sola volta)
+  const aggiungi=(ds,campo,val)=>{
+    if(!days[ds])days[ds]={};
+    const key=campo+'|'+ds;
+    days[ds][campo]=(touched[key]?(parseFloat(days[ds][campo])||0):0)+val;
+    touched[key]=true;
+  };
+  // Ferie: richieste approvate + chiusure ufficio, senza contare due volte lo stesso giorno
+  const giorniFerie=new Set();
+  richieste.filter(r=>r.stato==='approvata'&&r.tipo==='ferie')
+    .forEach(r=>espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorniFerie.add(d)));
+  chiusureUfficio.forEach(c=>espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorniFerie.add(d)));
+  giorniFerie.forEach(ds=>aggiungi(ds,'oreFerie',oreGiorno));
+  // Permesso e ROL: le ore richieste ripartite sui giorni lavorativi della richiesta, così i report
+  // per mese/periodo mostrano le ore nel periodo in cui sono state effettivamente godute.
+  const ripartisci=(tipo,campo)=>{
+    richieste.filter(r=>r.stato==='approvata'&&r.tipo===tipo).forEach(r=>{
+      const gg=espandiGiorniLavorativi(r.dataInizio,r.dataFine);
+      if(!gg.length)return;
+      const orePerGiorno=(parseFloat(r.oreRichieste)||0)/gg.length;
+      gg.forEach(ds=>aggiungi(ds,campo,orePerGiorno));
+    });
+  };
+  ripartisci('permesso','orePermesso');
+  ripartisci('rol','oreRol');
+  // Malattia: giorni lavorativi del periodo, valorizzati a ore/giorno standard (nessun workflow di approvazione)
+  malattie.forEach(m=>espandiGiorniLavorativi(m.dataInizio,m.dataFine).forEach(ds=>aggiungi(ds,'oreFestivitaMalattia',oreGiorno)));
 }
 
 function startApp(){
@@ -1832,6 +1872,7 @@ async function loadDashboard(){
         db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
       ]);
       const days={};snap.forEach(d=>{days[d.id]=d.data()});snapNext.forEach(d=>{days[d.id]=d.data()});
+      iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
       // I totali della dashboard restano riferiti al solo ANNO corrente
       const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(days).filter(([id])=>id.startsWith(String(ANNO)+'-')).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0)});
       dipDataCache[emp.username]={days,totals};
@@ -2529,7 +2570,7 @@ function apriModificaDip(username){
   // Tariffe
   const t=emp.tariffe||{};
   ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
-   'oreAttivitaGenerali','oreFerie','orePermesso','oreFestivitaMalattia',
+   'oreAttivitaGenerali','oreFerie','orePermesso','oreRol','oreFestivitaMalattia',
    'oreRecuperoElettrico','oreRecuperoMeccanico','kmPercorsi'].forEach(k=>{
     const el=document.getElementById('t-'+k);
     if(el)el.value=t[k]||'';
@@ -2565,7 +2606,7 @@ async function salvaDipendente(){
   try{
     const tariffe={};
     ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
-     'oreAttivitaGenerali','oreFerie','orePermesso','oreFestivitaMalattia',
+     'oreAttivitaGenerali','oreFerie','orePermesso','oreRol','oreFestivitaMalattia',
      'oreRecuperoElettrico','oreRecuperoMeccanico','kmPercorsi'].forEach(k=>{
       const v=parseFloat(document.getElementById('t-'+k)?.value)||0;
       if(v>0)tariffe[k]=v;
@@ -2894,6 +2935,7 @@ function esportaDetPeriodo(formato){
         snap.forEach(d=>{all[d.id]=d.data()});
       }catch(e){}
     }
+    iniettaAssenzeInGiorni(all,detUser,oreGiorno);
     const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
     if(formato==='excel')generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno);else generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno);
   },{titolo:'Esporta Ore — '+nome});
@@ -3010,6 +3052,7 @@ async function esportaDetPDF(){
   const pref=pdfAnno+'-'+pad(pdfMese+1);
   const snap=await db.collection('timesheets').doc(String(pdfAnno)).collection('dipendenti').doc(detUser).collection('giorni').get();
   const all={};snap.forEach(d=>{if(d.id.startsWith(pref))all[d.id]=d.data()});
+  iniettaAssenzeInGiorni(all,detUser,oreGiornoDip(emp));
   const giorni=Object.keys(all).sort();
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -3094,6 +3137,7 @@ async function loadCostiMensili(){
   const tuttiDati=await Promise.all(dipList.map(async emp=>{
     const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
     const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
     return{...emp,days};
   }));
   // Crea tabella per mese
@@ -3142,6 +3186,7 @@ async function esportaCostiExcel(){
   const tuttiDati=await Promise.all(dipList.map(async emp=>{
     const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
     const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
     return{...emp,days};
   }));
   const wb=XLSX.utils.book_new();
@@ -3290,6 +3335,7 @@ async function loadArchivio(){
   for(const emp of dipDaVisualizzare){
     const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
     const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
     const tariffe=emp.tariffe||{};
     const totals={};CN.forEach(c=>{totals[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
     const totOre=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totals[c.k],0);
@@ -4777,20 +4823,23 @@ async function statCalcolaTutto(){
 const STAT_TIPI=[
   {k:'ordinarie',l:'Ordinarie',c:'#7A9E8E',campi:['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico','oreAttivitaGenerali']},
   {k:'ferie',l:'Ferie',c:'#4F8A5B',campi:['oreFerie']},
-  {k:'festMal',l:'Festività/Malattia',c:'#A855F7',campi:['oreFestivitaMalattia']},
+  {k:'festMal',l:'Malattia',c:'#A855F7',campi:['oreFestivitaMalattia']},
   {k:'permessi',l:'Permessi',c:'#F59E0B',campi:['orePermesso']},
+  {k:'rol',l:'ROL',c:'#3B82F6',campi:['oreRol']},
   {k:'recuperi',l:'Recuperi',c:'#6B7280',campi:['oreRecuperoElettrico','oreRecuperoMeccanico']},
 ];
 async function statCalcolaTipologia(p){
-  const perMese={}; // 'YYYY-MM' -> {ordinarie,ferie,festMal,permessi,recuperi}
+  const perMese={}; // 'YYYY-MM' -> {ordinarie,ferie,festMal,permessi,rol,recuperi}
   for(const y of periodoAnni(p)){
     for(const emp of (dipList||[])){
       try{
         const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-        snap.forEach(d=>{
-          const ds=d.id;if(!periodoInRange(ds,p))return;
-          const dd=d.data();const ym=ds.substring(0,7);
-          if(!perMese[ym])perMese[ym]={ordinarie:0,ferie:0,festMal:0,permessi:0,recuperi:0};
+        const days={};snap.forEach(d=>{days[d.id]=d.data()});
+        iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
+        Object.entries(days).forEach(([ds,dd])=>{
+          if(!periodoInRange(ds,p))return;
+          const ym=ds.substring(0,7);
+          if(!perMese[ym])perMese[ym]={ordinarie:0,ferie:0,festMal:0,permessi:0,rol:0,recuperi:0};
           STAT_TIPI.forEach(t=>{perMese[ym][t.k]+=t.campi.reduce((s,k)=>s+(parseFloat(dd[k])||0),0)});
         });
       }catch(e){}
@@ -4802,9 +4851,9 @@ async function statCalcolaTipologia(p){
 }
 function statRenderTipologia(){
   const tbody=document.getElementById('stat-tipologia-tbody');
-  if(!STAT_tipologia.length){tbody.innerHTML='<tr><td colspan="6" class="empty-state">Nessun dato per il periodo selezionato</td></tr>';}
+  if(!STAT_tipologia.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessun dato per il periodo selezionato</td></tr>';}
   else{
-    tbody.innerHTML=STAT_tipologia.map(r=>`<tr><td>${r.label}</td><td class="td-r">${fmtTitN(r.ordinarie)}</td><td class="td-r">${fmtTitN(r.ferie)}</td><td class="td-r">${fmtTitN(r.festMal)}</td><td class="td-r">${fmtTitN(r.permessi)}</td><td class="td-r">${fmtTitN(r.recuperi)}</td></tr>`).join('')
+    tbody.innerHTML=STAT_tipologia.map(r=>`<tr><td>${r.label}</td><td class="td-r">${fmtTitN(r.ordinarie)}</td><td class="td-r">${fmtTitN(r.ferie)}</td><td class="td-r">${fmtTitN(r.festMal)}</td><td class="td-r">${fmtTitN(r.permessi)}</td><td class="td-r">${fmtTitN(r.rol)}</td><td class="td-r">${fmtTitN(r.recuperi)}</td></tr>`).join('')
       +`<tr class="td-bold"><td>TOTALE</td>${STAT_TIPI.map(t=>`<td class="td-r">${fmtTitN(STAT_tipologia.reduce((s,r)=>s+r[t.k],0))}</td>`).join('')}</tr>`;
   }
   if(typeof Chart==='undefined')return;
