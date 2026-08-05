@@ -940,8 +940,17 @@ async function inviaRichiestaSblocco(){
   const alertEl=document.getElementById('blocked-alert');
   btn.disabled=true;
   try{
-    const esistente=await db.collection('richieste_sblocco').where('username','==',BLOCKED_username).where('stato','==','in_attesa').get();
-    if(!esistente.empty){
+    // Il controllo duplicati richiede una sessione autenticata attiva. Un utente bloccato
+    // può però trovarsi senza sessione valida (persistenza browser persa, token scaduto, ecc.):
+    // in quel caso saltiamo il controllo invece di bloccare l'intero invio con un errore.
+    let giaInviata=false;
+    try{
+      const esistente=await db.collection('richieste_sblocco').where('username','==',BLOCKED_username).where('stato','==','in_attesa').get();
+      giaInviata=!esistente.empty;
+    }catch(checkErr){
+      console.log('Controllo richieste duplicate non disponibile (si procede comunque):',checkErr.message);
+    }
+    if(giaInviata){
       alertEl.innerHTML='<div class="alert-box alert-ok">Richiesta già inviata, in attesa di risposta.</div>';
       btn.style.display='none';
       return;
