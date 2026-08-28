@@ -739,7 +739,7 @@ tbody tr:hover{background:var(--paper)}
             <button class="btn btn-sm" onclick="goPage('budget',document.querySelector('.nav-item[data-page=budget]'))">← Budget Contract</button>
             <div class="page-title" id="bc-det-title">Commessa</div>
           </div>
-          <button class="btn" onclick="apriModalTariffeCommessa()">✎ Tariffe & Monte Ore</button>
+          <button class="btn" onclick="apriModalTariffeCommessa()">✎ Modifica dati o elimina</button>
         </div>
 
         <div class="card" style="margin-bottom:18px">
@@ -1128,6 +1128,7 @@ tbody tr:hover{background:var(--paper)}
       <div><label class="fl">Monte Ferie (ore)</label><input class="fi" id="edit-ferie" type="number"></div>
       <div><label class="fl">Monte Permessi (ore)</label><input class="fi" id="edit-permessi" type="number"></div>
       <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="edit-rol" type="number"></div>
+      <div><label class="fl">Giorni inattività prima del blocco</label><input class="fi" id="edit-giorni-inattivita" type="number" min="1" step="1" placeholder="2"></div>
       <div><label class="fl">Livello (Budget Contract)</label>
         <select class="fi" id="edit-livello">
           <option value="senior">Senior</option>
@@ -1205,7 +1206,7 @@ tbody tr:hover{background:var(--paper)}
 <!-- MODAL TARIFFE/MONTE ORE COMMESSA -->
 <div class="modal-overlay" id="modal-commessa-tariffe">
   <div class="modal" style="max-width:520px">
-    <div class="modal-title">Tariffe & Monte Ore</div>
+    <div class="modal-title">Modifica dati o elimina</div>
     <div class="modal-sub" id="bc-tariffe-sub"></div>
     <div id="bc-tariffe-alert"></div>
     <div class="form-grid" style="margin-bottom:6px">
@@ -1692,7 +1693,8 @@ async function checkInattivita(){
         if(dow!==0&&dow!==6&&!FESTIVITA_CHECK.includes(ds))ggLav++;
         cur.setDate(cur.getDate()+1);
       }
-      if(ggLav>=2){
+      const sogliaGiorni=parseInt(d.giorniInattivita)||2;
+      if(ggLav>=sogliaGiorni){
         promises.push(
           db.collection('dipendenti').doc(docSnap.id).update({
             bloccatoInattivita:true,
@@ -2535,7 +2537,7 @@ async function creaDipendente(){
     // 1) Crea l'account di accesso (Firebase Authentication)
     await creaAccountAuthSecondario(email,p);
     // 2) Scrive il profilo su Firestore — NIENTE password in chiaro, solo l'email per il login
-    const rec={nome:n,cognome:c,email,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,livello,abilitato:true,createdAt:new Date().toISOString()};
+    const rec={nome:n,cognome:c,email,tipoOrario:orario,monteFerie:ferie,montePermesso:permessi,monteRol:rol,giorniInattivita:2,livello,abilitato:true,createdAt:new Date().toISOString()};
     await db.collection('dipendenti').doc(u).set(rec);
     dipList.push({username:u,...rec});
     dipDataCache[u]={days:{},totals:{}};
@@ -2566,6 +2568,7 @@ function apriModificaDip(username){
   document.getElementById('edit-ferie').value=emp.monteFerie||0;
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
   document.getElementById('edit-rol').value=emp.monteRol||0;
+  document.getElementById('edit-giorni-inattivita').value=emp.giorniInattivita||2;
   document.getElementById('edit-livello').value=emp.livello||'senior';
   // Tariffe
   const t=emp.tariffe||{};
@@ -2618,6 +2621,7 @@ async function salvaDipendente(){
       monteFerie:parseFloat(document.getElementById('edit-ferie').value)||0,
       montePermesso:parseFloat(document.getElementById('edit-permessi').value)||0,
       monteRol:parseFloat(document.getElementById('edit-rol').value)||0,
+      giorniInattivita:parseInt(document.getElementById('edit-giorni-inattivita').value)||2,
       livello:document.getElementById('edit-livello').value,
       tariffe,
       dataAssunzione:document.getElementById('edit-data-assunzione').value||'',

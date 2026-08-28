@@ -150,6 +150,8 @@ a{text-decoration:none;color:inherit}
 .cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-congedo.selected,.cal-day.gc-chiusura-festivo.selected,.cal-day.gc-compilato.selected{background:var(--blu)!important;color:#fff!important;opacity:1}
 .cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
 .cal-day.selected::after{display:none}
+.cal-day.gc-mancante::before{content:'❗';position:absolute;top:-4px;right:-3px;font-size:12px;line-height:1;filter:drop-shadow(0 0 1px rgba(255,255,255,.9))}
+.cal-day.selected::before{display:none}
 .cal-legenda{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-family:'Inter',monospace;font-size:10px;color:var(--ink4)}
 .cal-legenda span{display:flex;align-items:center;gap:4px}
 
@@ -628,7 +630,12 @@ tbody tr:last-child{border-bottom:none}
       <div class="page" id="page-budget">
         <div class="page-header">
           <div class="page-title">📁 Budget Contract</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="field-input" id="bc-list-search-dip" type="text" style="max-width:240px" placeholder="Cerca per numero o nome..." oninput="renderListaCommesseDip()">
+            <button class="btn btn-sm" onclick="loadCommesseDip(true)">🔄 Aggiorna</button>
+          </div>
         </div>
+        <div class="filtri" id="bc-anni-wrap-dip" style="margin-bottom:14px"></div>
         <div id="lista-commesse-dip"><div class="empty-state">Caricamento...</div></div>
       </div>
 
@@ -827,6 +834,7 @@ let DATI_CARICATI=false;
 
 function pad(n){return String(n).padStart(2,'0')}
 function dsOf(m,g){const{anno,mese}=annoMese(m);return `${anno}-${pad(mese+1)}-${pad(g)}`}
+function dsOggi(){const o=new Date();return `${o.getFullYear()}-${pad(o.getMonth()+1)}-${pad(o.getDate())}`}
 function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
 function isFestivo(ds){return FESTIVITA.includes(ds)}
 function getDays(m){return new Date(ANNO,m+1,0).getDate()}
@@ -1007,12 +1015,13 @@ async function checkInattivita(){
       while(cur<oggi){
         const dow=cur.getDay();
         const ds=cur.toISOString().split('T')[0];
-        if(dow!==0&&dow!==6&&!['2026-01-01','2026-01-06','2026-04-05','2026-04-06','2026-04-25','2026-05-01','2026-06-02','2026-08-15','2026-11-01','2026-12-08','2026-12-25','2026-12-26'].includes(ds)){
+        if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds)){
           ggLav++;
         }
         cur.setDate(cur.getDate()+1);
       }
-      if(ggLav>=2){
+      const sogliaGiorni=parseInt(d.giorniInattivita)||2;
+      if(ggLav>=sogliaGiorni){
         await db.collection('dipendenti').doc(docSnap.id).update({bloccatoInattivita:true,abilitato:false});
       }
     });
@@ -1057,6 +1066,7 @@ async function startApp(){
   initCal();
   await Promise.all([caricaTuttiDati(), loadCommesseDip()]);
   loadMese(meseSel);
+  selectDay(dsOggi()); // apre subito il giorno corrente, così l'utente lo vede al primo accesso
   aggiornaRiepilogoSaldi();
   renderCalendarioFerie();
   // init select riepilogo mesi
@@ -1241,6 +1251,7 @@ function loadMese(m){
 function renderCal(m){
   const g=document.getElementById('cal-giorni');g.innerHTML='';
   const primo=getPrimo(m),giorni=getDays(m);
+  const oggiDs=dsOggi();
   for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
   for(let day=1;day<=giorni;day++){
     const ds=dsOf(m,day);
@@ -1248,6 +1259,7 @@ function renderCal(m){
     const festivo=isFestivo(ds);
     const assenza=dati?dati['_tipo_assenza']:null;
     const chius=chiusuraDelGiorno(ds);
+    const weekend=isWE(m,day);
     const btn=document.createElement('button');
     let cls='cal-day';
     // Priorità colore: chiusura+festivo (strisce) > chiusura > malattia > ferie > congedo > festivo > permesso > rol > compilato (grigio) > (tutto il resto: casella vuota)
@@ -1260,6 +1272,8 @@ function renderCal(m){
     else if(assenza==='permesso')cls+=' gc-permesso';
     else if(assenza==='rol')cls+=' gc-rol';
     else if(totaleGiorno(dati)>0)cls+=' gc-compilato';
+    // Giorno passato, lavorativo (non weekend, non festivo, non chiusura) e completamente vuoto: segnalato con ❗
+    if(!chius&&!festivo&&!weekend&&ds<oggiDs&&!assenza&&totaleGiorno(dati)<=0)cls+=' gc-mancante';
     if(giornoSel===ds)cls+=' selected';
     btn.className=cls;btn.textContent=day;
     btn.onclick=()=>selectDay(ds);
@@ -2118,27 +2132,68 @@ function dipGoPage(pid){
   document.getElementById('topbar-title').textContent=titles[pid]||'';
 }
 
-async function loadCommesseDip(){
+let BC_commesseLoadedDip=false, BC_listAnnoDip='tutti';
+async function loadCommesseDip(forza){
   const el=document.getElementById('lista-commesse-dip');
+  if(BC_commesseLoadedDip&&!forza){renderListaCommesseDip();return}
   el.innerHTML='<div class="empty-state">Caricamento...</div>';
   try{
     const snap=await db.collection('commesse').get();
     BC_commesse=snap.docs.map(d=>({numero:d.id,...d.data()})).sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
-    if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa disponibile al momento.</div>';return}
-    el.innerHTML=BC_commesse.map(c=>`
-      <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
-        <div class="commessa-num">${c.numero}</div>
-        <div class="commessa-info">
-          <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
-          <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${c.monteOreEle||0}h · Meccanico ${c.monteOreMec||0}h</div>
-        </div>
-        <div class="commessa-pills">
-          <span class="commessa-pill">Sr ${bcEuro(c.tariffaSenior)}/h</span>
-          <span class="commessa-pill">Jr ${bcEuro(c.tariffaJunior)}/h</span>
-          <span class="commessa-pill">Km ${bcEuro(c.tariffaKm)}</span>
-        </div>
-      </div>`).join('');
+    BC_commesseLoadedDip=true;
+    renderListaCommesseDip();
   }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
+}
+function bcSetAnnoListDip(v,btn){
+  BC_listAnnoDip=v;
+  document.querySelectorAll('#bc-anni-wrap-dip .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderListaCommesseDip();
+}
+function renderBcAnniBarDip(){
+  const wrap=document.getElementById('bc-anni-wrap-dip');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${BC_listAnnoDip==='tutti'?'active':''}" onclick="bcSetAnnoListDip('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(BC_listAnnoDip)===String(a)?'active':''}" onclick="bcSetAnnoListDip(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${BC_listAnnoDip==='nd'?'active':''}" onclick="bcSetAnnoListDip('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function bcOrdinaPerAnnoDip(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
+function renderListaCommesseDip(){
+  const el=document.getElementById('lista-commesse-dip');
+  renderBcAnniBarDip();
+  if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa disponibile al momento.</div>';return}
+  const f=(document.getElementById('bc-list-search-dip')?.value||'').trim().toLowerCase();
+  let listaBC=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  listaBC=listaBC.filter(c=>{
+    if(BC_listAnnoDip==='tutti')return true;
+    if(BC_listAnnoDip==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(BC_listAnnoDip);
+  });
+  listaBC=bcOrdinaPerAnnoDip(listaBC);
+  if(!listaBC.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata per la ricerca.</div>';return}
+  el.innerHTML=listaBC.map(c=>`
+    <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
+      <div class="commessa-num">${c.numero}</div>
+      <div class="commessa-info">
+        <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${c.monteOreEle||0}h · Meccanico ${c.monteOreMec||0}h</div>
+      </div>
+      <div class="commessa-pills">
+        <span class="commessa-pill">Sr ${bcEuro(c.tariffaSenior)}/h</span>
+        <span class="commessa-pill">Jr ${bcEuro(c.tariffaJunior)}/h</span>
+        <span class="commessa-pill">Km ${bcEuro(c.tariffaKm)}</span>
+      </div>
+    </div>`).join('');
 }
 
 async function bcCaricaRighe(numero){
