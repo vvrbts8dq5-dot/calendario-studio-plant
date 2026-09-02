@@ -732,6 +732,7 @@ tbody tr:hover{background:var(--paper)}
           </div>
         </div>
         <div style="font-size:11px;color:var(--ink4);margin-bottom:14px">Elenco sempre aggiornato con le commesse create in Budget Contract. Le note sono modificabili qui e si salvano da sole.</div>
+        <div id="corr-nomi-commesse-wrap"></div>
         <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
         <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -1187,7 +1188,9 @@ tbody tr:hover{background:var(--paper)}
     <div class="form-grid" style="margin-bottom:6px">
       <div><label class="fl">N° Commessa</label><input class="fi" id="bc-n-numero" type="text" placeholder="es. 26001"></div>
       <div><label class="fl">Anno</label><input class="fi" id="bc-n-anno" type="number" value="2026"></div>
-      <div style="grid-column:1/-1"><label class="fl">Committente</label><input class="fi" id="bc-n-committente" type="text"></div>
+      <div style="grid-column:1/-1"><label class="fl">Nome Commessa</label><input class="fi" id="bc-n-committente" type="text" placeholder="es. Casa della Farina">
+        <div style="font-size:11px;color:var(--ink4);margin-top:3px">Verrà salvato automaticamente come "N°_Nome", es. 26085_Casa della Farina</div>
+      </div>
       <div style="grid-column:1/-1"><label class="fl">Progetto</label><input class="fi" id="bc-n-progetto" type="text"></div>
       <div style="grid-column:1/-1"><label class="fl">Note</label><textarea class="fi" id="bc-n-note" rows="2" placeholder="Note interne, visibili nella Rubrica Commesse"></textarea></div>
     </div>
@@ -1854,7 +1857,7 @@ function goPage(pid,btn){
   if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
-  if(pid==='rubrica')loadCommesse().then(renderRubrica);
+  if(pid==='rubrica')loadCommesse().then(()=>{renderRubrica();if(typeof renderCorrNomiCommesseBanner==='function')renderCorrNomiCommesseBanner();});
   if(pid==='statistiche')initStatistiche();
   if(pid==='cestino')loadCestino();
 }
@@ -4347,6 +4350,19 @@ function apriModalNuovaCommessa(){
   document.getElementById('modal-commessa-nuova').classList.add('open');
 }
 
+// Compone il nome commessa sempre nel formato "numero_nome", così è identico
+// ovunque compaia nell'app (Rubrica, Budget Contract, menu dipendenti,
+// Contabilità...). Stessa identica logica di cncComponiCommittente in
+// correzione_nomi_commesse.js — tenerle allineate se una delle due cambia.
+// Se il nome digitato contiene già "numero_" davanti, non lo raddoppia.
+function bcComponiCommittente(numero,nomeRaw){
+  numero=(numero||'').toString().trim();
+  let nome=(nomeRaw||'').toString().trim();
+  const prefix=numero+'_';
+  if(nome.startsWith(prefix))nome=nome.slice(prefix.length);
+  return numero?(prefix+nome):nome;
+}
+
 async function salvaNuovaCommessa(){
   const alertEl=document.getElementById('bc-nuova-alert');
   const numero=document.getElementById('bc-n-numero').value.trim();
@@ -4355,7 +4371,7 @@ async function salvaNuovaCommessa(){
   const rec={
     numero,
     anno:parseInt(document.getElementById('bc-n-anno').value)||ANNO,
-    committente:document.getElementById('bc-n-committente').value.trim(),
+    committente:bcComponiCommittente(numero,document.getElementById('bc-n-committente').value.trim()),
     progetto:document.getElementById('bc-n-progetto').value.trim(),
     note:document.getElementById('bc-n-note').value.trim(),
     tariffaSenior:parseFloat(document.getElementById('bc-n-tsenior').value)||0,
@@ -4963,5 +4979,6 @@ function statEsportaCommessePDF(){
 <script src="importa_storico_orario.js" defer></script>
 <script src="correzione_storico_orario.js" defer></script>
 <script src="pulizia_duplicati.js" defer></script>
+<script src="correzione_nomi_commesse.js" defer></script>
 </body>
 </html>
