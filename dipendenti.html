@@ -1384,28 +1384,34 @@ function renderForm(ds,dati){
 // Fino a 5 righe per giornata: ognuna collegata (in automatico, allo stesso modo
 // dell'autosave esistente) a una riga dentro commesse/{numero}/righe.
 function rcArr(dati){
-  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',nota:(r&&r.nota)||''}));
-  while(a.length<5)a.push({commessa:'',disciplina:'ele',ore:'',nota:''});
+  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',km:(r&&r.km!==undefined)?r.km:'',spese:(r&&r.spese!==undefined)?r.spese:'',nota:(r&&r.nota)||''}));
+  while(a.length<5)a.push({commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
   return a;
 }
 function renderRigheCommesseBox(dati){
   const rows=rcArr(dati);
   return `<div class="card" style="margin-top:16px">
     <div style="font-weight:700;font-size:14px;margin-bottom:2px">📁 Ore per Commessa</div>
-    <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Le ore inserite qui si collegano automaticamente al Budget Contract della commessa scelta. Puoi dividere la giornata su più commesse diverse.</div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Le ore inserite qui si collegano automaticamente al Budget Contract della commessa scelta. Puoi dividere la giornata su più commesse diverse. Km e spese inseriti qui si sommano automaticamente ai campi "Km Percorsi" e "Spese Extra" del giorno, qui sopra.</div>
     ${rows.map((r,i)=>`
-      <div style="display:grid;grid-template-columns:1.7fr 1fr .8fr 1.3fr auto;gap:8px;margin-bottom:8px;align-items:center">
-        <select class="field-input" id="rc-commessa-${i}" onchange="rcChange(${i},'commessa',this.value)">
-          <option value="">— Nessuna commessa —</option>
-          ${BC_commesse.map(c=>`<option value="${c.numero}" ${r.commessa===c.numero?'selected':''}>${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('')}
-        </select>
-        <select class="field-input" onchange="rcChange(${i},'disciplina',this.value)">
-          <option value="ele" ${r.disciplina!=='mec'?'selected':''}>⚡ Elettrico</option>
-          <option value="mec" ${r.disciplina==='mec'?'selected':''}>⚙️ Meccanico</option>
-        </select>
-        <input class="field-input" type="number" min="0" step="0.5" placeholder="Ore" value="${r.ore===''?'':r.ore}" oninput="rcChange(${i},'ore',this.value)">
-        <input class="field-input" type="text" placeholder="Nota (opz.)" value="${String(r.nota||'').replace(/"/g,'&quot;')}" oninput="rcChange(${i},'nota',this.value)">
-        <button class="btn btn-sm" onclick="rcClear(${i})" title="Svuota riga">🗑</button>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1.7fr 1fr .8fr auto;gap:8px;align-items:center">
+          <select class="field-input" id="rc-commessa-${i}" onchange="rcChange(${i},'commessa',this.value)">
+            <option value="">— Nessuna commessa —</option>
+            ${BC_commesse.map(c=>`<option value="${c.numero}" ${r.commessa===c.numero?'selected':''}>${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('')}
+          </select>
+          <select class="field-input" onchange="rcChange(${i},'disciplina',this.value)">
+            <option value="ele" ${r.disciplina!=='mec'?'selected':''}>⚡ Elettrico</option>
+            <option value="mec" ${r.disciplina==='mec'?'selected':''}>⚙️ Meccanico</option>
+          </select>
+          <input class="field-input" type="number" min="0" step="0.5" placeholder="Ore" value="${r.ore===''?'':r.ore}" oninput="rcChange(${i},'ore',this.value)">
+          <button class="btn btn-sm" onclick="rcClear(${i})" title="Svuota riga">🗑</button>
+        </div>
+        <div style="display:grid;grid-template-columns:.7fr .9fr 1.6fr;gap:8px;margin-top:6px">
+          <input class="field-input" type="number" min="0" step="1" placeholder="Km" value="${r.km===''?'':r.km}" oninput="rcChange(${i},'km',this.value)">
+          <input class="field-input" type="number" min="0" step="0.01" placeholder="Spese (€)" value="${r.spese===''?'':r.spese}" oninput="rcChange(${i},'spese',this.value)">
+          <input class="field-input" type="text" placeholder="Nota (opz.)" value="${String(r.nota||'').replace(/"/g,'&quot;')}" oninput="rcChange(${i},'nota',this.value)">
+        </div>
       </div>`).join('')}
   </div>`;
 }
@@ -1414,21 +1420,43 @@ function rcEnsure(){
   if(!cache[giornoSel])cache[giornoSel]={};
   if(!cache[giornoSel].righeCommesse)cache[giornoSel].righeCommesse=rcArr(ALL_GIORNI[giornoSel]||{});
   const arr=cache[giornoSel].righeCommesse;
-  while(arr.length<5)arr.push({commessa:'',disciplina:'ele',ore:'',nota:''});
+  while(arr.length<5)arr.push({commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
   return arr;
+}
+// Applica un delta (positivo o negativo) al campo giornata 'kmPercorsi'/'speseExtra' quando
+// cambia un valore km/spese di una riga commessa, sommandolo a quanto già presente nel campo
+// (che resta comunque liberamente modificabile a mano dal dipendente in qualsiasi momento).
+function rcApplicaDeltaTotale(campo,delta){
+  if(!giornoSel||!cache[giornoSel]||!delta)return;
+  const attuale=parseFloat(cache[giornoSel][campo])||0;
+  const nuovo=Math.round((attuale+delta)*100)/100;
+  cache[giornoSel][campo]=nuovo;
+  const el=document.getElementById('f-'+campo);
+  if(el)el.value=nuovo;
 }
 function rcChange(i,field,value){
   const arr=rcEnsure();
   if(!arr)return;
-  if(!arr[i])arr[i]={commessa:'',disciplina:'ele',ore:'',nota:''};
-  arr[i][field]=field==='ore'?(value===''?'':(parseFloat(value)||0)):value;
+  if(!arr[i])arr[i]={commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  if(field==='km'||field==='spese'){
+    const nuovo=value===''?0:(parseFloat(value)||0);
+    const vecchio=parseFloat(arr[i][field])||0;
+    arr[i][field]=value===''?'':nuovo;
+    rcApplicaDeltaTotale(field==='km'?'kmPercorsi':'speseExtra',nuovo-vecchio);
+  }else{
+    arr[i][field]=field==='ore'?(value===''?'':(parseFloat(value)||0)):value;
+  }
   if(saveTimer)clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
 }
 function rcClear(i){
   const arr=rcEnsure();
   if(!arr)return;
-  arr[i]={commessa:'',disciplina:'ele',ore:'',nota:''};
+  const kmVecchio=parseFloat(arr[i]&&arr[i].km)||0;
+  const speseVecchie=parseFloat(arr[i]&&arr[i].spese)||0;
+  arr[i]={commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  rcApplicaDeltaTotale('kmPercorsi',-kmVecchio);
+  rcApplicaDeltaTotale('speseExtra',-speseVecchie);
   renderForm(giornoSel,cache[giornoSel]);
   if(saveTimer)clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
@@ -1472,7 +1500,7 @@ async function syncRigheCommesseBC(ds,curr){
         username:U.username,nomeCompleto,tipoPersona:'dipendente',
         livello:profilo.livello||'senior',disciplina:c.disciplina||'ele',
         data:ds,descrizione:(c.nota||'').trim()||'(da calendario ore)',
-        ore:currOre,speseVive:0,km:0,
+        ore:currOre,speseVive:parseFloat(c.spese)||0,km:parseFloat(c.km)||0,
         origineCalendario:true,
         createdBy:U.username,createdAt:new Date().toISOString()
       },{merge:true}).catch(e=>console.log('Sync BC calendario:',e.message)));

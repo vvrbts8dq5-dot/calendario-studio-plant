@@ -965,6 +965,7 @@ tbody tr:hover{background:var(--paper)}
             <div><label class="fl">Ore Offerte/Contratti</label><input class="fi" id="tit-oreOfferte" type="number" step="0.5" min="0"></div>
             <div><label class="fl">Altro (ore)</label><input class="fi" id="tit-oreAltro" type="number" step="0.5" min="0"></div>
             <div><label class="fl">Km A/R</label><input class="fi" id="tit-kmAR" type="number" step="1" min="0"></div>
+            <div><label class="fl">Spese (€)</label><input class="fi" id="tit-spese" type="number" step="0.01" min="0"></div>
           </div>
           <div style="margin-top:16px;display:flex;gap:8px">
             <button class="btn btn-ink" onclick="salvaRigaTit()">✓ Salva</button>
@@ -978,7 +979,7 @@ tbody tr:hover{background:var(--paper)}
             <thead><tr>
               <th>Data</th><th>Attività Svolta</th><th>Rif. Commessa</th>
               <th class="td-r">Societarie</th><th class="td-r">Commessa</th><th class="td-r">Altre Attività</th>
-              <th class="td-r">Offerte</th><th class="td-r">Altro</th><th class="td-r">Km A/R</th><th>Azioni</th>
+              <th class="td-r">Offerte</th><th class="td-r">Altro</th><th class="td-r">Km A/R</th><th class="td-r">Spese</th><th>Azioni</th>
             </tr></thead>
             <tbody id="tit-tbody"></tbody>
           </table>
@@ -3622,7 +3623,7 @@ const TIT_ORE=[
   {k:'oreIndirette',l:'Percentuale tempo per lavoro indiretto (organizzazione interna, riunioni, corsi, formazione)',c:'#FBE3D0',ct:'#b04a17'},
   {k:'oreOfferte',l:'Percentuale tempo per attività commerciale (Offerte, contratti, ecc.)',c:'#FDF3C9',ct:'#8a6d00'},
 ];
-const TIT_CAMPI_N=['oreSocietarie','oreCommessa','oreIndirette','oreOfferte','oreAltro','kmAR'];
+const TIT_CAMPI_N=['oreSocietarie','oreCommessa','oreIndirette','oreOfferte','oreAltro','kmAR','spese'];
 let TIT_target=null;         // username del titolare visualizzato
 let TIT_listaTitolari=[];    // titolari (per admin non titolare)
 let TIT_righe=[];            // cache righe anno corrente del target
@@ -3763,7 +3764,7 @@ function renderTitMese(){
   const pref=titAnno+'-'+pad(titMeseLoc+1);
   const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(pref));
   const tbody=document.getElementById('tit-tbody');
-  if(!righe.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">Nessuna attività registrata per questo mese.</td></tr>';return}
+  if(!righe.length){tbody.innerHTML='<tr><td colspan="11" class="empty-state">Nessuna attività registrata per questo mese.</td></tr>';return}
   let html='',lastData='';
   righe.forEach(r=>{
     const parts=String(r.data||'').split('-');
@@ -3779,6 +3780,7 @@ function renderTitMese(){
       <td class="td-r">${fmtTitN(r.oreOfferte)}</td>
       <td class="td-r">${fmtTitN(r.oreAltro)}</td>
       <td class="td-r">${(parseFloat(r.kmAR)||0)>0?r.kmAR:'—'}</td>
+      <td class="td-r">${(parseFloat(r.spese)||0)>0?bcEuro(r.spese):'—'}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-sm" onclick="apriFormTit('${r.id}')">✏️</button>
         <button class="btn btn-rosso btn-sm" onclick="eliminaRigaTit('${r.id}')">🗑</button>
@@ -3795,6 +3797,7 @@ function renderTitMese(){
     <td class="td-r">${fmtTitN(tot('oreOfferte'))}</td>
     <td class="td-r">${fmtTitN(tot('oreAltro'))}</td>
     <td class="td-r">${tot('kmAR')>0?tot('kmAR')+' km':'—'}</td>
+    <td class="td-r">${tot('spese')>0?bcEuro(tot('spese')):'—'}</td>
     <td style="font-size:11px;color:var(--blu);white-space:nowrap">${totOre%1===0?totOre:totOre.toFixed(1)}h tot</td>
   </tr>`;
   tbody.innerHTML=html;
@@ -3803,7 +3806,7 @@ function renderTitMese(){
 // Riepilogo annuale (come il foglio Excel dei titolari)
 function renderTitRiepilogo(){
   const tot=k=>TIT_righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
-  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR'),spese=tot('spese');
   const somma=soc+com+ind+off;
   const orePrev=orePrevisteTit();
   const f=v=>v%1===0?v:v.toFixed(1);
@@ -3813,6 +3816,7 @@ function renderTitRiepilogo(){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
       <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Somma ore spese</div><div class="kpi-val">${f(somma)}<span class="kpi-unit">h</span></div></div>
       <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Strada percorsa</div><div class="kpi-val">${f(km)}<span class="kpi-unit">km</span></div></div>
+      <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Spese sostenute</div><div class="kpi-val">${bcEuro(spese)}</div></div>
       <div class="kpi" style="padding:12px 14px"><div class="kpi-label">Altro</div><div class="kpi-val">${f(altro)}<span class="kpi-unit">h</span></div></div>
       <div class="kpi" style="padding:12px 14px">
         <div class="kpi-label">Ore previste ${ANNO}</div>
@@ -3932,7 +3936,7 @@ async function syncRigaTitBC(id,prev,dati){
       username:TIT_target,nomeCompleto:nomeTit(TIT_target),tipoPersona:'admin',
       livello:dati.livello||'senior',disciplina:dati.disciplina||'ele',
       data:dati.data,descrizione:dati.descrizione||'(da Registro Titolare)',
-      ore:currOre,speseVive:0,km:0,
+      ore:currOre,speseVive:parseFloat(dati.spese)||0,km:parseFloat(dati.kmAR)||0,
       origineCalendario:true,
       createdBy:ADM.username,createdAt:new Date().toISOString()
     },{merge:true}).catch(e=>console.log('Sync BC titolare:',e.message)));
@@ -3996,7 +4000,7 @@ function esportaTitPeriodo(formato){
 }
 function generaTitExcelPeriodo(righe,p){
   const tot=k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
-  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR'),spese=tot('spese');
   const somma=soc+com+ind+off;
   const pct=v=>somma>0?Math.round(v/somma*100)+'%':'';
   const wb=XLSX.utils.book_new();
@@ -4007,6 +4011,7 @@ function generaTitExcelPeriodo(righe,p){
     ['Ore utilizzate per attività commerciale (Offerte, contratti, ecc):',off],
     ['Altro:',altro],
     ['Strada percorsa (km):',km],
+    ['Spese sostenute (€):',spese],
     [],
     ['Somma totale delle ore spese:',somma],
     [],
@@ -4016,9 +4021,9 @@ function generaTitExcelPeriodo(righe,p){
     ['Percentuale tempo per attività commerciale:',pct(off)],
   ];
   XLSX.utils.book_append_sheet(wb,expFoglioExcelLibero('Registro Titolare — Riepilogo',nomeTit(TIT_target)+' — '+periodoLabel(p),riep),'Riepilogo');
-  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R'];
-  const rr=righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m&&y?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',r.oreSocietarie||0,r.oreCommessa||0,r.oreIndirette||0,r.oreOfferte||0,r.oreAltro||0,r.kmAR||0]});
-  const footRow=['TOTALE','','',soc,com,ind,off,altro,km];
+  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R','Spese (€)'];
+  const rr=righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m&&y?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',r.oreSocietarie||0,r.oreCommessa||0,r.oreIndirette||0,r.oreOfferte||0,r.oreAltro||0,r.kmAR||0,r.spese||0]});
+  const footRow=['TOTALE','','',soc,com,ind,off,altro,km,spese];
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Registro Titolare — Dettaglio',nomeTit(TIT_target)+' — '+periodoLabel(p),hh,rr,footRow),'Dettaglio');
   XLSX.writeFile(wb,`Registro_Titolare_${nomeTit(TIT_target).replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
 }
@@ -4029,9 +4034,9 @@ function generaTitPDFPeriodo(righe,p){
   const tot=k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
   doc.autoTable({
     startY,
-    head:[['Data','Attività','Commessa','Societ.','Commessa','Indirette','Offerte','Altro','Km']],
-    body:righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',fmtTitN(r.oreSocietarie),fmtTitN(r.oreCommessa),fmtTitN(r.oreIndirette),fmtTitN(r.oreOfferte),fmtTitN(r.oreAltro),fmtTitN(r.kmAR)]}),
-    foot:[['TOTALE','','',fmtTitN(tot('oreSocietarie')),fmtTitN(tot('oreCommessa')),fmtTitN(tot('oreIndirette')),fmtTitN(tot('oreOfferte')),fmtTitN(tot('oreAltro')),fmtTitN(tot('kmAR'))]],
+    head:[['Data','Attività','Commessa','Societ.','Commessa','Indirette','Offerte','Altro','Km','Spese €']],
+    body:righe.map(r=>{const[y,m,g]=String(r.data||'').split('-');return[g&&m?`${g}/${m}/${y}`:(r.data||''),r.descrizione||'',r.commessa||'',fmtTitN(r.oreSocietarie),fmtTitN(r.oreCommessa),fmtTitN(r.oreIndirette),fmtTitN(r.oreOfferte),fmtTitN(r.oreAltro),fmtTitN(r.kmAR),fmtTitN(r.spese)]}),
+    foot:[['TOTALE','','',fmtTitN(tot('oreSocietarie')),fmtTitN(tot('oreCommessa')),fmtTitN(tot('oreIndirette')),fmtTitN(tot('oreOfferte')),fmtTitN(tot('oreAltro')),fmtTitN(tot('kmAR')),fmtTitN(tot('spese'))]],
     styles:EXP_PDF_BODY_STYLE,
     headStyles:EXP_PDF_HEAD_STYLE,
     footStyles:EXP_PDF_FOOT_STYLE,
@@ -4043,7 +4048,7 @@ function generaTitPDFPeriodo(righe,p){
 // Export Excel registro titolare (replica il foglio dei titolari) — non più collegato a un pulsante, sostituito dal periodico
 function esportaTitExcel(){
   const tot=k=>TIT_righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0);
-  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR');
+  const soc=tot('oreSocietarie'),com=tot('oreCommessa'),ind=tot('oreIndirette'),off=tot('oreOfferte'),altro=tot('oreAltro'),km=tot('kmAR'),spese=tot('spese');
   const somma=soc+com+ind+off;
   const orePrev=orePrevisteTit();
   const pct=v=>somma>0?Math.round(v/somma*100)+'%':'';
@@ -4057,6 +4062,7 @@ function esportaTitExcel(){
     ['Ore utilizzate per attività commerciale (Offerte, contratti, ecc):',off],
     ['Altro:',altro],
     ['Strada percorsa (km):',km],
+    ['Spese sostenute (€):',spese],
     [],
     ['Somma totale delle ore spese:',somma],
     [],
@@ -4069,14 +4075,14 @@ function esportaTitExcel(){
     ['Ore di lavoro complessive previste per l’anno '+ANNO+':',orePrev||''],
   ];
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(riep),'Riepilogo');
-  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R'];
+  const hh=['Data','Attività svolta','Rif. Commessa','Ore Societarie','Ore su Commessa','Ore Altre Attività','Ore Offerte e Contratti','Altro','Km A/R','Spese (€)'];
   for(let m=0;m<12;m++){
     const ms=pad(m+1);
     const righe=TIT_righe.filter(r=>String(r.data||'').startsWith(`${ANNO}-${ms}`));
     if(!righe.length)continue;
     const rr=righe.map(r=>{
       const parts=String(r.data||'').split('-');
-      return[parts[2]+'/'+parts[1]+'/'+parts[0],r.descrizione||'',r.commessa||'',parseFloat(r.oreSocietarie)||0,parseFloat(r.oreCommessa)||0,parseFloat(r.oreIndirette)||0,parseFloat(r.oreOfferte)||0,parseFloat(r.oreAltro)||0,parseFloat(r.kmAR)||0];
+      return[parts[2]+'/'+parts[1]+'/'+parts[0],r.descrizione||'',r.commessa||'',parseFloat(r.oreSocietarie)||0,parseFloat(r.oreCommessa)||0,parseFloat(r.oreIndirette)||0,parseFloat(r.oreOfferte)||0,parseFloat(r.oreAltro)||0,parseFloat(r.kmAR)||0,parseFloat(r.spese)||0];
     });
     rr.push(['TOTALE','','',...TIT_CAMPI_N.map(k=>righe.reduce((s,r)=>s+(parseFloat(r[k])||0),0))]);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[m]);
