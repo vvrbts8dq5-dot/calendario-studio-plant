@@ -2117,7 +2117,8 @@ function bcFasi(c){
   if(c&&Array.isArray(c.fasi)&&c.fasi.length)return c.fasi;
   return [{id:'fase1',nome:'Generale',
     tariffaSenior:parseFloat(c&&c.tariffaSenior)||0,tariffaJunior:parseFloat(c&&c.tariffaJunior)||0,tariffaKm:parseFloat(c&&c.tariffaKm)||0,
-    monteOreEle:parseFloat(c&&c.monteOreEle)||0,monteOreMec:parseFloat(c&&c.monteOreMec)||0,
+    monteOreEleSenior:parseFloat(c&&c.monteOreEleSenior)||0,monteOreEleJunior:parseFloat(c&&c.monteOreEleJunior)||0,
+    monteOreMecSenior:parseFloat(c&&c.monteOreMecSenior)||0,monteOreMecJunior:parseFloat(c&&c.monteOreMecJunior)||0,
     listinoStampe:(c&&c.listinoStampe)||JSON.parse(JSON.stringify(BC_DEFAULT_LISTINO))}];
 }
 function bcFaseById(c,faseId){const fasi=bcFasi(c);return fasi.find(f=>f.id===faseId)||fasi[0]}
@@ -2323,7 +2324,7 @@ function renderListaCommesseDip(){
       <div class="commessa-num">${c.numero}</div>
       <div class="commessa-info">
         <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
-        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${fd.monteOreEle||0}h · Meccanico ${fd.monteOreMec||0}h</div>
+        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Ele ${(parseFloat(fd.monteOreEleSenior)||0)+(parseFloat(fd.monteOreEleJunior)||0)}h (Sr ${fd.monteOreEleSenior||0}/Jr ${fd.monteOreEleJunior||0}) · Mec ${(parseFloat(fd.monteOreMecSenior)||0)+(parseFloat(fd.monteOreMecJunior)||0)}h (Sr ${fd.monteOreMecSenior||0}/Jr ${fd.monteOreMecJunior||0})</div>
       </div>
       <div class="commessa-pills">
         ${fasi.length>1?`<span class="commessa-pill" style="font-weight:700">${fasi.length} fasi</span>`:''}
@@ -2408,11 +2409,19 @@ function bcCalcRiepilogo(fase,righe,stampe){
   const costoTrasferta=costoKmTot+speseViveTot;
   const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
   const costoGenerale=costoSeniorTot+costoJuniorTot+costoTrasferta;
-  const monteOreEle=parseFloat(fase.monteOreEle)||0;
-  const monteOreMec=parseFloat(fase.monteOreMec)||0;
+  const monteOreEleSenior=parseFloat(fase.monteOreEleSenior)||0;
+  const monteOreEleJunior=parseFloat(fase.monteOreEleJunior)||0;
+  const monteOreMecSenior=parseFloat(fase.monteOreMecSenior)||0;
+  const monteOreMecJunior=parseFloat(fase.monteOreMecJunior)||0;
+  const monteOreEle=monteOreEleSenior+monteOreEleJunior;
+  const monteOreMec=monteOreMecSenior+monteOreMecJunior;
   return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,oreNonClassificateTot,
     tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
-    costoStampeTot,costoGenerale,monteOreEle,monteOreMec,residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
+    costoStampeTot,costoGenerale,
+    monteOreEleSenior,monteOreEleJunior,monteOreMecSenior,monteOreMecJunior,monteOreEle,monteOreMec,
+    residuoEleSenior:monteOreEleSenior-oreSeniorEle,residuoEleJunior:monteOreEleJunior-oreJuniorEle,
+    residuoMecSenior:monteOreMecSenior-oreSeniorMec,residuoMecJunior:monteOreMecJunior-oreJuniorMec,
+    residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
 }
 
 function bcRenderTutto(commessa){
@@ -2438,26 +2447,30 @@ function bcRenderAnagrafica(c,fase){
     <div class="bc-info-row"><span class="bc-info-key">FASE</span><span class="bc-info-val">${fase.nome||fase.id}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaSenior)}/h</span></div>
     <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaJunior)}/h</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(fase.tariffaKm)}/km</span></div>`;
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(fase.tariffaKm)}/km</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE ELE SENIOR</span><span class="bc-info-val">${fase.monteOreEleSenior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE ELE JUNIOR</span><span class="bc-info-val">${fase.monteOreEleJunior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE MEC SENIOR</span><span class="bc-info-val">${fase.monteOreMecSenior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE MEC JUNIOR</span><span class="bc-info-val">${fase.monteOreMecJunior||0}h</span></div>`;
 }
 
 function bcRenderResidui(riep){
   function cls(res,tot){if(tot<=0)return 'ok';return res>tot*0.2?'ok':res>0?'warn':'danger'}
-  const clsEle=cls(riep.residuoEle,riep.monteOreEle),clsMec=cls(riep.residuoMec,riep.monteOreMec);
-  document.getElementById('bc-residui').innerHTML=`
-    <div class="saldo-card">
-      <div class="saldo-info"><div class="saldo-tipo">⚡ Monte Ore Elettrico</div><div class="saldo-dettaglio">Monte: ${riep.monteOreEle}h · Usate: ${riep.oreEleTot}h</div>
-        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${clsEle}" style="width:${riep.monteOreEle>0?Math.max(0,Math.min(100,Math.round(riep.residuoEle/riep.monteOreEle*100))):0}%"></div></div>
+  function card(icona,titolo,monte,usate,residuo){
+    const c=cls(residuo,monte);
+    return `<div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">${icona} ${titolo}</div><div class="saldo-dettaglio">Monte: ${monte}h · Usate: ${usate}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${c}" style="width:${monte>0?Math.max(0,Math.min(100,Math.round(residuo/monte*100))):0}%"></div></div>
       </div>
-      <div class="saldo-numeri"><div class="saldo-residuo ${clsEle}">${riep.residuoEle}h</div><div class="saldo-sub">${riep.residuoEle<0?'⚠️ superato':'residue'}</div></div>
-    </div>
-    <div class="saldo-card">
-      <div class="saldo-info"><div class="saldo-tipo">⚙️ Monte Ore Meccanico</div><div class="saldo-dettaglio">Monte: ${riep.monteOreMec}h · Usate: ${riep.oreMecTot}h</div>
-        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${clsMec}" style="width:${riep.monteOreMec>0?Math.max(0,Math.min(100,Math.round(riep.residuoMec/riep.monteOreMec*100))):0}%"></div></div>
-      </div>
-      <div class="saldo-numeri"><div class="saldo-residuo ${clsMec}">${riep.residuoMec}h</div><div class="saldo-sub">${riep.residuoMec<0?'⚠️ superato':'residue'}</div></div>
-    </div>
-    <div class="saldo-card">
+      <div class="saldo-numeri"><div class="saldo-residuo ${c}">${residuo}h</div><div class="saldo-sub">${residuo<0?'⚠️ superato':'residue'}</div></div>
+    </div>`;
+  }
+  document.getElementById('bc-residui').innerHTML=
+    card('⚡','Monte Ore Ele Senior',riep.monteOreEleSenior,riep.oreSeniorEle,riep.residuoEleSenior)+
+    card('⚡','Monte Ore Ele Junior',riep.monteOreEleJunior,riep.oreJuniorEle,riep.residuoEleJunior)+
+    card('⚙️','Monte Ore Mec Senior',riep.monteOreMecSenior,riep.oreSeniorMec,riep.residuoMecSenior)+
+    card('⚙️','Monte Ore Mec Junior',riep.monteOreMecJunior,riep.oreJuniorMec,riep.residuoMecJunior)+
+    `<div class="saldo-card">
       <div class="saldo-info"><div class="saldo-tipo">💰 Costo Consuntivato</div><div class="saldo-dettaglio">Manodopera + trasferta</div></div>
       <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--blu)">${bcEuro(riep.costoGenerale)}</div><div class="saldo-sub">totale</div></div>
     </div>`;
