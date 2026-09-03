@@ -688,6 +688,11 @@ tbody tr:last-child{border-bottom:none}
           </div>
         </div>
 
+        <div class="card" style="margin-bottom:18px" id="bc-fase-tabs-card">
+          <div class="section-title">Fasi (Budget Contract)</div>
+          <div id="bc-fase-tabs"></div>
+        </div>
+
         <div class="card" style="margin-bottom:18px">
           <div class="section-title">Anagrafica Commessa</div>
           <div id="bc-anagrafica"></div>
@@ -1410,8 +1415,8 @@ function renderForm(ds,dati){
 // Fino a 5 righe per giornata: ognuna collegata (in automatico, allo stesso modo
 // dell'autosave esistente) a una riga dentro commesse/{numero}/righe.
 function rcArr(dati){
-  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',km:(r&&r.km!==undefined)?r.km:'',spese:(r&&r.spese!==undefined)?r.spese:'',nota:(r&&r.nota)||''}));
-  while(a.length<5)a.push({commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
+  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',faseId:(r&&r.faseId)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',km:(r&&r.km!==undefined)?r.km:'',spese:(r&&r.spese!==undefined)?r.spese:'',nota:(r&&r.nota)||''}));
+  while(a.length<5)a.push({commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
   return a;
 }
 function renderRigheCommesseBox(dati){
@@ -1424,7 +1429,10 @@ function renderRigheCommesseBox(dati){
         <div style="display:grid;grid-template-columns:1.7fr 1fr .8fr auto;gap:8px;align-items:center">
           <select class="field-input" id="rc-commessa-${i}" onchange="rcChange(${i},'commessa',this.value)">
             <option value="">— Nessuna commessa —</option>
-            ${BC_commesse.map(c=>`<option value="${c.numero}" ${r.commessa===c.numero?'selected':''}>${c.numero}${c.committente?(' — '+c.committente):''}</option>`).join('')}
+            ${BC_commesse.map(c=>{
+              const fasi=bcFasi(c);
+              return fasi.map(f=>`<option value="${c.numero}::${f.id}" ${(r.commessa===c.numero&&(r.faseId||fasi[0].id)===f.id)?'selected':''}>${c.numero}${fasi.length>1?(' · '+(f.nome||f.id)):''}${c.committente?(' — '+c.committente):''}</option>`).join('');
+            }).join('')}
           </select>
           <select class="field-input" onchange="rcChange(${i},'disciplina',this.value)">
             <option value="ele" ${r.disciplina!=='mec'?'selected':''}>⚡ Elettrico</option>
@@ -1446,7 +1454,7 @@ function rcEnsure(){
   if(!cache[giornoSel])cache[giornoSel]={};
   if(!cache[giornoSel].righeCommesse)cache[giornoSel].righeCommesse=rcArr(ALL_GIORNI[giornoSel]||{});
   const arr=cache[giornoSel].righeCommesse;
-  while(arr.length<5)arr.push({commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
+  while(arr.length<5)arr.push({commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
   return arr;
 }
 // Applica un delta (positivo o negativo) al campo giornata 'kmPercorsi'/'speseExtra' quando
@@ -1463,8 +1471,12 @@ function rcApplicaDeltaTotale(campo,delta){
 function rcChange(i,field,value){
   const arr=rcEnsure();
   if(!arr)return;
-  if(!arr[i])arr[i]={commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
-  if(field==='km'||field==='spese'){
+  if(!arr[i])arr[i]={commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  if(field==='commessa'){
+    const [numero,faseId]=value?value.split('::'):['',''];
+    arr[i].commessa=numero;
+    arr[i].faseId=faseId||'';
+  }else if(field==='km'||field==='spese'){
     const nuovo=value===''?0:(parseFloat(value)||0);
     const vecchio=parseFloat(arr[i][field])||0;
     arr[i][field]=value===''?'':nuovo;
@@ -1480,7 +1492,7 @@ function rcClear(i){
   if(!arr)return;
   const kmVecchio=parseFloat(arr[i]&&arr[i].km)||0;
   const speseVecchie=parseFloat(arr[i]&&arr[i].spese)||0;
-  arr[i]={commessa:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  arr[i]={commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
   rcApplicaDeltaTotale('kmPercorsi',-kmVecchio);
   rcApplicaDeltaTotale('speseExtra',-speseVecchie);
   renderForm(giornoSel,cache[giornoSel]);
@@ -1527,6 +1539,7 @@ async function syncRigheCommesseBC(ds,curr){
         livello:profilo.livello||'senior',disciplina:c.disciplina||'ele',
         data:ds,descrizione:(c.nota||'').trim()||'(da calendario ore)',
         ore:currOre,speseVive:parseFloat(c.spese)||0,km:parseFloat(c.km)||0,
+        faseId:c.faseId||'',
         origineCalendario:true,
         createdBy:U.username,createdAt:new Date().toISOString()
       },{merge:true}).catch(e=>console.log('Sync BC calendario:',e.message)));
@@ -2096,7 +2109,19 @@ const BC_DEFAULT_LISTINO=[
   {nome:'Acetato',prezzo:0.25},
   {nome:'Cartoncino',prezzo:0.30}
 ];
-let BC_commesse=[],BC_current=null,BC_righe=[],BC_stampe=[];
+let BC_commesse=[],BC_current=null,BC_currentFaseId=null,BC_righe=[],BC_stampe=[];
+
+// ── FASI (più budget per commessa) — sola consultazione/switch, la creazione
+// di nuove fasi resta un'operazione da admin.html ──
+function bcFasi(c){
+  if(c&&Array.isArray(c.fasi)&&c.fasi.length)return c.fasi;
+  return [{id:'fase1',nome:'Generale',
+    tariffaSenior:parseFloat(c&&c.tariffaSenior)||0,tariffaJunior:parseFloat(c&&c.tariffaJunior)||0,tariffaKm:parseFloat(c&&c.tariffaKm)||0,
+    monteOreEle:parseFloat(c&&c.monteOreEle)||0,monteOreMec:parseFloat(c&&c.monteOreMec)||0,
+    listinoStampe:(c&&c.listinoStampe)||JSON.parse(JSON.stringify(BC_DEFAULT_LISTINO))}];
+}
+function bcFaseById(c,faseId){const fasi=bcFasi(c);return fasi.find(f=>f.id===faseId)||fasi[0]}
+function bcRigaFaseId(r,c){return r.faseId||bcFasi(c)[0].id}
 
 // ── TENDINE COMMESSE RICERCABILI (scrivi numero o nome per filtrare) ──
 function makeSearchable(selectEl,placeholder){
@@ -2291,19 +2316,22 @@ function renderListaCommesseDip(){
   });
   listaBC=bcOrdinaPerAnnoDip(listaBC);
   if(!listaBC.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata per la ricerca.</div>';return}
-  el.innerHTML=listaBC.map(c=>`
+  el.innerHTML=listaBC.map(c=>{
+    const fasi=bcFasi(c),fd=fasi[0];
+    return `
     <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
       <div class="commessa-num">${c.numero}</div>
       <div class="commessa-info">
         <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
-        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${c.monteOreEle||0}h · Meccanico ${c.monteOreMec||0}h</div>
+        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Elettrico ${fd.monteOreEle||0}h · Meccanico ${fd.monteOreMec||0}h</div>
       </div>
       <div class="commessa-pills">
-        <span class="commessa-pill">Sr ${bcEuro(c.tariffaSenior)}/h</span>
-        <span class="commessa-pill">Jr ${bcEuro(c.tariffaJunior)}/h</span>
-        <span class="commessa-pill">Km ${bcEuro(c.tariffaKm)}</span>
+        ${fasi.length>1?`<span class="commessa-pill" style="font-weight:700">${fasi.length} fasi</span>`:''}
+        <span class="commessa-pill">Sr ${bcEuro(fd.tariffaSenior)}/h</span>
+        <span class="commessa-pill">Jr ${bcEuro(fd.tariffaJunior)}/h</span>
+        <span class="commessa-pill">Km ${bcEuro(fd.tariffaKm)}</span>
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
 }
 
 async function bcCaricaRighe(numero){
@@ -2315,39 +2343,63 @@ async function bcCaricaStampe(numero){
   BC_stampe=snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
-async function apriCommessaBC(numero){
+async function apriCommessaBC(numero,faseId){
   BC_current=numero;
+  BC_currentFaseId=faseId||null;
   dipGoPage('budget-dettaglio');
   document.getElementById('bc-det-title').textContent='Commessa '+numero;
   document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Caricamento...</div>';
   document.getElementById('bc-residui').innerHTML='<div class="empty-state">Caricamento...</div>';
   document.getElementById('bc-tbody-righe').innerHTML='';
   document.getElementById('bc-tbody-stampe').innerHTML='';
+  const tabsEl=document.getElementById('bc-fase-tabs');if(tabsEl)tabsEl.innerHTML='';
   chiudiFormRigaBC();chiudiFormStampaBC();
   try{
     const doc=await db.collection('commesse').doc(numero).get();
     if(!doc.exists){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Commessa non trovata</div>';return}
     const commessa={numero:doc.id,...doc.data()};
     BC_commesse=BC_commesse.filter(c=>c.numero!==numero).concat([commessa]);
+    if(!BC_currentFaseId)BC_currentFaseId=bcFasi(commessa)[0].id;
     // Mostra subito l'anagrafica: non serve aspettare righe/stampe per questi dati
-    bcRenderAnagrafica(commessa);
+    bcRenderFaseTabsDip(commessa);
+    bcRenderAnagrafica(commessa,bcFaseById(commessa,BC_currentFaseId));
     await Promise.all([bcCaricaRighe(numero),bcCaricaStampe(numero)]);
     bcRenderTutto(commessa);
   }catch(e){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Errore: '+e.message+'</div>'}
 }
 
-function bcCalcRiepilogo(commessa,righe,stampe){
-  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0;
+function bcRenderFaseTabsDip(c){
+  const el=document.getElementById('bc-fase-tabs');
+  if(!el)return;
+  const fasi=bcFasi(c);
+  if(fasi.length<=1){el.innerHTML='<div style="font-size:12px;color:var(--ink4)">Fase unica</div>';return}
+  el.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${fasi.map(f=>`<button class="btn btn-sm ${f.id===BC_currentFaseId?'btn-ink':''}" onclick="bcCambiaFaseDip('${f.id}')">${f.nome||f.id}</button>`).join('')}
+  </div>`;
+}
+function bcCambiaFaseDip(faseId){
+  BC_currentFaseId=faseId;
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  if(!c)return;
+  bcRenderFaseTabsDip(c);
+  bcRenderTutto(c);
+}
+
+function bcCalcRiepilogo(fase,righe,stampe){
+  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0,oreNonClassificateTot=0;
   righe.forEach(r=>{
     const ore=parseFloat(r.ore)||0;
-    if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
+    // Ore storiche importate dal vecchio formato Excel (senza distinzione Ele/Mec,
+    // Senior/Junior): tenute visibili ma escluse dai calcoli di monte ore e costo manodopera.
+    if(r.nonClassificato){oreNonClassificateTot+=ore}
+    else if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
     else{if(r.disciplina==='ele')oreJuniorEle+=ore;else oreJuniorMec+=ore}
     speseViveTot+=parseFloat(r.speseVive)||0;
     kmTot+=parseFloat(r.km)||0;
   });
-  const tariffaSenior=parseFloat(commessa.tariffaSenior)||0;
-  const tariffaJunior=parseFloat(commessa.tariffaJunior)||0;
-  const tariffaKm=parseFloat(commessa.tariffaKm)||0;
+  const tariffaSenior=parseFloat(fase.tariffaSenior)||0;
+  const tariffaJunior=parseFloat(fase.tariffaJunior)||0;
+  const tariffaKm=parseFloat(fase.tariffaKm)||0;
   const oreEleTot=oreSeniorEle+oreJuniorEle;
   const oreMecTot=oreSeniorMec+oreJuniorMec;
   const costoSeniorTot=(oreSeniorEle+oreSeniorMec)*tariffaSenior;
@@ -2356,32 +2408,37 @@ function bcCalcRiepilogo(commessa,righe,stampe){
   const costoTrasferta=costoKmTot+speseViveTot;
   const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
   const costoGenerale=costoSeniorTot+costoJuniorTot+costoTrasferta;
-  const monteOreEle=parseFloat(commessa.monteOreEle)||0;
-  const monteOreMec=parseFloat(commessa.monteOreMec)||0;
-  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,
+  const monteOreEle=parseFloat(fase.monteOreEle)||0;
+  const monteOreMec=parseFloat(fase.monteOreMec)||0;
+  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,oreNonClassificateTot,
     tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
     costoStampeTot,costoGenerale,monteOreEle,monteOreMec,residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
 }
 
 function bcRenderTutto(commessa){
-  bcRenderAnagrafica(commessa);
-  const riep=bcCalcRiepilogo(commessa,BC_righe,BC_stampe);
+  const fase=bcFaseById(commessa,BC_currentFaseId);
+  const righeFase=BC_righe.filter(r=>bcRigaFaseId(r,commessa)===fase.id);
+  const stampeFase=BC_stampe.filter(s=>bcRigaFaseId(s,commessa)===fase.id);
+  bcRenderAnagrafica(commessa,fase);
+  const riep=bcCalcRiepilogo(fase,righeFase,stampeFase);
   bcRenderResidui(riep);
-  bcRenderRighe(BC_righe,commessa);
+  bcRenderRighe(righeFase,fase);
   bcRenderRiepilogo(riep);
-  bcPopolaSelectListino(commessa);
-  bcRenderStampe(BC_stampe);
+  bcPopolaSelectListino(fase);
+  bcRenderStampe(stampeFase);
 }
 
-function bcRenderAnagrafica(c){
+function bcRenderAnagrafica(c,fase){
+  fase=fase||bcFaseById(c,BC_currentFaseId);
   document.getElementById('bc-det-title').textContent='Commessa '+c.numero;
   document.getElementById('bc-anagrafica').innerHTML=`
     <div class="bc-info-row"><span class="bc-info-key">COMMITTENTE</span><span class="bc-info-val">${c.committente||'—'}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">PROGETTO</span><span class="bc-info-val">${c.progetto||'—'}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">ANNO</span><span class="bc-info-val">${c.anno||'—'}</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(c.tariffaSenior)}/h</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(c.tariffaJunior)}/h</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(c.tariffaKm)}/km</span></div>`;
+    <div class="bc-info-row"><span class="bc-info-key">FASE</span><span class="bc-info-val">${fase.nome||fase.id}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaSenior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaJunior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(fase.tariffaKm)}/km</span></div>`;
 }
 
 function bcRenderResidui(riep){
@@ -2406,11 +2463,11 @@ function bcRenderResidui(riep){
     </div>`;
 }
 
-function bcRenderRighe(righe){
+function bcRenderRighe(righe,fase){
   const tb=document.getElementById('bc-tbody-righe');
   if(!righe.length){tb.innerHTML='<tr><td colspan="9" class="empty-state">Nessuna riga inserita</td></tr>';return}
-  const c=BC_commesse.find(x=>x.numero===BC_current)||{};
-  const ts=parseFloat(c.tariffaSenior)||0,tj=parseFloat(c.tariffaJunior)||0,tk=parseFloat(c.tariffaKm)||0;
+  fase=fase||{};
+  const ts=parseFloat(fase.tariffaSenior)||0,tj=parseFloat(fase.tariffaJunior)||0,tk=parseFloat(fase.tariffaKm)||0;
   tb.innerHTML=righe.map(r=>{
     const ore=parseFloat(r.ore)||0;
     const tariffa=r.livello==='senior'?ts:tj;
@@ -2442,12 +2499,13 @@ function bcRenderRiepilogo(riep){
     <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM (${bcEuro(riep.tariffaKm)}/km)</span><span class="bc-info-val">${bcEuro(riep.costoKmTot)}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">TOTALE SPESE DI TRASFERTA</span><span class="bc-info-val">${bcEuro(riep.costoTrasferta)}</span></div>
     <div class="bc-info-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px"><span class="bc-info-key" style="font-weight:700;color:var(--ink)">COSTO GENERALE COMMESSA</span><span class="bc-info-val" style="font-size:15px;color:var(--verde)">${bcEuro(riep.costoGenerale)}</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">Costo stampe (voce separata, vedi sotto)</span><span class="bc-info-val">${bcEuro(riep.costoStampeTot)}</span></div>`;
+    <div class="bc-info-row"><span class="bc-info-key">Costo stampe (voce separata, vedi sotto)</span><span class="bc-info-val">${bcEuro(riep.costoStampeTot)}</span></div>
+    ${riep.oreNonClassificateTot>0?`<div class="bc-info-row"><span class="bc-info-key">Ore storiche non classificate (escluse da monte ore/costo)</span><span class="bc-info-val">${riep.oreNonClassificateTot}h</span></div>`:''}`;
 }
 
-function bcPopolaSelectListino(commessa){
+function bcPopolaSelectListino(fase){
   const sel=document.getElementById('bc-s-voce');
-  const listino=(commessa&&commessa.listinoStampe)||BC_DEFAULT_LISTINO;
+  const listino=(fase&&fase.listinoStampe)||BC_DEFAULT_LISTINO;
   sel.innerHTML=listino.map((v,i)=>`<option value="${i}">${v.nome} — ${bcEuro(v.prezzo)}</option>`).join('');
 }
 
@@ -2491,12 +2549,15 @@ async function salvaRigaBC(){
   if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
   if(!ore||ore<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci le ore lavorate</div>';return}
   const nomeCompleto=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  const c0=BC_commesse.find(x=>x.numero===BC_current);
+  const faseId0=BC_currentFaseId||bcFasi(c0)[0].id;
   const rec={
     username:U.username,nomeCompleto,tipoPersona:'dipendente',
     livello:profilo.livello||'senior',disciplina:document.getElementById('bc-r-disciplina').value,data,
     descrizione:document.getElementById('bc-r-descrizione').value.trim(),
     ore,speseVive:parseFloat(document.getElementById('bc-r-spese').value)||0,
     km:parseFloat(document.getElementById('bc-r-km').value)||0,
+    faseId:faseId0,
     createdBy:U.username,createdAt:new Date().toISOString()
   };
   try{
@@ -2525,7 +2586,7 @@ function apriFormStampaBC(){
   document.getElementById('bc-s-copie').value=1;
   document.getElementById('bc-s-note').value='';
   const c=BC_commesse.find(x=>x.numero===BC_current);
-  bcPopolaSelectListino(c);
+  bcPopolaSelectListino(c?bcFaseById(c,BC_currentFaseId):null);
   document.getElementById('bc-form-stampa').classList.add('open');
 }
 function chiudiFormStampaBC(){const f=document.getElementById('bc-form-stampa');if(f)f.classList.remove('open')}
@@ -2533,7 +2594,9 @@ function chiudiFormStampaBC(){const f=document.getElementById('bc-form-stampa');
 async function salvaStampaBC(){
   const alertEl=document.getElementById('bc-stampa-alert');
   const c=BC_commesse.find(x=>x.numero===BC_current);
-  const listino=(c&&c.listinoStampe)||[];
+  const faseId1=BC_currentFaseId||(c?bcFasi(c)[0].id:null);
+  const fase1=c?bcFaseById(c,faseId1):null;
+  const listino=(fase1&&fase1.listinoStampe)||[];
   const idx=parseInt(document.getElementById('bc-s-voce').value);
   const voce=listino[idx];
   const data=document.getElementById('bc-s-data').value;
@@ -2541,7 +2604,7 @@ async function salvaStampaBC(){
   if(!voce){alertEl.innerHTML='<div class="alert-box alert-err">Seleziona una voce dal listino</div>';return}
   if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
   if(!copie||copie<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci il numero di copie</div>';return}
-  const rec={data,voce:voce.nome,costoUnitario:voce.prezzo,copie,note:document.getElementById('bc-s-note').value.trim(),username:U.username,createdBy:U.username,createdAt:new Date().toISOString()};
+  const rec={data,voce:voce.nome,costoUnitario:voce.prezzo,copie,note:document.getElementById('bc-s-note').value.trim(),faseId:faseId1,username:U.username,createdBy:U.username,createdAt:new Date().toISOString()};
   try{
     await db.collection('commesse').doc(BC_current).collection('stampe').add(rec);
     chiudiFormStampaBC();
