@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Calendario Ore — Dipendenti</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js" defer></script>
+<script src="xlsx-style.min.js" defer></script>
+<style>
+:root{
+  --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
+  --paper:#FAFBFA;--paper2:#F1F6F3;--white:#FFF;--border:#E5E7EB;
+  --blu:#7A9E8E;--blu-dark:#5E7F70;--blu-light:#EAF2ED;
+  --verde:#4F8A5B;--verde-light:#E3F0E6;
+  --amber:#F59E0B;--amber-light:#FEF3E2;
+  --rosso:#DC2626;--rosso-light:#FDECEC;
+  --viola:#C05621;--viola-light:#F5E6DC;
+  --festivo:#A855F7;--festivo-light:#F5EDFC;
+  --gc-festivo:#16A34A;--gc-festivo-bg:#DCFCE7;
+  --gc-chiusura:#DC2626;--gc-chiusura-bg:#FEE2E2;
+  --gc-ferie:#F97316;--gc-ferie-bg:#FFEDD5;
+  --gc-malattia:#8B5CF6;--gc-malattia-bg:#EDE9FE;
+  --gc-permesso:#2563EB;--gc-permesso-bg:#DBEAFE;
+  --gc-rol:#CA8A04;--gc-rol-bg:#FEF9C3;
+  --gc-congedo:#0891B2;--gc-congedo-bg:#CFFAFE;
+  --sidebar-w:240px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;border:none;font-family:'Inter',sans-serif}
+input,select,textarea{font-family:'Inter',sans-serif}
+a{text-decoration:none;color:inherit}
+
+/* LOGIN */
+#login-screen,#blocked-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px}
+.login-box{background:var(--white);border-radius:16px;padding:40px 44px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.login-tag{font-family:'Inter',monospace;font-size:10px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:6px}
+.login-title{font-family:'Inter',sans-serif;font-size:24px;font-weight:800;color:var(--ink);margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--ink4);margin-bottom:28px}
+.f-label{font-size:12px;font-weight:500;color:var(--ink3);display:block;margin-bottom:5px}
+.f-input{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;margin-bottom:14px}
+.f-input:focus{border-color:var(--blu);background:var(--white)}
+.f-select{width:100%;padding:10px 14px;border:.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--paper);color:var(--ink);outline:none}
+.login-btn{width:100%;padding:12px;background:var(--blu);color:#fff;border-radius:8px;font-size:14px;font-weight:500;margin-top:4px;transition:background .15s}
+.login-btn:hover{background:var(--blu-dark)}
+.login-error{font-size:12px;color:var(--rosso);margin-top:10px;background:var(--rosso-light);padding:8px 12px;border-radius:6px;display:none;margin-bottom:12px}
+
+/* APP */
+#app{display:none;height:100vh;overflow:hidden}
+#app.visible{display:flex;flex-direction:row}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:.5px solid #222}
+.logo-tag{font-family:'Inter',monospace;font-size:9px;letter-spacing:.15em;color:var(--blu);text-transform:uppercase;margin-bottom:4px}
+.logo-name{font-family:'Inter',sans-serif;font-size:16px;font-weight:800;color:#fff;line-height:1.1}
+.logo-sub{font-size:11px;color:#555;margin-top:3px}
+.sidebar-section{padding:14px 12px 6px}
+.sidebar-lbl{font-family:'Inter',monospace;font-size:9px;letter-spacing:.12em;color:#444;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#888;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:#1a1a1a;color:#fff}
+.nav-item.active{background:var(--blu);color:#fff}
+.nav-icon{font-size:15px;min-width:18px}
+.sidebar-divider{height:.5px;background:#222;margin:8px 12px}
+.sidebar-footer{padding:14px 20px;border-top:.5px solid #1e1e1e;margin-top:auto}
+.user-name{font-size:13px;font-weight:500;color:#ccc}
+.user-role{font-size:11px;color:#555;margin-bottom:8px}
+.logout-btn{font-size:11px;color:#555;cursor:pointer;border:none;background:none;font-family:'Inter',sans-serif;padding:0;transition:color .15s}
+.logout-btn:hover{color:var(--rosso)}
+
+/* SALDI SIDEBAR */
+.saldo-box{padding:12px 20px;border-top:.5px solid #1e1e1e}
+.saldo-title{font-family:'Inter',monospace;font-size:9px;letter-spacing:.1em;color:#444;text-transform:uppercase;margin-bottom:8px}
+.saldo-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.saldo-label{font-size:11px;color:#666}
+.saldo-val{font-family:'Inter',monospace;font-size:11px;font-weight:500}
+.saldo-val.ok{color:var(--verde)}
+.saldo-val.warn{color:var(--amber)}
+.saldo-val.danger{color:var(--rosso)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:52px;background:var(--white);border-bottom:.5px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
+.topbar-title{font-family:'Inter',sans-serif;font-size:15px;font-weight:700;flex:1}
+.topbar-tag{font-family:'Inter',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em}
+.content{flex:1;overflow-y:auto;padding:24px;background:var(--paper)}
+.page{display:none}
+.page.active{display:block}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:.5px solid var(--border);background:var(--white);color:var(--ink2);transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap}
+.btn:hover{background:var(--paper2)}
+.filtri{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.btn-filtro{padding:5px 12px;border-radius:10px;font-size:12px;font-weight:500;background:var(--white);color:var(--ink4);border:.5px solid var(--border);cursor:pointer;font-family:'Inter',monospace;transition:all .15s}
+.btn-filtro.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn-blu{background:var(--blu);color:#fff;border-color:var(--blu-dark)}
+.btn-blu:hover{background:var(--blu-dark)}
+.btn-verde{background:var(--verde);color:#fff;border-color:#145c37}
+.btn-verde:hover{background:#145c37}
+.btn-rosso{background:var(--rosso);color:#fff;border-color:#a01e1e}
+.btn-rosso:hover{background:#a01e1e}
+.btn-viola{background:var(--viola);color:#fff;border-color:#4a2a70}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* CARDS */
+.card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px}
+.section-title{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:var(--ink2)}
+.section-title::after{content:'';flex:1;height:.5px;background:var(--border)}
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+.page-title{font-family:'Inter',sans-serif;font-size:18px;font-weight:700}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-family:'Inter',monospace;font-size:10px;font-weight:500}
+.badge-attesa{background:var(--rosso-light);color:var(--rosso)}
+.badge-approvata{background:var(--verde-light);color:var(--verde)}
+.badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
+.badge-malattia{background:var(--viola-light);color:var(--viola)}
+
+/* CALENDARIO */
+.cal-layout{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+.nav-mese{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.btn-mese{background:var(--white);border:.5px solid var(--border);color:var(--ink2);border-radius:6px;padding:6px 12px;font-size:14px;transition:all .15s}
+.btn-mese:hover{background:var(--paper2)}
+.sel-mese{flex:1;padding:7px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;font-weight:500;background:var(--white);color:var(--ink);outline:none}
+.cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.cal-dow{text-align:center;font-family:'Inter',monospace;font-size:10px;color:var(--ink4);padding:4px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day{aspect-ratio:1;border-radius:5px;border:1.5px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--ink);transition:all .1s;position:relative;font-family:'Inter',sans-serif}
+.cal-day:hover{background:var(--paper2)}
+.cal-day.weekend{color:var(--ink4)}
+.cal-day.festivo{color:var(--festivo);font-weight:600}
+.cal-day.has-data{background:var(--verde-light);color:var(--verde)}
+.cal-day.has-data::after{content:'';position:absolute;bottom:2px;right:2px;width:4px;height:4px;background:var(--verde);border-radius:50%}
+.cal-day.ferie-day{background:var(--verde-light);color:var(--verde)}
+.cal-day.malattia-day{background:var(--viola-light);color:var(--viola)}
+.cal-day.gc-festivo{background:var(--gc-festivo-bg);color:var(--gc-festivo);font-weight:600}
+.cal-day.gc-chiusura{background:var(--gc-chiusura-bg);color:var(--gc-chiusura);font-weight:600}
+.cal-day.gc-ferie{background:var(--gc-ferie-bg);color:var(--gc-ferie);font-weight:600}
+.cal-day.gc-malattia{background:var(--gc-malattia-bg);color:var(--gc-malattia);font-weight:600}
+.cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
+.cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
+.cal-day.gc-congedo{background:var(--gc-congedo-bg);color:var(--gc-congedo);font-weight:600}
+.cal-day.gc-chiusura-festivo,.cal-ferie-cell.gc-chiusura-festivo{background:repeating-linear-gradient(45deg,var(--gc-chiusura-bg) 0 8px,var(--gc-festivo-bg) 8px 16px);color:var(--gc-chiusura);font-weight:600}
+.cal-day.gc-compilato{background:#F8FAFC;color:var(--ink4);opacity:.55}
+.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-congedo.selected,.cal-day.gc-chiusura-festivo.selected,.cal-day.gc-compilato.selected{background:var(--blu)!important;color:#fff!important;opacity:1}
+.cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
+.cal-day.selected::after{display:none}
+.cal-day.gc-mancante::before{content:'❗';position:absolute;top:-4px;right:-3px;font-size:12px;line-height:1;filter:drop-shadow(0 0 1px rgba(255,255,255,.9))}
+.cal-day.selected::before{display:none}
+.cal-legenda{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;font-family:'Inter',monospace;font-size:10px;color:var(--ink4)}
+.cal-legenda span{display:flex;align-items:center;gap:4px}
+
+/* FORM GIORNO */
+.form-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:8px}
+.form-date{font-family:'Inter',sans-serif;font-size:16px;font-weight:700}
+.form-actions{display:flex;gap:8px;align-items:center}
+.save-status{font-family:'Inter',monospace;font-size:11px}
+.save-ok{color:var(--verde)}
+.save-err{color:var(--rosso)}
+.save-loading{color:var(--ink4)}
+.fields-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.field-group{display:flex;flex-direction:column;gap:4px}
+.field-group.full{grid-column:1/-1}
+.field-label{font-family:'Inter',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase}
+.field-input{padding:8px 10px;border:.5px solid var(--border);border-radius:6px;font-size:13px;background:var(--paper);color:var(--ink);outline:none;transition:border .15s;width:100%}
+.field-input:focus{border-color:var(--blu);background:var(--white)}
+.field-textarea{resize:vertical;min-height:72px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:12px;padding:28px;max-width:480px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.2);max-height:calc(100vh - 48px);overflow-y:auto}
+.modal-title{font-family:'Inter',sans-serif;font-size:17px;font-weight:700;margin-bottom:4px}
+.modal-sub{color:var(--ink4);font-size:13px;margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.totale-giorno{margin-top:16px;padding:12px 14px;background:var(--blu-light);border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+.totale-giorno-label{font-family:'Inter',monospace;font-size:11px;color:var(--blu-dark)}
+.totale-giorno-val{font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:var(--blu)}
+.placeholder-box{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--ink4);text-align:center}
+.placeholder-icon{font-size:32px;margin-bottom:10px;opacity:.4}
+
+/* RIEPILOGO */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 18px}
+.stat-label{font-family:'Inter',monospace;font-size:10px;color:var(--ink4);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.stat-val{font-family:'Inter',sans-serif;font-size:22px;font-weight:700;line-height:1;color:var(--ink)}
+.stat-unit{font-size:12px;font-weight:400;color:var(--ink4);margin-left:3px}
+.table-wrap{background:var(--white);border:.5px solid var(--border);border-radius:10px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:9px 14px;text-align:left}
+thead tr{border-bottom:.5px solid var(--border)}
+thead th{font-family:'Inter',monospace;font-size:10px;letter-spacing:.06em;color:var(--ink4);text-transform:uppercase;font-weight:400}
+tbody tr{border-bottom:.5px solid var(--paper2)}
+tbody tr:last-child{border-bottom:none}
+.td-r{text-align:right}
+.td-bold{font-weight:600;color:var(--blu)}
+
+/* ASSENZE */
+.assenze-tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:.5px solid var(--border);padding-bottom:0}
+.ass-tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--ink4);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .15s;font-family:'Inter',sans-serif;margin-bottom:-1px}
+.ass-tab.active{color:var(--blu);border-bottom-color:var(--blu)}
+.ass-subtab{display:none}
+.ass-subtab.active{display:block}
+.saldo-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.saldo-info{}
+.saldo-tipo{font-family:'Inter',sans-serif;font-size:14px;font-weight:700;margin-bottom:4px}
+.saldo-dettaglio{font-size:12px;color:var(--ink4)}
+.saldo-numeri{text-align:right}
+.saldo-residuo{font-family:'Inter',sans-serif;font-size:22px;font-weight:700}
+.saldo-residuo.ok{color:var(--verde)}
+.saldo-residuo.warn{color:var(--amber)}
+.saldo-residuo.danger{color:var(--rosso)}
+.saldo-sub{font-size:11px;color:var(--ink4);margin-top:2px;font-family:'Inter',monospace}
+.progress-bar{height:6px;background:var(--paper2);border-radius:3px;overflow:hidden;margin-top:8px;min-width:120px}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.fill-ok{background:var(--verde)}
+.fill-warn{background:var(--amber)}
+.fill-danger{background:var(--rosso)}
+.form-richiesta{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;display:none}
+.form-richiesta.open{display:block}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.richieste-list{display:flex;flex-direction:column;gap:8px}
+.richiesta-row{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.r-tipo{font-size:13px;font-weight:500;margin-bottom:3px}
+.r-date{font-family:'Inter',monospace;font-size:11px;color:var(--ink4);margin-bottom:3px}
+.r-nota{font-size:12px;color:var(--ink3)}
+.r-admin-nota{font-size:12px;color:var(--amber);margin-top:3px}
+.alert-box{padding:10px 14px;border-radius:6px;font-size:12px;margin-bottom:12px}
+.alert-ok{background:var(--verde-light);color:var(--verde)}
+.alert-err{background:var(--rosso-light);color:var(--rosso)}
+.empty-state{text-align:center;padding:40px;color:var(--ink4);font-size:13px}
+
+/* MALATTIA */
+.malattia-form{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px}
+.mal-item{background:var(--white);border:.5px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.mal-date{font-family:'Inter',monospace;font-size:12px;font-weight:500}
+.mal-giorni{font-size:12px;color:var(--ink4)}
+.mal-nota{font-size:12px;color:var(--ink3)}
+
+/* CALENDARIO FERIE CONDIVISO */
+.cal-ferie-wrap{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px}
+.cal-ferie-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.cal-ferie-nav{display:flex;align-items:center;gap:8px}
+.cal-ferie-label{font-family:'Inter',sans-serif;font-size:13px;font-weight:700;min-width:110px;text-align:center}
+.cal-ferie-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-ferie-cell{min-height:64px;border-radius:6px;border:.5px solid var(--border);padding:4px;background:var(--white);display:flex;flex-direction:column;gap:2px}
+.cal-ferie-cell.cal-ferie-empty{border:none;background:none}
+.cal-ferie-cell.cal-ferie-oggi{border-color:var(--blu);border-width:1.5px}
+.cal-ferie-cell.cal-ferie-click{cursor:pointer}
+.cal-ferie-cell.cal-ferie-click:hover{background:var(--paper2)}
+.cal-ferie-num{font-family:'Inter',monospace;font-size:10px;color:var(--ink4)}
+.cal-ferie-chips{display:flex;flex-direction:column;gap:2px}
+.cal-ferie-chip{font-size:9px;padding:1px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.cal-ferie-chip-more{font-size:9px;color:var(--ink4)}
+.cal-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--ink3)}
+.cal-legend-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
+
+/* BUDGET CONTRACT */
+.commessa-card{background:var(--white);border:.5px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:10px;cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.commessa-card:hover{border-color:var(--blu);background:var(--paper2)}
+.commessa-num{font-family:'Inter',monospace;font-weight:700;font-size:13px;color:var(--blu);min-width:64px}
+.commessa-info{flex:1;min-width:180px}
+.commessa-title{font-size:13px;font-weight:600}
+.commessa-sub{font-size:11px;color:var(--ink4);margin-top:2px}
+.commessa-pills{display:flex;gap:10px;flex-wrap:wrap}
+.commessa-pill{font-family:'Inter',monospace;font-size:11px;padding:3px 9px;border-radius:10px;background:var(--paper2);color:var(--ink3)}
+.ss-wrap{position:relative}
+.ss-list{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--white);border:.5px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:80;display:none}
+.ss-list.open{display:block}
+.ss-opt{padding:8px 12px;font-size:12px;cursor:pointer;color:var(--ink2)}
+.ss-opt:hover,.ss-opt.sel{background:var(--paper2)}
+.ss-empty{padding:8px 12px;font-size:12px;color:var(--ink4)}
+.rub-note-ro{font-size:12px;color:var(--ink3);white-space:pre-wrap}
+
+.bc-info-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:.5px solid var(--paper2)}
+.bc-info-row:last-child{border-bottom:none}
+.bc-info-key{color:var(--ink4);font-family:'Inter',monospace;font-size:11px}
+.bc-info-val{font-weight:600}
+.saldi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+
+/* RESPONSIVE */
+.btn-hamburger{display:none;background:none;border:none;color:var(--ink2);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px}
+.btn-hamburger:hover{background:var(--paper2)}
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:290}
+.sidebar-backdrop.show{display:block}
+
+@media(max-width:1024px){
+  :root{--sidebar-w:210px}
+  .content{padding:18px}
+  .topbar{padding:0 16px}
+}
+
+@media(max-width:768px){
+  .cal-layout{grid-template-columns:1fr}
+  .btn-hamburger{display:inline-flex;align-items:center;justify-content:center}
+  .sidebar{position:fixed;top:0;left:0;z-index:300;transform:translateX(-100%);transition:transform .25s ease;box-shadow:8px 0 28px rgba(0,0,0,.3)}
+  .sidebar.open{transform:translateX(0)}
+  .main{width:100%}
+  .content{padding:14px}
+  .topbar{padding:0 12px;gap:8px}
+  .topbar-title{font-size:14px}
+  .page-title{font-size:16px}
+  .stat-row{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  .fields-grid,.form-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  th,td{padding:8px 10px;font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div style="display:flex;justify-content:center;margin-bottom:14px">
+      <svg width="230" height="129" viewBox="0 0 340 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plantime">
+        <g transform="translate(136 30) scale(1)">
+          <path d="M34 0A34 34 0 0 1 68 34V64.5A3.5 3.5 0 0 1 64.5 68H34A34 34 0 0 1 34 0Z" fill="#6E8C72"></path>
+          <rect x="30" y="12" width="8" height="22" rx="4" fill="#EDF2EA"></rect>
+          <rect x="34" y="30" width="16" height="8" rx="4" fill="#EDF2EA" fill-opacity="0.6"></rect>
+        </g>
+        <text x="174" y="146" text-anchor="middle" font-family="Syne, sans-serif" font-size="30" font-weight="700" letter-spacing="8.4" fill="#3E4E41">PLANTIME</text>
+      </svg>
+    </div>
+    <div class="login-sub" style="margin-top:2px">Accedi al tuo portale personale</div>
+    <div class="login-error" id="login-error"></div>
+    <label class="f-label">Email</label>
+    <input class="f-input" id="inp-user" type="email" placeholder="nome.cognome@plantingegneria.com" autocomplete="username">
+    <label class="f-label">Password</label>
+    <div style="position:relative">
+      <input class="f-input" id="inp-pass" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:42px">
+      <button type="button" onclick="togglePassDip()" id="btn-toggle-pass" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:17px;padding:6px;line-height:1">👁</button>
+    </div>
+    <button class="login-btn" id="btn-login">Accedi</button>
+  </div>
+</div>
+
+<!-- BLOCCATO PER INATTIVITA -->
+<div id="blocked-screen" style="display:none">
+  <div class="login-box">
+    <div style="display:flex;justify-content:center;margin-bottom:14px">
+      <svg width="230" height="129" viewBox="0 0 340 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plantime">
+        <g transform="translate(136 30) scale(1)">
+          <path d="M34 0A34 34 0 0 1 68 34V64.5A3.5 3.5 0 0 1 64.5 68H34A34 34 0 0 1 34 0Z" fill="#6E8C72"></path>
+          <rect x="30" y="12" width="8" height="22" rx="4" fill="#EDF2EA"></rect>
+          <rect x="34" y="30" width="16" height="8" rx="4" fill="#EDF2EA" fill-opacity="0.6"></rect>
+        </g>
+        <text x="174" y="146" text-anchor="middle" font-family="Syne, sans-serif" font-size="30" font-weight="700" letter-spacing="8.4" fill="#3E4E41">PLANTIME</text>
+      </svg>
+    </div>
+    <div class="login-title">Account sospeso</div>
+    <div class="login-sub">Il tuo account è stato sospeso per inattività. Invia una richiesta agli amministratori per essere riattivato.</div>
+    <div id="blocked-alert"></div>
+    <button class="login-btn" id="btn-richiedi-sblocco" onclick="inviaRichiestaSblocco()">Invia richiesta di sblocco</button>
+    <button class="btn btn-sm" style="margin-top:10px;width:100%" onclick="tornaAlLogin()">← Torna al login</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div style="margin-bottom:6px">
+        <svg width="190" height="39" viewBox="0 0 330 68" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plantime">
+          <g transform="translate(0 0) scale(1)">
+            <path d="M34 0A34 34 0 0 1 68 34V64.5A3.5 3.5 0 0 1 64.5 68H34A34 34 0 0 1 34 0Z" fill="#BCCFB8"></path>
+            <rect x="30" y="12" width="8" height="22" rx="4" fill="#2E3A30"></rect>
+            <rect x="34" y="30" width="16" height="8" rx="4" fill="#2E3A30" fill-opacity="0.6"></rect>
+          </g>
+          <text x="92" y="44" font-family="Syne, sans-serif" font-size="28" font-weight="700" letter-spacing="6" fill="#F2F5F0">PLANTIME</text>
+        </svg>
+      </div>
+      <div class="logo-sub" id="dip-logo-sub" style="margin-top:2px">Portale Dipendenti · 2026</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-lbl">Menu</div>
+      <button class="nav-item active" data-page="calendario">
+        <span class="nav-icon">📅</span> Calendario
+      </button>
+      <button class="nav-item" data-page="assenze">
+        <span class="nav-icon">🏖️</span> Ferie & Assenze
+      </button>
+      <button class="nav-item" data-page="riepilogo">
+        <span class="nav-icon">📊</span> Riepilogo Mensile
+      </button>
+      <button class="nav-item" data-page="budget">
+        <span class="nav-icon">📁</span> Budget Contract
+      </button>
+      <button class="nav-item" data-page="rubrica">
+        <span class="nav-icon">📇</span> Rubrica Commesse
+      </button>
+      <button class="nav-item" data-page="archivio">
+        <span class="nav-icon">🗂️</span> Archivio Anni
+      </button>
+    </div>
+    <!-- SALDI SIDEBAR -->
+    <div class="saldo-box" id="sidebar-saldi">
+      <div class="saldo-title">I tuoi saldi</div>
+      <div class="saldo-row">
+        <span class="saldo-label">Ferie residue</span>
+        <span class="saldo-val ok" id="sb-ferie">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">Permessi residui</span>
+        <span class="saldo-val ok" id="sb-permessi">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">ROL residuo</span>
+        <span class="saldo-val ok" id="sb-rol">— h</span>
+      </div>
+      <div class="saldo-row">
+        <span class="saldo-label">Giorni malattia</span>
+        <span class="saldo-val" id="sb-malattia" style="color:var(--viola)">0 gg</span>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-name" id="sidebar-nome"></div>
+      <div class="user-role" id="sidebar-ruolo">Dipendente · 2026</div>
+      <button class="logout-btn" id="btn-logout">Esci dall'account →</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="btn-hamburger" id="btn-hamburger" onclick="toggleSidebar()" aria-label="Apri menu">☰</button>
+      <div class="topbar-title" id="topbar-title">Calendario</div>
+      <div class="topbar-tag">2026</div>
+    </div>
+    <div class="content">
+
+      <!-- CALENDARIO -->
+      <div class="page active" id="page-calendario">
+        <div class="cal-layout">
+          <div>
+            <div class="nav-mese">
+              <button class="btn-mese" id="mese-prec">‹</button>
+              <select class="sel-mese" id="sel-mese"></select>
+              <button class="btn-mese" id="mese-succ">›</button>
+            </div>
+            <div class="card">
+              <div class="cal-dow-row" id="cal-dow"></div>
+              <div class="cal-grid" id="cal-giorni"></div>
+              <div class="cal-legenda">
+                <span><span class="cal-legend-dot" style="background:var(--gc-festivo)"></span>Festivo</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-chiusura)"></span>Chiusura uffici</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-malattia)"></span>Malattia</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
+              </div>
+            </div>
+          </div>
+          <div class="card" id="form-giorno">
+            <div class="placeholder-box">
+              <div class="placeholder-icon">📅</div>
+              <div style="font-size:13px">Seleziona un giorno<br>per inserire o vedere le ore</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FERIE & ASSENZE -->
+      <div class="page" id="page-assenze">
+        <div class="page-header">
+          <div class="page-title">Ferie & Assenze</div>
+        </div>
+
+        <!-- Saldi -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px" id="saldi-cards"></div>
+
+        <!-- Calendario condiviso ferie -->
+        <div class="cal-ferie-wrap">
+          <div class="cal-ferie-head">
+            <div style="font-size:14px;font-weight:700">📅 Chi è in ferie</div>
+            <div class="cal-ferie-nav">
+              <button class="btn btn-sm" onclick="calFeriePrev()">←</button>
+              <div class="cal-ferie-label" id="cal-ferie-label"></div>
+              <button class="btn btn-sm" onclick="calFerieNext()">→</button>
+            </div>
+          </div>
+          <div class="cal-ferie-grid" id="cal-ferie-grid"></div>
+          <div class="cal-legend">
+            <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
+            <span>👑 Titolare</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-chiusura-bg);border:1px solid var(--gc-chiusura)"></span>Chiusura uffici</span>
+            <span><span class="cal-legend-dot" style="background:var(--gc-festivo-bg);border:1px solid var(--gc-festivo)"></span>Festivo</span>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="assenze-tabs">
+          <button class="ass-tab active" onclick="setAssTab(this,'ferie')">🏖️ Ferie</button>
+          <button class="ass-tab" onclick="setAssTab(this,'permesso')">🕐 Permessi</button>
+          <button class="ass-tab" onclick="setAssTab(this,'rol')">🔄 ROL</button>
+          <button class="ass-tab" onclick="setAssTab(this,'congedo')">🗂️ Congedi</button>
+          <button class="ass-tab" onclick="setAssTab(this,'malattia')">🤒 Malattia</button>
+        </div>
+
+        <!-- TAB FERIE -->
+        <div class="ass-subtab active" id="subtab-ferie">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Ferie</div>
+            <button class="btn btn-blu" id="btn-nuova-ferie">+ Richiedi Ferie</button>
+          </div>
+          <div class="form-richiesta" id="form-ferie">
+            <div id="alert-form-ferie"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-ferie"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-ferie"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-ferie" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('ferie')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('ferie')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-ferie"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB PERMESSI -->
+        <div class="ass-subtab" id="subtab-permesso">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Permessi</div>
+            <button class="btn btn-blu" id="btn-nuova-permesso">+ Richiedi Permesso</button>
+          </div>
+          <div class="form-richiesta" id="form-permesso">
+            <div id="alert-form-permesso"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-permesso"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-permesso"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-permesso" placeholder="es. 4" min="0.5" step="0.5"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-permesso" rows="2"></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('permesso')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('permesso')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-permesso"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB ROL -->
+        <div class="ass-subtab" id="subtab-rol">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico ROL / Recupero</div>
+            <button class="btn btn-blu" id="btn-nuova-rol">+ Richiedi ROL</button>
+          </div>
+          <div class="form-richiesta" id="form-rol">
+            <div id="alert-form-rol"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-rol"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-rol"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-rol" placeholder="es. 8" min="0.5" step="0.5"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-rol" rows="2"></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('rol')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('rol')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-rol"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB CONGEDI -->
+        <div class="ass-subtab" id="subtab-congedo">
+          <div class="page-header" style="margin-bottom:14px">
+            <div style="font-size:14px;font-weight:500">Storico Congedi</div>
+            <button class="btn btn-blu" id="btn-nuova-congedo">+ Richiedi Congedo</button>
+          </div>
+          <div class="form-richiesta" id="form-congedo">
+            <div id="alert-form-congedo"></div>
+            <div class="form-grid">
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Tipo di congedo</label>
+                <select class="f-input" style="margin:0" id="f-tipo-congedo">
+                  <option value="">— Seleziona —</option>
+                  <option value="parentale">Congedo parentale</option>
+                  <option value="lutto">Lutto o grave infermità</option>
+                  <option value="matrimoniale">Congedo matrimoniale</option>
+                  <option value="formativo">Congedo formativo/studio</option>
+                </select>
+              </div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-congedo"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-congedo"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-congedo" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-blu" onclick="inviaRichiesta('congedo')">📤 Invia Richiesta</button>
+              <button class="btn" onclick="chiudiForm('congedo')">Annulla</button>
+            </div>
+          </div>
+          <div id="lista-congedo"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB MALATTIA -->
+        <div class="ass-subtab" id="subtab-malattia">
+          <div class="malattia-form">
+            <div class="section-title">Inserisci Periodo di Malattia</div>
+            <div id="alert-malattia"></div>
+            <div class="form-grid">
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="mal-inizio"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="mal-fine"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note / Numero certificato</label><textarea class="f-input field-textarea" style="margin:0" id="mal-note" rows="2" placeholder="es. Certificato n. 12345..."></textarea></div>
+            </div>
+            <button class="btn btn-viola" style="margin-top:12px" onclick="inserisciMalattia()">🤒 Registra Malattia</button>
+          </div>
+          <div class="section-title">Storico Malattie</div>
+          <div id="lista-malattia"><div class="empty-state">Caricamento...</div></div>
+        </div>
+      </div>
+
+      <!-- ARCHIVIO -->
+      <div class="page" id="page-archivio">
+        <div class="page-header">
+          <div class="page-title">🗂️ Archivio Anni Precedenti</div>
+          <select class="f-select" id="arch-anno-dip" style="width:auto;padding:7px 12px;font-size:13px" onchange="loadArchivioDip()"></select>
+        </div>
+        <div id="archivio-dip-content"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- RIEPILOGO -->
+      <div class="page" id="page-riepilogo">
+        <div class="page-header">
+          <div class="page-title">Riepilogo Mensile</div>
+          <div style="display:flex;gap:8px">
+            <select class="f-select" id="sel-mese-riepilogo" style="width:auto;padding:7px 12px;font-size:13px"></select>
+            <button class="btn btn-verde" onclick="esportaPeriodoDip('excel')">📅 Excel</button>
+            <button class="btn btn-rosso" onclick="esportaPeriodoDip('pdf')">📅 PDF</button>
+          </div>
+        </div>
+        <div class="stat-row" id="stat-row-riepilogo"></div>
+        <div class="section-title">Dettaglio per Giorno</div>
+        <div class="table-wrap" id="table-riepilogo-wrap">
+          <table id="tab-riepilogo">
+            <thead><tr id="thead-r"></tr></thead>
+            <tbody id="tbody-r"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px" class="section-title">Totali Mensili per Tipologia</div>
+        <div class="table-wrap">
+          <table id="tab-totali">
+            <thead><tr><th>Tipologia</th><th class="td-r">Totale</th></tr></thead>
+            <tbody id="tbody-totali"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BUDGET CONTRACT - ELENCO -->
+      <div class="page" id="page-budget">
+        <div class="page-header">
+          <div class="page-title">📁 Budget Contract</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="field-input" id="bc-list-search-dip" type="text" style="max-width:240px" placeholder="Cerca per numero o nome..." oninput="renderListaCommesseDip()">
+            <button class="btn btn-sm" onclick="loadCommesseDip(true)">🔄 Aggiorna</button>
+          </div>
+        </div>
+        <div class="filtri" id="bc-anni-wrap-dip" style="margin-bottom:14px"></div>
+        <div id="lista-commesse-dip"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- RUBRICA COMMESSE -->
+      <div class="page" id="page-rubrica">
+        <div class="page-header">
+          <div class="page-title">📇 Rubrica Commesse</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="field-input" id="rub-search-dip" type="text" style="max-width:240px" placeholder="Cerca per numero o nome..." oninput="renderRubricaDip()">
+            <button class="btn btn-verde btn-sm" onclick="rubricaDipEsportaExcel()">📥 Excel</button>
+            <button class="btn btn-rosso btn-sm" onclick="rubricaDipEsportaPDF()">📄 PDF</button>
+          </div>
+        </div>
+        <div class="filtri" id="rubrica-anni-wrap-dip" style="margin-bottom:14px"></div>
+        <div id="rubrica-lista-dip"><div class="empty-state">Caricamento...</div></div>
+      </div>
+
+      <!-- BUDGET CONTRACT - DETTAGLIO COMMESSA -->
+      <div class="page" id="page-budget-dettaglio">
+        <div class="page-header">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn btn-sm" onclick="dipGoPage('budget')">← Budget Contract</button>
+            <div class="page-title" id="bc-det-title">Commessa</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px" id="bc-fase-tabs-card">
+          <div class="section-title">Fasi (Budget Contract)</div>
+          <div id="bc-fase-tabs"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title">Anagrafica Commessa</div>
+          <div id="bc-anagrafica"></div>
+        </div>
+
+        <div class="saldi-grid" id="bc-residui" style="margin-bottom:20px"></div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Righe di Lavoro</div>
+          <button class="btn btn-blu btn-sm" onclick="apriFormRigaBC()">+ Aggiungi Riga</button>
+        </div>
+        <div class="form-richiesta" id="bc-form-riga">
+          <div id="bc-riga-alert"></div>
+          <div class="form-grid">
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Disciplina</label>
+              <select class="f-input" style="margin:0" id="bc-r-disciplina">
+                <option value="ele">Elettrico</option>
+                <option value="mec">Meccanico</option>
+              </select>
+            </div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data</label><input class="f-input" style="margin:0" id="bc-r-data" type="date"></div>
+            <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Attività (breve descrizione)</label><input class="f-input" style="margin:0" id="bc-r-descrizione" type="text" placeholder="es. Sopralluogo cantiere"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore</label><input class="f-input" style="margin:0" id="bc-r-ore" type="number" step="0.5" min="0"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Spese vive (€)</label><input class="f-input" style="margin:0" id="bc-r-spese" type="number" step="0.01" min="0"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Km A+R</label><input class="f-input" style="margin:0" id="bc-r-km" type="number" step="1" min="0"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-blu" onclick="salvaRigaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormRigaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr>
+              <th>Data</th><th>Utente</th><th>Livello/Disciplina</th><th>Attività</th>
+              <th class="td-r">Ore</th><th class="td-r">Spese vive</th><th class="td-r">Km A+R</th><th class="td-r">Costo riga</th><th>Azioni</th>
+            </tr></thead>
+            <tbody id="bc-tbody-righe"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="section-title">Riepilogo Costi Commessa</div>
+          <div id="bc-riepilogo"></div>
+        </div>
+
+        <div class="page-header">
+          <div class="section-title" style="flex:1;margin-bottom:0">Calcolo Stampe / Plottaggi</div>
+          <button class="btn btn-blu btn-sm" onclick="apriFormStampaBC()">+ Aggiungi Riga</button>
+        </div>
+        <div class="form-richiesta" id="bc-form-stampa">
+          <div id="bc-stampa-alert"></div>
+          <div class="form-grid">
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data</label><input class="f-input" style="margin:0" id="bc-s-data" type="date"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Voce listino</label><select class="f-input" style="margin:0" id="bc-s-voce"></select></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">N° copie</label><input class="f-input" style="margin:0" id="bc-s-copie" type="number" step="1" min="1" value="1"></div>
+            <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><input class="f-input" style="margin:0" id="bc-s-note" type="text"></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-blu" onclick="salvaStampaBC()">✓ Salva Riga</button>
+            <button class="btn" onclick="chiudiFormStampaBC()">Annulla</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Voce</th><th class="td-r">Costo unitario</th><th class="td-r">Copie</th><th class="td-r">Totale</th><th>Note</th><th>Azioni</th></tr></thead>
+            <tbody id="bc-tbody-stampe"></tbody>
+          </table>
+        </div>
+        <div class="bc-info-row" style="max-width:320px;margin-top:10px">
+          <span class="bc-info-key">COSTO STAMPE PRODOTTE</span>
+          <span class="bc-info-val" id="bc-tot-stampe">€ 0,00</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SELEZIONE PERIODO (esportazione) -->
+<div class="modal-overlay" id="modal-periodo">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title" id="periodo-titolo">Seleziona periodo da esportare</div>
+    <div class="modal-sub">Scegli una scorciatoia oppure un intervallo personalizzato.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn" onclick="periodoScegli('corrente')">📅 Anno corrente</button>
+      <button class="btn" onclick="periodoScegli('scorso')">📅 Anno scorso</button>
+      <button class="btn" onclick="periodoScegli('storico')">🗂️ Tutto lo storico</button>
+    </div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:8px;font-weight:600">— oppure intervallo personalizzato —</div>
+    <div class="fields-grid">
+      <div class="field-group"><label class="field-label">Da mese</label><select class="field-input" id="periodo-da-mese"></select></div>
+      <div class="field-group"><label class="field-label">Da anno</label><select class="field-input" id="periodo-da-anno"></select></div>
+      <div class="field-group"><label class="field-label">A mese</label><select class="field-input" id="periodo-a-mese"></select></div>
+      <div class="field-group"><label class="field-label">A anno</label><select class="field-input" id="periodo-a-anno"></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="chiudiSelettorePeriodo()">Annulla</button>
+      <button class="btn btn-blu" onclick="periodoConferma()">✓ Esporta questo intervallo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FC={apiKey:"AIzaSyDv60cdVI9GT0r9VZukaVhWuozWUAbop5c",authDomain:"calendario-studio-plant.firebaseapp.com",projectId:"calendario-studio-plant",storageBucket:"calendario-studio-plant.firebasestorage.app",messagingSenderId:"693007035080",appId:"1:693007035080:web:026feab436ecd3814053fd"};
+firebase.initializeApp(FC);
+const db=firebase.firestore();
+const auth=firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(e=>console.log('Persistenza auth:',e.message));
+
+// Copia un documento nel cestino prima di cancellarlo per davvero: un admin potrà
+// vederlo e ripristinarlo da admin.html → Cestino se la cancellazione è stata un errore.
+async function spostaNelCestino(tipo,percorso,dati,etichetta,cancellatoDa){
+  try{
+    await db.collection('cestino').add({tipo,percorso,dati,etichetta:etichetta||'',cancellatoDa:cancellatoDa||'',cancellatoIl:new Date().toISOString()});
+  }catch(e){console.error('Impossibile salvare nel cestino:',e.message)}
+}
+
+const ANNO=new Date().getFullYear();
+const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const MB=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+// Finestra mobile: sempre 12 mesi in avanti rispetto al mese corrente (calcolata dal vivo)
+const MESE_ATTUALE_ABS=new Date().getMonth();
+const MESE_MAX_ABS=MESE_ATTUALE_ABS+12;
+function annoMese(meseAbs){const a=ANNO+Math.floor(meseAbs/12);const m=((meseAbs%12)+12)%12;return{anno:a,mese:m}}
+
+// Festività italiane — Pasqua/Pasquetta calcolate automaticamente (algoritmo di Gauss), valide per qualsiasi anno
+function pasquaGauss(anno){
+  const a=anno%19,b=Math.floor(anno/100),c=anno%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,mm=Math.floor((a+11*h+22*l)/451),mese=Math.floor((h+l-7*mm+114)/31),giorno=((h+l-7*mm+114)%31)+1;
+  return new Date(anno,mese-1,giorno);
+}
+function festivitaAnno(anno){
+  const p2=n=>String(n).padStart(2,'0');
+  const pasqua=pasquaGauss(anno);
+  const pasquetta=new Date(pasqua);pasquetta.setDate(pasqua.getDate()+1);
+  const fmt=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+  return[`${anno}-01-01`,`${anno}-01-06`,fmt(pasqua),fmt(pasquetta),`${anno}-04-25`,`${anno}-05-01`,`${anno}-06-02`,`${anno}-08-15`,`${anno}-11-01`,`${anno}-12-08`,`${anno}-12-25`,`${anno}-12-26`];
+}
+// Festività nazionali — calcolate su ANNO e ANNO+1 (copre l'intera finestra mobile di 12 mesi)
+const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
+
+// Tipi di congedo selezionabili nella richiesta e relative etichette (usate anche lato admin)
+const TIPI_CONGEDO={parentale:'Congedo parentale',lutto:'Lutto o grave infermità',matrimoniale:'Congedo matrimoniale',formativo:'Congedo formativo/studio'};
+
+const CAMPI=[
+  {k:'oreElectriciMD',l:'Ore Elettrici M.D.',t:'number'},
+  {k:'oreStraordinariElettrico',l:'Ore Straord. Elettrici',t:'number'},
+  {k:'oreMeccaniciMA',l:'Ore Meccanici M.A.',t:'number'},
+  {k:'oreStraordinariMeccanico',l:'Ore Straord. Meccanici',t:'number'},
+  {k:'oreAttivitaGenerali',l:'Ore Attività Generali',t:'number'},
+  {k:'oreRecuperoElettrico',l:'Ore Recupero Elettrici',t:'number'},
+  {k:'oreRecuperoMeccanico',l:'Ore Recupero Meccanici',t:'number'},
+  {k:'kmPercorsi',l:'Km Percorsi',t:'number'},
+  {k:'speseExtra',l:'Spese Extra (€)',t:'number'},
+  {k:'note',l:'Note',t:'textarea'},
+];
+const CN=CAMPI.filter(c=>c.t==='number');
+// Colonne virtuali di assenza (Ferie/Permesso/ROL/Malattia): NON fanno parte dei campi compilabili
+// nel form del giorno (CAMPI) — vengono calcolate al volo dal sistema "Ferie & Assenze" solo per i
+// report (Riepilogo Mensile a schermo + esportazioni), esattamente come già avviene in admin.html.
+const CN_ASSENZE=[
+  {k:'oreFerie',l:'Ore Ferie',t:'number'},
+  {k:'orePermesso',l:'Ore Permesso',t:'number'},
+  {k:'oreRol',l:'Ore ROL',t:'number'},
+  {k:'oreFestivitaMalattia',l:'Ore Malattia',t:'number'},
+];
+// CN con le colonne di assenza inserite dopo "Ore Attività Generali", stesso ordine usato in admin.html
+const CN_REPORT=(()=>{const i=CN.findIndex(c=>c.k==='oreAttivitaGenerali');const a=CN.slice();a.splice(i+1,0,...CN_ASSENZE);return a})();
+function totaleGiornoReport(d){if(!d)return 0;return CN_REPORT.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
+
+let U=null,profilo=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
+let assenzeProprie=[];
+let assTab='ferie';
+// Cache centralizzata — caricata UNA VOLTA all'avvio, aggiornata localmente dopo ogni operazione
+let ALL_GIORNI={};  // {data_string: {campi...}} — tutti i giorni dell'anno
+let ALL_ASSENZE=[]; // [{id,tipo,stato,dataInizio,...}] — tutte le richieste assenza
+let ALL_MALATTIE=[]; // [{id,dataInizio,dataFine,...}] — tutte le malattie
+let ALL_ASSENZE_TUTTI=[]; // ferie/permessi/rol approvati di TUTTI (dipendenti+titolari) — calendario condiviso
+let chiusureUfficio=[]; // chiusure ufficio programmate dall'admin
+let DATI_CARICATI=false;
+
+function pad(n){return String(n).padStart(2,'0')}
+function dsOf(m,g){const{anno,mese}=annoMese(m);return `${anno}-${pad(mese+1)}-${pad(g)}`}
+function dsOggi(){const o=new Date();return `${o.getFullYear()}-${pad(o.getMonth()+1)}-${pad(o.getDate())}`}
+function isWE(m,g){const d=new Date(ANNO,m,g).getDay();return d===0||d===6}
+function isFestivo(ds){return FESTIVITA.includes(ds)}
+function getDays(m){return new Date(ANNO,m+1,0).getDate()}
+function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
+function hasD(d){if(!d)return false;return CN.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
+function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]} ${y}`}
+function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});return n+'h'}
+function totaleGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
+function giorniLavorativi(dal,al){
+  let cnt=0;
+  const d=new Date(dal),fine=new Date(al);
+  while(d<=fine){
+    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))cnt++;
+    d.setDate(d.getDate()+1);
+  }
+  return cnt;
+}
+// Espande un intervallo di date nei singoli giorni lavorativi (esclude weekend e festività) come array 'YYYY-MM-DD'
+function espandiGiorniLavorativi(dal,al){
+  const out=[];
+  if(!dal||!al)return out;
+  const d=new Date(dal),fine=new Date(al);
+  while(d<=fine){
+    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
+    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))out.push(ds);
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+// Calcola le ore ferie usate = giorni delle richieste ferie approvate + giorni di chiusura ufficio
+// (le chiusure ufficio vengono scalate automaticamente dalle ferie di TUTTI i dipendenti), senza
+// contare due volte lo stesso giorno se coincide con una richiesta ferie personale già approvata.
+function oreFerieConChiusure(richiesteFerieApprovate,oreGiorno){
+  const giorni=new Set();
+  (richiesteFerieApprovate||[]).forEach(r=>{espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorni.add(d))});
+  chiusureUfficio.forEach(c=>{espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorni.add(d))});
+  return giorni.size*oreGiorno;
+}
+// Inietta nei giorni del timesheet (solo in memoria, non su Firestore) le ore di Ferie/Permesso/ROL/Malattia
+// del dipendente loggato, derivate dal sistema "Ferie & Assenze" (richieste approvate + chiusure ufficio +
+// malattie) — stessa logica di iniettaAssenzeInGiorni() in admin.html, adattata qui all'unico utente già
+// caricato in ALL_ASSENZE/ALL_MALATTIE. Va chiamata su un oggetto 'days' (chiave 'YYYY-MM-DD' -> dati del
+// giorno) SUBITO DOPO averlo popolato da Firestore/cache e PRIMA di calcolare totali per un report. Non
+// tocca gli altri campi del giorno (ordinarie, straordinari, km, note, righe commesse, ecc.). Le chiusure
+// ufficio confluiscono nella colonna Ferie (stessa convenzione usata ovunque nell'app). I Congedi restano
+// esclusi (nessun costo/ore associate).
+function iniettaAssenzeInGiorniDip(days,oreGiorno){
+  const touched={}; // 'campo|data' -> già toccato in questa chiamata (per azzerare i valori residui una sola volta)
+  const aggiungi=(ds,campo,val)=>{
+    if(!days[ds])days[ds]={};
+    const key=campo+'|'+ds;
+    days[ds][campo]=(touched[key]?(parseFloat(days[ds][campo])||0):0)+val;
+    touched[key]=true;
+  };
+  // Ferie: richieste approvate + chiusure ufficio, senza contare due volte lo stesso giorno
+  const giorniFerie=new Set();
+  ALL_ASSENZE.filter(r=>r.stato==='approvata'&&r.tipo==='ferie')
+    .forEach(r=>espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>giorniFerie.add(d)));
+  chiusureUfficio.forEach(c=>espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>giorniFerie.add(d)));
+  giorniFerie.forEach(ds=>aggiungi(ds,'oreFerie',oreGiorno));
+  // Permesso e ROL: le ore richieste ripartite sui giorni lavorativi della richiesta, così i report
+  // per mese/periodo mostrano le ore nel periodo in cui sono state effettivamente godute.
+  const ripartisci=(tipo,campo)=>{
+    ALL_ASSENZE.filter(r=>r.stato==='approvata'&&r.tipo===tipo).forEach(r=>{
+      const gg=espandiGiorniLavorativi(r.dataInizio,r.dataFine);
+      if(!gg.length)return;
+      const orePerGiorno=(parseFloat(r.oreRichieste)||0)/gg.length;
+      gg.forEach(ds=>aggiungi(ds,campo,orePerGiorno));
+    });
+  };
+  ripartisci('permesso','orePermesso');
+  ripartisci('rol','oreRol');
+  // Malattia: giorni lavorativi del periodo, valorizzati a ore/giorno standard (nessun workflow di approvazione)
+  ALL_MALATTIE.forEach(m=>espandiGiorniLavorativi(m.dataInizio,m.dataFine).forEach(ds=>aggiungi(ds,'oreFestivitaMalattia',oreGiorno)));
+}
+// Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
+// con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
+function oreGiornoDip(o){
+  if(!o)return 8;
+  const t=o.tipoOrario;
+  if(t===undefined||t===null||t==='')return 8;
+  const n=parseFloat(t);
+  if(!isNaN(n)&&n>0)return n;
+  return t==='ridotto'?6:8;
+}
+
+// LOGIN
+document.getElementById('btn-login').addEventListener('click',doLogin);
+document.getElementById('inp-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// Trova il documento dipendenti/{username} associato a un'email (l'email è salvata come
+// campo sul documento, lo username resta l'id del documento come prima).
+async function trovaDipendentePerEmail(email){
+  const snap=await db.collection('dipendenti').where('email','==',email).limit(1).get();
+  if(snap.empty)return null;
+  const doc=snap.docs[0];
+  return {username:doc.id,data:doc.data()};
+}
+
+async function doLogin(){
+  const email=document.getElementById('inp-user').value.trim().toLowerCase();
+  const p=document.getElementById('inp-pass').value;
+  const errEl=document.getElementById('login-error');errEl.style.display='none';
+  if(!email||!p){showLoginErr('Inserisci email e password.');return}
+  document.getElementById('btn-login').textContent='Accesso...';
+  try{
+    await auth.signInWithEmailAndPassword(email,p);
+    const trovato=await trovaDipendentePerEmail(email);
+    if(!trovato){showLoginErr('Utente non trovato. Contatta l\'amministratore.');await auth.signOut();return}
+    const d=trovato.data,u=trovato.username;
+    if(!d.abilitato){showLoginErr('Account non abilitato. Contatta l\'amministratore.');await auth.signOut();return}
+    if(d.bloccatoInattivita===true){
+      mostraSchermataBloccato(u,(d.nome||'')+' '+(d.cognome||''));
+      return
+    }
+    U={username:u};profilo=d;
+    // Salva ultimo accesso
+    await db.collection('dipendenti').doc(u).update({ultimoAccesso:new Date().toISOString()});
+    startApp();
+  }catch(e){
+    if(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(e.code)){showLoginErr('Email o password errati.')}
+    else{showLoginErr('Errore: '+e.message)}
+  }
+  finally{document.getElementById('btn-login').textContent='Accedi'}
+}
+function showLoginErr(m){const e=document.getElementById('login-error');e.textContent=m;e.style.display='block'}
+function togglePassDip(){
+  const inp=document.getElementById('inp-pass');
+  const btn=document.getElementById('btn-toggle-pass');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁';}
+}
+let BLOCKED_username=null,BLOCKED_nome=null;
+function mostraSchermataBloccato(username,nome){
+  BLOCKED_username=username;BLOCKED_nome=nome;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('blocked-screen').style.display='flex';
+  document.getElementById('blocked-alert').innerHTML='';
+  const btn=document.getElementById('btn-richiedi-sblocco');
+  btn.style.display='inline-flex';btn.disabled=false;btn.textContent='Invia richiesta di sblocco';
+}
+async function inviaRichiestaSblocco(){
+  const btn=document.getElementById('btn-richiedi-sblocco');
+  const alertEl=document.getElementById('blocked-alert');
+  btn.disabled=true;
+  try{
+    // Il controllo duplicati richiede una sessione autenticata attiva. Un utente bloccato
+    // può però trovarsi senza sessione valida (persistenza browser persa, token scaduto, ecc.):
+    // in quel caso saltiamo il controllo invece di bloccare l'intero invio con un errore.
+    let giaInviata=false;
+    try{
+      const esistente=await db.collection('richieste_sblocco').where('username','==',BLOCKED_username).where('stato','==','in_attesa').get();
+      giaInviata=!esistente.empty;
+    }catch(checkErr){
+      console.log('Controllo richieste duplicate non disponibile (si procede comunque):',checkErr.message);
+    }
+    if(giaInviata){
+      alertEl.innerHTML='<div class="alert-box alert-ok">Richiesta già inviata, in attesa di risposta.</div>';
+      btn.style.display='none';
+      return;
+    }
+    await db.collection('richieste_sblocco').add({
+      username:BLOCKED_username,
+      nomeCompleto:BLOCKED_nome,
+      stato:'in_attesa',
+      createdAt:new Date().toISOString()
+    });
+    alertEl.innerHTML='<div class="alert-box alert-ok">✓ Richiesta inviata. Un amministratore ti sbloccherà a breve.</div>';
+    btn.style.display='none';
+  }catch(e){
+    alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>';
+    btn.disabled=false;
+  }
+}
+async function tornaAlLogin(){
+  try{await auth.signOut()}catch(e){}
+  document.getElementById('blocked-screen').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+// Ripristino sessione: Firebase Auth notifica in automatico se c'è già un utente loggato
+// (persistenza SESSION: rimane loggato finché non chiude la scheda, come prima con sessionStorage)
+auth.onAuthStateChanged(async user=>{
+  if(!user||U)return; // nessuno loggato, o U già impostato da doLogin()
+  try{
+    const trovato=await trovaDipendentePerEmail(user.email);
+    if(trovato&&trovato.data.abilitato&&!trovato.data.bloccatoInattivita){
+      U={username:trovato.username};profilo=trovato.data();
+      await db.collection('dipendenti').doc(trovato.username).update({ultimoAccesso:new Date().toISOString()});
+      startApp();
+    }else if(trovato&&trovato.data.bloccatoInattivita){
+      mostraSchermataBloccato(trovato.username,(trovato.data.nome||'')+' '+(trovato.data.cognome||''));
+    }else{
+      await auth.signOut();
+    }
+  }catch(e){console.log('Ripristino sessione:',e.message)}
+});
+
+// Controllo auto-blocco: eseguito al caricamento della pagina
+// Controlla tutti i dipendenti e blocca quelli inattivi da 2 giorni lavorativi
+async function checkInattivita(){
+  try{
+    const snap=await db.collection('dipendenti').get();
+    const oggi=new Date();
+    snap.forEach(async docSnap=>{
+      const d=docSnap.data();
+      if(!d.abilitato||d.bloccatoInattivita)return;
+      if(!d.ultimoAccesso)return;
+      const ultimo=new Date(d.ultimoAccesso);
+      // Conta giorni lavorativi dall'ultimo accesso
+      let ggLav=0;
+      const cur=new Date(ultimo);
+      cur.setDate(cur.getDate()+1); // Inizia dal giorno dopo l'ultimo accesso
+      while(cur<oggi){
+        const dow=cur.getDay();
+        const ds=cur.toISOString().split('T')[0];
+        if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds)){
+          ggLav++;
+        }
+        cur.setDate(cur.getDate()+1);
+      }
+      const sogliaGiorni=parseInt(d.giorniInattivita)||2;
+      if(ggLav>=sogliaGiorni){
+        await db.collection('dipendenti').doc(docSnap.id).update({bloccatoInattivita:true,abilitato:false});
+      }
+    });
+  }catch(e){console.log('Check inattività:',e.message)}
+}
+// Esegui il check solo se l'utente è loggato come admin (non nel portale dipendenti)
+// Il controllo viene eseguito dal portale admin al caricamento
+
+// CARICAMENTO DATI CENTRALIZZATO — una sola volta all'avvio
+async function caricaTuttiDati(){
+  try{
+    const [giorniSnap, assenzeSnap, malattieSnap, tutteAssenzeSnap, chiusSnap] = await Promise.all([
+      db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get(),
+      db.collection('richieste_assenza').where('username','==',U.username).get(),
+      db.collection('malattie').where('username','==',U.username).get(),
+      db.collection('richieste_assenza').where('stato','==','approvata').get(),
+      db.collection('chiusure').get()
+    ]);
+    ALL_GIORNI={};
+    giorniSnap.forEach(d=>{ALL_GIORNI[d.id]=d.data()});
+    ALL_ASSENZE=assenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
+    ALL_MALATTIE=malattieSnap.docs.map(d=>({id:d.id,...d.data()}));
+    ALL_ASSENZE_TUTTI=tutteAssenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
+    chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
+    DATI_CARICATI=true;
+    console.log('Dati caricati:',Object.keys(ALL_GIORNI).length,'giorni,',ALL_ASSENZE.length,'assenze,',ALL_MALATTIE.length,'malattie');
+  }catch(e){
+    console.error('Errore caricamento dati iniziale:',e);
+    DATI_CARICATI=false;
+  }
+}
+
+async function startApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').classList.add('visible');
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
+  document.getElementById('sidebar-nome').textContent=nome;
+  const dlsub=document.getElementById('dip-logo-sub');
+  if(dlsub)dlsub.textContent=`Portale Dipendenti · ${ANNO}`;
+  const orario=`Orario ${oreGiornoDip(profilo)}h/giorno`;
+  document.getElementById('sidebar-ruolo').textContent=`Dipendente · ${orario}`;
+  initCal();
+  await Promise.all([caricaTuttiDati(), loadCommesseDip()]);
+  loadMese(meseSel);
+  selectDay(dsOggi()); // apre subito il giorno corrente, così l'utente lo vede al primo accesso
+  aggiornaRiepilogoSaldi();
+  renderCalendarioFerie();
+  // init select riepilogo mesi
+  const sr=document.getElementById('sel-mese-riepilogo');
+  for(let i=0;i<=MESE_MAX_ABS;i++){const{anno,mese}=annoMese(i);const o=document.createElement('option');o.value=i;o.textContent=MESI[mese]+' '+anno;if(i===meseSel)o.selected=true;sr.appendChild(o)}
+  sr.addEventListener('change',()=>loadRiepilogoMese(parseInt(sr.value)));
+}
+
+document.getElementById('btn-logout').addEventListener('click',async()=>{
+  U=null;profilo=null;giornoSel=null;cache={};assenzeProprie=[];
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('inp-user').value='';document.getElementById('inp-pass').value='';
+  try{await auth.signOut()}catch(e){console.log('Logout:',e.message)}
+});
+
+// SIDEBAR MOBILE
+function toggleSidebar(){
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop').classList.toggle('show');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('show');
+}
+
+// NAV
+document.querySelectorAll('.nav-item[data-page]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    closeSidebar();
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('page-'+b.dataset.page).classList.add('active');
+    const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile',budget:'Budget Contract','budget-dettaglio':'Commessa',rubrica:'Rubrica Commesse'};
+    document.getElementById('topbar-title').textContent=titles[b.dataset.page]||'';
+    if(b.dataset.page==='assenze'){loadTutteAssenze();renderCalendarioFerie()}
+    if(b.dataset.page==='riepilogo'){loadRiepilogoMese(parseInt(document.getElementById('sel-mese-riepilogo').value))}
+    if(b.dataset.page==='archivio'){initArchivioDip()}
+    if(b.dataset.page==='budget'){loadCommesseDip()}
+    if(b.dataset.page==='rubrica'){loadCommesseDip().then(renderRubricaDip)}
+  });
+});
+
+// ASSEENZE TABS
+function setAssTab(btn,tab){
+  assTab=tab;
+  document.querySelectorAll('.ass-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.ass-subtab').forEach(s=>s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('subtab-'+tab).classList.add('active');
+  if(tab==='malattia')loadMalattie();
+}
+
+// BTN NUOVA RICHIESTA
+['ferie','permesso','rol','congedo'].forEach(tipo=>{
+  document.getElementById('btn-nuova-'+tipo).addEventListener('click',()=>{
+    document.getElementById('form-'+tipo).classList.add('open');
+    document.getElementById('btn-nuova-'+tipo).style.display='none';
+  });
+});
+function chiudiForm(tipo){
+  document.getElementById('form-'+tipo).classList.remove('open');
+  document.getElementById('btn-nuova-'+tipo).style.display='';
+}
+
+// SALDI
+function aggiornaRiepilogoSaldi(){
+  if(!profilo)return;
+  try{
+  const monteFerie=profilo.monteFerie||0;
+  const montePermesso=profilo.montePermesso||0;
+  const monteRol=profilo.monteRol||0;
+  const oreGiorno=oreGiornoDip(profilo);
+
+  // Calcola ore usate da cache locale — ZERO query Firestore
+  let permessiUsati=0,rolUsato=0,giorniMalattia=0,congediApprovati=0,congediInAttesa=0;
+  const richiesteFerieApprovate=[];
+  ALL_ASSENZE.forEach(r=>{
+    if(r.stato==='approvata'){
+      if(r.tipo==='ferie'){richiesteFerieApprovate.push(r)}
+      if(r.tipo==='permesso'){permessiUsati+=parseFloat(r.oreRichieste)||0}
+      if(r.tipo==='rol'){rolUsato+=parseFloat(r.oreRichieste)||0}
+      if(r.tipo==='congedo'){congediApprovati++}
+    }
+    if(r.tipo==='congedo'&&r.stato==='in_attesa')congediInAttesa++;
+  });
+  // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
+  const ferieUsate=oreFerieConChiusure(richiesteFerieApprovate,oreGiorno);
+  // Malattie
+  ALL_MALATTIE.forEach(r=>{
+    giorniMalattia+=giorniLavorativi(r.dataInizio,r.dataFine);
+  });
+
+  const ferieRes=monteFerie-ferieUsate;
+  const permRes=montePermesso-permessiUsati;
+  const rolRes=monteRol-rolUsato;
+
+  // Sidebar
+  document.getElementById('sb-ferie').textContent=ferieRes+'h';
+  document.getElementById('sb-ferie').className='saldo-val '+(ferieRes>monteFerie*0.3?'ok':ferieRes>0?'warn':'danger');
+  document.getElementById('sb-permessi').textContent=permRes+'h';
+  document.getElementById('sb-permessi').className='saldo-val '+(permRes>0?'ok':'danger');
+  document.getElementById('sb-rol').textContent=rolRes+'h';
+  document.getElementById('sb-rol').className='saldo-val '+(rolRes>0?'ok':'danger');
+  document.getElementById('sb-malattia').textContent=giorniMalattia+' gg';
+
+  // Cards nella pagina assenze
+  const html=`
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🏖️ Ferie</div><div class="saldo-dettaglio">Monte: ${monteFerie}h · Usate: ${ferieUsate}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${ferieRes>monteFerie*0.3?'fill-ok':ferieRes>0?'fill-warn':'fill-danger'}" style="width:${monteFerie>0?Math.max(0,Math.round(ferieRes/monteFerie*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${ferieRes>monteFerie*0.3?'ok':ferieRes>0?'warn':'danger'}">${ferieRes}h</div><div class="saldo-sub">residue</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🕐 Permessi</div><div class="saldo-dettaglio">Monte: ${montePermesso}h · Usati: ${permessiUsati}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${permRes>0?'fill-ok':'fill-danger'}" style="width:${montePermesso>0?Math.max(0,Math.round(permRes/montePermesso*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${permRes>0?'ok':'danger'}">${permRes}h</div><div class="saldo-sub">residui</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🔄 ROL</div><div class="saldo-dettaglio">Monte: ${monteRol}h · Usato: ${rolUsato}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill ${rolRes>0?'fill-ok':'fill-danger'}" style="width:${monteRol>0?Math.max(0,Math.round(rolRes/monteRol*100)):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${rolRes>0?'ok':'danger'}">${rolRes}h</div><div class="saldo-sub">residuo</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati nel 2026</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--viola)">${giorniMalattia}</div><div class="saldo-sub">giorni</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">🗂️ Congedi</div><div class="saldo-dettaglio">${congediInAttesa>0?congediInAttesa+' in attesa di approvazione':'Nessuna richiesta in attesa'}</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--gc-congedo)">${congediApprovati}</div><div class="saldo-sub">approvati</div></div>
+    </div>
+  `;
+  document.getElementById('saldi-cards').innerHTML=html;
+  }catch(e){console.error('Errore aggiornamento saldi:',e)}
+}
+
+// CALENDARIO
+function initCal(){
+  document.getElementById('cal-dow').innerHTML=['L','M','M','G','V','S','D'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const sel=document.getElementById('sel-mese');
+  for(let i=0;i<=MESE_MAX_ABS;i++){const{anno,mese}=annoMese(i);const o=document.createElement('option');o.value=i;o.textContent=MESI[mese]+' '+anno;if(i===meseSel)o.selected=true;sel.appendChild(o)}
+  sel.addEventListener('change',()=>{meseSel=parseInt(sel.value);loadMese(meseSel)});
+  document.getElementById('mese-prec').addEventListener('click',()=>{if(meseSel>0){meseSel--;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
+  document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<MESE_MAX_ABS){meseSel++;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
+}
+
+function loadMese(m){
+  const{anno:annoM,mese:meseM}=annoMese(m);
+  const pref=annoM+'-'+pad(meseM+1);
+  cache={};
+  // Legge dalla cache locale — ZERO query Firestore
+  Object.entries(ALL_GIORNI).forEach(([id,data])=>{
+    if(id.startsWith(pref))cache[id]={...data};
+  });
+  // Assenze approvate per colorare il calendario
+  ALL_ASSENZE.filter(r=>r.stato==='approvata').forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  // Malattie
+  ALL_MALATTIE.forEach(r=>{
+    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
+    const cur=new Date(inizio);
+    while(cur<=fine){
+      const ds=cur.toISOString().split('T')[0];
+      if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  renderCal(m);
+}
+
+function renderCal(m){
+  const g=document.getElementById('cal-giorni');g.innerHTML='';
+  const primo=getPrimo(m),giorni=getDays(m);
+  const oggiDs=dsOggi();
+  for(let i=0;i<primo;i++)g.innerHTML+='<div></div>';
+  for(let day=1;day<=giorni;day++){
+    const ds=dsOf(m,day);
+    const dati=cache[ds];
+    const festivo=isFestivo(ds);
+    const assenza=dati?dati['_tipo_assenza']:null;
+    const chius=chiusuraDelGiorno(ds);
+    const weekend=isWE(m,day);
+    const btn=document.createElement('button');
+    let cls='cal-day';
+    // Priorità colore: chiusura+festivo (strisce) > chiusura > malattia > ferie > congedo > festivo > permesso > rol > compilato (grigio) > (tutto il resto: casella vuota)
+    if(chius&&festivo)cls+=' gc-chiusura-festivo';
+    else if(chius)cls+=' gc-chiusura';
+    else if(assenza==='malattia')cls+=' gc-malattia';
+    else if(assenza==='ferie')cls+=' gc-ferie';
+    else if(assenza==='congedo')cls+=' gc-congedo';
+    else if(festivo)cls+=' gc-festivo';
+    else if(assenza==='permesso')cls+=' gc-permesso';
+    else if(assenza==='rol')cls+=' gc-rol';
+    else if(totaleGiorno(dati)>0)cls+=' gc-compilato';
+    // Giorno passato, lavorativo (non weekend, non festivo, non chiusura) e completamente vuoto: segnalato con ❗
+    if(!chius&&!festivo&&!weekend&&ds<oggiDs&&!assenza&&totaleGiorno(dati)<=0)cls+=' gc-mancante';
+    if(giornoSel===ds)cls+=' selected';
+    btn.className=cls;btn.textContent=day;
+    btn.onclick=()=>selectDay(ds);
+    g.appendChild(btn);
+  }
+}
+
+function selectDay(ds){
+  giornoSel=ds;renderCal(meseSel);
+  let dati=cache[ds]||ALL_GIORNI[ds]||null;
+  renderForm(ds,dati||{});
+}
+
+function renderForm(ds,dati){
+  const[y,m,g]=ds.split('-');
+  const label=`${g} ${MESI[parseInt(m)-1]} ${y}`;
+  const festivo=isFestivo(ds);
+  const totOre=totaleGiorno(dati);
+  let html=`<div class="form-header">
+    <div>
+      <div class="form-date">${label}</div>
+      ${festivo?'<div style="font-size:11px;color:var(--amber);margin-top:2px">★ Giorno festivo</div>':''}
+    </div>
+    <div class="form-actions">
+      <span class="save-status" id="sv-status"></span>
+      <button class="btn btn-blu btn-sm" onclick="saveDayManual()">💾 Salva</button>
+    </div>
+  </div><div class="fields-grid">`;
+  CAMPI.forEach(c=>{
+    const v=dati[c.k]!==undefined?dati[c.k]:'';
+    if(c.t==='textarea'){
+      html+=`<div class="field-group full"><label class="field-label">${c.l}</label><textarea class="field-input field-textarea" id="f-${c.k}" oninput="fieldChange('${c.k}',this.value)">${v}</textarea></div>`;
+    }else{
+      html+=`<div class="field-group"><label class="field-label">${c.l}</label><input class="field-input" type="${c.t}" id="f-${c.k}" value="${v}" ${c.t==='number'?'min="0" step="0.5"':''} placeholder="${c.ph||'0'}" oninput="fieldChange('${c.k}',this.value)"></div>`;
+    }
+  });
+  html+=`</div>`;
+  if(totOre>0){
+    html+=`<div class="totale-giorno"><span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${totOre}h</span></div>`;
+  }
+  // Mostra stato straordinari se presenti
+  const straEl=parseFloat(dati.oreStraordinariElettrico)||0;
+  const straMec=parseFloat(dati.oreStraordinariMeccanico)||0;
+  if(straEl>0||straMec>0){
+    const stato=dati.statoStraordinari||'da_convalidare';
+    const statoMap={da_convalidare:{label:'⏳ In attesa di convalida',bg:'var(--amber-light)',color:'var(--amber)'},autorizzati:{label:'✓ Straordinari autorizzati',bg:'var(--verde-light)',color:'var(--verde)'},non_autorizzati:{label:'✕ Straordinari non autorizzati',bg:'var(--rosso-light)',color:'var(--rosso)'}};
+    const s=statoMap[stato]||statoMap.da_convalidare;
+    html+=`<div style="margin-top:8px;background:${s.bg};border-radius:6px;padding:8px 12px;font-size:12px;color:${s.color};font-weight:500">⚡ ${s.label}</div>`;
+  }
+  html+=renderRigheCommesseBox(dati);
+  document.getElementById('form-giorno').innerHTML=html;
+  for(let i=0;i<5;i++){
+    const selRc=document.getElementById('rc-commessa-'+i);
+    if(selRc)makeSearchable(selRc,'Cerca per numero o nome...');
+  }
+}
+
+// ── COLLEGAMENTO CALENDARIO → BUDGET CONTRACT ──────────────────────────
+// Fino a 5 righe per giornata: ognuna collegata (in automatico, allo stesso modo
+// dell'autosave esistente) a una riga dentro commesse/{numero}/righe.
+function rcArr(dati){
+  const a=((dati&&dati.righeCommesse)||[]).slice(0,5).map(r=>({commessa:(r&&r.commessa)||'',faseId:(r&&r.faseId)||'',disciplina:(r&&r.disciplina)||'ele',ore:(r&&r.ore!==undefined)?r.ore:'',km:(r&&r.km!==undefined)?r.km:'',spese:(r&&r.spese!==undefined)?r.spese:'',nota:(r&&r.nota)||''}));
+  while(a.length<5)a.push({commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
+  return a;
+}
+function renderRigheCommesseBox(dati){
+  const rows=rcArr(dati);
+  return `<div class="card" style="margin-top:16px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:2px">📁 Ore per Commessa</div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Le ore inserite qui si collegano automaticamente al Budget Contract della commessa scelta. Puoi dividere la giornata su più commesse diverse. Km e spese inseriti qui si sommano automaticamente ai campi "Km Percorsi" e "Spese Extra" del giorno, qui sopra.</div>
+    ${rows.map((r,i)=>`
+      <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:1.7fr 1fr .8fr auto;gap:8px;align-items:center">
+          <select class="field-input" id="rc-commessa-${i}" onchange="rcChange(${i},'commessa',this.value)">
+            <option value="">— Nessuna commessa —</option>
+            ${BC_commesse.map(c=>{
+              const fasi=bcFasi(c);
+              return fasi.map(f=>`<option value="${c.numero}::${f.id}" ${(r.commessa===c.numero&&(r.faseId||fasi[0].id)===f.id)?'selected':''}>${c.numero}${fasi.length>1?(' · '+(f.nome||f.id)):''}${c.committente?(' — '+c.committente):''}</option>`).join('');
+            }).join('')}
+          </select>
+          <select class="field-input" onchange="rcChange(${i},'disciplina',this.value)">
+            <option value="ele" ${r.disciplina!=='mec'?'selected':''}>⚡ Elettrico</option>
+            <option value="mec" ${r.disciplina==='mec'?'selected':''}>⚙️ Meccanico</option>
+          </select>
+          <input class="field-input" type="number" min="0" step="0.5" placeholder="Ore" value="${r.ore===''?'':r.ore}" oninput="rcChange(${i},'ore',this.value)">
+          <button class="btn btn-sm" onclick="rcClear(${i})" title="Svuota riga">🗑</button>
+        </div>
+        <div style="display:grid;grid-template-columns:.7fr .9fr 1.6fr;gap:8px;margin-top:6px">
+          <input class="field-input" type="number" min="0" step="1" placeholder="Km" value="${r.km===''?'':r.km}" oninput="rcChange(${i},'km',this.value)">
+          <input class="field-input" type="number" min="0" step="0.01" placeholder="Spese (€)" value="${r.spese===''?'':r.spese}" oninput="rcChange(${i},'spese',this.value)">
+          <input class="field-input" type="text" placeholder="Nota (opz.)" value="${String(r.nota||'').replace(/"/g,'&quot;')}" oninput="rcChange(${i},'nota',this.value)">
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+function rcEnsure(){
+  if(!giornoSel)return null;
+  if(!cache[giornoSel])cache[giornoSel]={};
+  if(!cache[giornoSel].righeCommesse)cache[giornoSel].righeCommesse=rcArr(ALL_GIORNI[giornoSel]||{});
+  const arr=cache[giornoSel].righeCommesse;
+  while(arr.length<5)arr.push({commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''});
+  return arr;
+}
+// Applica un delta (positivo o negativo) al campo giornata 'kmPercorsi'/'speseExtra' quando
+// cambia un valore km/spese di una riga commessa, sommandolo a quanto già presente nel campo
+// (che resta comunque liberamente modificabile a mano dal dipendente in qualsiasi momento).
+function rcApplicaDeltaTotale(campo,delta){
+  if(!giornoSel||!cache[giornoSel]||!delta)return;
+  const attuale=parseFloat(cache[giornoSel][campo])||0;
+  const nuovo=Math.round((attuale+delta)*100)/100;
+  cache[giornoSel][campo]=nuovo;
+  const el=document.getElementById('f-'+campo);
+  if(el)el.value=nuovo;
+}
+function rcChange(i,field,value){
+  const arr=rcEnsure();
+  if(!arr)return;
+  if(!arr[i])arr[i]={commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  if(field==='commessa'){
+    const [numero,faseId]=value?value.split('::'):['',''];
+    arr[i].commessa=numero;
+    arr[i].faseId=faseId||'';
+  }else if(field==='km'||field==='spese'){
+    const nuovo=value===''?0:(parseFloat(value)||0);
+    const vecchio=parseFloat(arr[i][field])||0;
+    arr[i][field]=value===''?'':nuovo;
+    rcApplicaDeltaTotale(field==='km'?'kmPercorsi':'speseExtra',nuovo-vecchio);
+  }else{
+    arr[i][field]=field==='ore'?(value===''?'':(parseFloat(value)||0)):value;
+  }
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+}
+function rcClear(i){
+  const arr=rcEnsure();
+  if(!arr)return;
+  const kmVecchio=parseFloat(arr[i]&&arr[i].km)||0;
+  const speseVecchie=parseFloat(arr[i]&&arr[i].spese)||0;
+  arr[i]={commessa:'',faseId:'',disciplina:'ele',ore:'',km:'',spese:'',nota:''};
+  rcApplicaDeltaTotale('kmPercorsi',-kmVecchio);
+  rcApplicaDeltaTotale('speseExtra',-speseVecchie);
+  renderForm(giornoSel,cache[giornoSel]);
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+}
+
+function fieldChange(k,v){
+  if(!giornoSel)return;
+  if(!cache[giornoSel])cache[giornoSel]={};
+  cache[giornoSel][k]=CAMPI.find(c=>c.k===k)?.t==='number'?(v===''?'':parseFloat(v)||0):v;
+  if(saveTimer)clearTimeout(saveTimer);
+  // Aggiorna totale in tempo reale
+  const tot=totaleGiorno(cache[giornoSel]);
+  const totEl=document.querySelector('.totale-giorno-val');
+  if(totEl)totEl.textContent=tot+'h';
+  else if(tot>0){
+    const form=document.getElementById('form-giorno');
+    const div=document.createElement('div');div.className='totale-giorno';
+    div.innerHTML=`<span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${tot}h</span>`;
+    form.appendChild(div);
+  }
+  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+}
+
+// Collega/scollega le righe "Ore per Commessa" del giorno ds alle righe reali
+// dentro commesse/{numero}/righe. ID deterministico per slot (0-4): cambia solo
+// se la commessa scelta in quello slot cambia, evitando duplicati o righe orfane.
+async function syncRigheCommesseBC(ds,curr){
+  const prev=(ALL_GIORNI[ds]&&ALL_GIORNI[ds].righeCommesse)||[];
+  const nomeCompleto=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  const tasks=[];
+  for(let i=0;i<5;i++){
+    const p=prev[i]||{},c=curr[i]||{};
+    const prevNumero=p.commessa||'',currNumero=c.commessa||'';
+    const prevOre=parseFloat(p.ore)||0,currOre=parseFloat(c.ore)||0;
+    const rigaId='cal_'+U.username+'_'+ds+'_'+i;
+    if(prevNumero&&(prevNumero!==currNumero||currOre<=0)){
+      tasks.push(db.collection('commesse').doc(prevNumero).collection('righe').doc(rigaId).delete().catch(()=>{}));
+    }
+    if(currNumero&&currOre>0){
+      tasks.push(db.collection('commesse').doc(currNumero).collection('righe').doc(rigaId).set({
+        username:U.username,nomeCompleto,tipoPersona:'dipendente',
+        livello:profilo.livello||'senior',disciplina:c.disciplina||'ele',
+        data:ds,descrizione:(c.nota||'').trim()||'(da calendario ore)',
+        ore:currOre,speseVive:parseFloat(c.spese)||0,km:parseFloat(c.km)||0,
+        faseId:c.faseId||'',
+        origineCalendario:true,
+        createdBy:U.username,createdAt:new Date().toISOString()
+      },{merge:true}).catch(e=>console.log('Sync BC calendario:',e.message)));
+    }
+  }
+  await Promise.all(tasks);
+}
+async function saveDay(ds){
+  if(!ds||!cache[ds])return;
+  const st=document.getElementById('sv-status');
+  if(st)st.innerHTML='<span class="save-loading">Salvataggio...</span>';
+  try{
+    const toSave={};
+    Object.entries(cache[ds]).forEach(([k,v])=>{if(!k.startsWith('_'))toSave[k]=v});
+    // Flag hasStraordinari per permettere all'admin di trovarli facilmente
+    const straEl=parseFloat(toSave.oreStraordinariElettrico)||0;
+    const straMec=parseFloat(toSave.oreStraordinariMeccanico)||0;
+    toSave.hasStraordinari=(straEl>0||straMec>0);
+    const salvaGiornoP=db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const syncP=syncRigheCommesseBC(ds,toSave.righeCommesse||[]);
+    await Promise.all([salvaGiornoP,syncP]);
+    segnalaAttivita('ore');
+    // Aggiorna cache locale immediatamente
+    ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
+    if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
+    renderCal(meseSel);
+    setTimeout(()=>{if(st)st.innerHTML=''},2500);
+  }catch(e){if(st)st.innerHTML='<span class="save-err">✗ Errore</span>'}
+}
+function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)}
+
+// Segnala all'admin (pulsante Aggiorna) che ci sono nuovi dati da vedere
+function segnalaAttivita(tipo){
+  db.collection('meta').doc('lastActivity').set({username:U.username,tipo,timestamp:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.log('Segnalazione attività fallita:',e.message));
+}
+
+// CALENDARIO FERIE CONDIVISO (dipendenti + titolari) — sola lettura per i dipendenti
+let calFerieMese=new Date();calFerieMese.setDate(1);
+const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const CAL_FERIE_LABEL={ferie:'Ferie',permesso:'Permesso',rol:'ROL',congedo:'Congedo'};
+function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
+function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
+function chiusuraDelGiorno(ds){
+  return chiusureUfficio.find(c=>c.dataInizio&&c.dataFine&&ds>=c.dataInizio&&ds<=c.dataFine);
+}
+function renderCalendarioFerie(){
+  const grid=document.getElementById('cal-ferie-grid');
+  if(!grid)return;
+  const anno=calFerieMese.getFullYear(),mese=calFerieMese.getMonth();
+  document.getElementById('cal-ferie-label').textContent=CAL_FERIE_MESI[mese]+' '+anno;
+  const giorniMese=new Date(anno,mese+1,0).getDate();
+  let offset=new Date(anno,mese,1).getDay();offset=offset===0?6:offset-1;
+  const perGiorno={};
+  ALL_ASSENZE_TUTTI.filter(r=>r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol'||r.tipo==='congedo').forEach(r=>{
+    if(!r.dataInizio||!r.dataFine)return;
+    let d=new Date(r.dataInizio+'T00:00:00');
+    const fine=new Date(r.dataFine+'T00:00:00');
+    let guard=0;
+    while(d<=fine&&guard<400){
+      if(d.getFullYear()===anno&&d.getMonth()===mese)(perGiorno[d.getDate()]=perGiorno[d.getDate()]||[]).push(r);
+      d.setDate(d.getDate()+1);guard++;
+    }
+  });
+  const COL={ferie:'var(--gc-ferie)',permesso:'var(--gc-permesso)',rol:'var(--gc-rol)',congedo:'var(--gc-congedo)'};
+  const oggi=new Date();
+  let html='';
+  ['L','M','M','G','V','S','D'].forEach(g=>html+=`<div class="cal-dow">${g}</div>`);
+  for(let i=0;i<offset;i++)html+='<div class="cal-ferie-cell cal-ferie-empty"></div>';
+  for(let g=1;g<=giorniMese;g++){
+    const persone=perGiorno[g]||[];
+    const isOggi=oggi.getFullYear()===anno&&oggi.getMonth()===mese&&oggi.getDate()===g;
+    const ds=anno+'-'+String(mese+1).padStart(2,'0')+'-'+String(g).padStart(2,'0');
+    const dow=new Date(anno,mese,g).getDay();
+    const chius=chiusuraDelGiorno(ds);
+    let bg='',tip='';
+    // Priorità colore: chiusura+festivo (strisce) > chiusura > festivo > (weekend/resto: nessun colore)
+    if(chius&&isFestivo(ds)){bg='background:repeating-linear-gradient(45deg,var(--gc-chiusura-bg) 0 8px,var(--gc-festivo-bg) 8px 16px)';tip=' title="🔒🎉 '+(chius.motivo||'Chiusura ufficio')+' — anche festività, non conteggiato"'}
+    else if(chius){bg='background:var(--gc-chiusura-bg)';tip=' title="🔒 '+(chius.motivo||'Chiusura ufficio')+'"'}
+    else if(isFestivo(ds)){bg='background:var(--gc-festivo-bg)'}
+    html+=`<div class="cal-ferie-cell${isOggi?' cal-ferie-oggi':''}" style="${bg}"${tip}>
+      <div class="cal-ferie-num">${g}</div>
+      <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
+        const c=COL[r.tipo]||'var(--ink3)';
+        const ic=r.daTitolare?'👑 ':'';
+        const nome=(r.nomeCompleto||r.username||'').split(' ')[0];
+        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c}" title="${r.nomeCompleto||r.username} — ${CAL_FERIE_LABEL[r.tipo]||r.tipo}">${ic}${nome}</span>`;
+      }).join('')}${persone.length>3?`<span class="cal-ferie-chip-more">+${persone.length-3}</span>`:''}</div>
+    </div>`;
+  }
+  grid.innerHTML=html;
+}
+
+// RICHIESTE ASSENZE
+async function inviaRichiesta(tipo){
+  const ini=document.getElementById(`f-inizio-${tipo}`).value;
+  const fin=document.getElementById(`f-fine-${tipo}`).value;
+  const note=document.getElementById(`f-note-${tipo}`).value;
+  const oreEl=document.getElementById(`f-ore-${tipo}`);
+  const ore=oreEl?parseFloat(oreEl.value)||0:0;
+  const tipoCongedoEl=tipo==='congedo'?document.getElementById('f-tipo-congedo'):null;
+  const tipoCongedo=tipoCongedoEl?tipoCongedoEl.value:'';
+  const ad=document.getElementById(`alert-form-${tipo}`);ad.innerHTML='';
+  if(tipo==='congedo'&&!tipoCongedo){ad.innerHTML='<div class="alert-box alert-err">Seleziona il tipo di congedo.</div>';return}
+  if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  if((tipo==='permesso'||tipo==='rol')&&ore<=0){ad.innerHTML='<div class="alert-box alert-err">Inserisci le ore richieste.</div>';return}
+  const oreGiorno=oreGiornoDip(profilo);
+  const gg=giorniLavorativi(ini,fin);
+  const oreTotali=(tipo==='ferie'||tipo==='congedo')?gg*oreGiorno:ore;
+  try{
+    const extra=tipo==='congedo'?{tipoCongedo}:{};
+    await db.collection('richieste_assenza').add({
+      username:U.username,
+      nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),
+      tipo,dataInizio:ini,dataFine:fin,note,
+      oreRichieste:oreTotali,
+      giorniLavorativi:gg,
+      stato:'in_attesa',
+      createdAt:new Date().toISOString(),
+      ...extra,
+    });
+    segnalaAttivita('richiesta');
+    // Aggiorna cache locale con la nuova richiesta
+    ALL_ASSENZE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),tipo,dataInizio:ini,dataFine:fin,note,oreRichieste:oreTotali,giorniLavorativi:gg,stato:'in_attesa',createdAt:new Date().toISOString(),...extra});
+    chiudiForm(tipo);
+    loadTutteAssenze();
+    aggiornaRiepilogoSaldi();
+    document.getElementById(`f-inizio-${tipo}`).value='';
+    document.getElementById(`f-fine-${tipo}`).value='';
+    if(oreEl)oreEl.value='';
+    if(tipoCongedoEl)tipoCongedoEl.value='';
+    document.getElementById(`f-note-${tipo}`).value='';
+  }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+}
+
+function loadTutteAssenze(){
+  // Legge dalla cache locale — ZERO query Firestore
+  assenzeProprie=[...ALL_ASSENZE].sort((a,b)=>(a.dataInizio||'').localeCompare(b.dataInizio||''));
+  ['ferie','permesso','rol','congedo'].forEach(tipo=>{
+    const lista=assenzeProprie.filter(r=>r.tipo===tipo);
+    renderListaAssenze(tipo,lista);
+  });
+  aggiornaRiepilogoSaldi();
+}
+
+function renderListaAssenze(tipo,lista){
+  const el=document.getElementById('lista-'+tipo);
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna richiesta di '+tipo+'.</div>';return}
+  el.innerHTML='<div class="richieste-list">'+lista.map(r=>{
+    const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
+    const bl=r.stato==='in_attesa'?'In fase di approvazione':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
+    const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
+    const tipoCongLbl=r.tipo==='congedo'&&r.tipoCongedo?`<div style="font-size:12px;font-weight:600;color:var(--gc-congedo);margin-top:2px">${TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo}</div>`:'';
+    return `<div class="richiesta-row">
+      <div>
+        <div class="r-tipo"><span class="badge ${bc}">${bl}</span></div>
+        ${tipoCongLbl}
+        <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h</div>
+        ${r.note?`<div class="r-nota">${r.note}</div>`:''}
+        ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}
+      </div>
+      <button class="btn btn-rosso btn-sm" title="Elimina richiesta" onclick="eliminaRichiesta('${r.id}')">🗑️ Elimina</button>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+async function eliminaRichiesta(id){
+  if(!confirm('Eliminare questa richiesta? Verrà spostata nel Cestino, come se non fosse mai stata inviata.'))return;
+  const r=ALL_ASSENZE.find(x=>x.id===id);
+  if(r){const{id:_id,...dati}=r;await spostaNelCestino('richiesta_assenza',['richieste_assenza',id],dati,'Richiesta '+(dati.tipo||'')+': '+U.username,U.username);}
+  await db.collection('richieste_assenza').doc(id).delete();
+  // Rimuovere dalla cache locale
+  ALL_ASSENZE=ALL_ASSENZE.filter(r=>r.id!==id);
+  loadTutteAssenze();
+}
+
+// MALATTIA
+async function inserisciMalattia(){
+  const ini=document.getElementById('mal-inizio').value;
+  const fin=document.getElementById('mal-fine').value;
+  const note=document.getElementById('mal-note').value;
+  const ad=document.getElementById('alert-malattia');ad.innerHTML='';
+  if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  const gg=giorniLavorativi(ini,fin);
+  try{
+    await db.collection('malattie').add({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
+    segnalaAttivita('malattia');
+    // Aggiorna cache locale con la nuova malattia
+    ALL_MALATTIE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
+    document.getElementById('mal-inizio').value='';document.getElementById('mal-fine').value='';document.getElementById('mal-note').value='';
+    ad.innerHTML='<div class="alert-box alert-ok">Malattia registrata ('+gg+' giorni lavorativi).</div>';
+    setTimeout(()=>ad.innerHTML='',3000);
+    loadMalattie();aggiornaRiepilogoSaldi();
+  }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+}
+
+function loadMalattie(){
+  const el=document.getElementById('lista-malattia');
+  const lista=[...ALL_MALATTIE].sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna malattia registrata.</div>';return}
+  el.innerHTML=lista.map(r=>`
+    <div class="mal-item">
+      <div>
+        <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
+        <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
+        ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge badge-malattia">Malattia</span>
+        <button class="btn btn-rosso btn-sm" title="Elimina malattia" onclick="eliminaMalattiaDip('${r.id}')">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+async function eliminaMalattiaDip(id){
+  if(!confirm('Eliminare questa malattia? Verrà spostata nel Cestino, come se non fosse mai stata registrata.'))return;
+  const r=ALL_MALATTIE.find(x=>x.id===id);
+  if(r){const{id:_id,...dati}=r;await spostaNelCestino('malattia',['malattie',id],dati,'Malattia: '+U.username+' '+(dati.dataInizio||''),U.username);}
+  await db.collection('malattie').doc(id).delete();
+  ALL_MALATTIE=ALL_MALATTIE.filter(x=>x.id!==id);
+  loadMalattie();aggiornaRiepilogoSaldi();
+}
+
+
+// RIEPILOGO MENSILE
+function loadRiepilogoMese(meseAbs){
+  try{
+  const{anno,mese}=annoMese(meseAbs);
+  const pref=anno+'-'+pad(mese+1);
+  // Clona la cache locale (ZERO query Firestore) e inietta Ferie/Permesso/ROL/Malattia derivate dal
+  // sistema "Ferie & Assenze" — solo su questa copia in memoria, la cache ALL_GIORNI resta intatta.
+  const allAnno={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{allAnno[id]={...data}});
+  iniettaAssenzeInGiorniDip(allAnno,oreGiornoDip(profilo));
+  const all={};Object.entries(allAnno).forEach(([id,data])=>{if(id.startsWith(pref))all[id]=data});
+  const giorni=Object.keys(all).sort();
+
+  // KPI (solo ore/km, nessun dato economico: i costi sono riservati all'amministrazione)
+  const totMensili={};CN_REPORT.forEach(c=>{totMensili[c.k]=giorni.reduce((s,d)=>s+(parseFloat(all[d][c.k])||0),0)});
+  const totOre=CN_REPORT.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totMensili[c.k],0);
+  const highlights=[
+    {l:'Ore Totali Mese',v:totOre+'h'},
+    {l:'Ore Elettrici M.D.',v:(totMensili.oreElectriciMD||0)+'h'},
+    {l:'Ore Meccanici M.A.',v:(totMensili.oreMeccaniciMA||0)+'h'},
+    {l:'Km Percorsi',v:(totMensili.kmPercorsi||0)+' km'},
+  ];
+  document.getElementById('stat-row-riepilogo').innerHTML=highlights.map(h=>`<div class="stat-box"><div class="stat-label">${h.l}</div><div class="stat-val">${h.v}</div></div>`).join('');
+
+  // Tabella giornaliera (solo ore, niente costi)
+  const thead=document.getElementById('thead-r');
+  thead.innerHTML='<th>Data</th>'+CN_REPORT.map(c=>`<th class="td-r">${c.l}</th>`).join('')+'<th class="td-r">Tot.Ore</th>';
+  const tbody=document.getElementById('tbody-r');tbody.innerHTML='';
+  giorni.forEach(ds=>{
+    const d=all[ds];const[y,m,g]=ds.split('-');
+    const tot=totaleGiornoReport(d);
+    let html=`<td style="font-family:'Inter',monospace;font-size:11px">${g}/${m}</td>`;
+    CN_REPORT.forEach(c=>{const v=parseFloat(d[c.k])||0;html+=`<td class="td-r" style="color:${v>0?'var(--ink)':'var(--border)'}">${v>0?fmtN(v,c.k):'—'}</td>`});
+    html+=`<td class="td-r td-bold">${tot>0?tot+'h':'—'}</td>`;
+    const tr=document.createElement('tr');tr.innerHTML=html;tbody.appendChild(tr);
+  });
+
+  // Tabella totali per tipologia (solo quantita', niente tariffe/costi)
+  const tbody2=document.getElementById('tbody-totali');tbody2.innerHTML='';
+  document.querySelector('#tab-totali thead tr').innerHTML='<th>Tipologia</th><th class="td-r">Quantità</th>';
+  CN_REPORT.forEach(c=>{
+    if(totMensili[c.k]>0){
+      const v=totMensili[c.k];
+      const unit=c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h';
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td style="font-weight:500">${c.l}</td><td class="td-r">${v%1===0?v:v.toFixed(1)}${unit}</td>`;
+      tbody2.appendChild(tr);
+    }
+  });
+  if(!tbody2.innerHTML){tbody2.innerHTML='<tr><td colspan="2" class="empty-state">Nessun dato per questo mese.</td></tr>';}
+  }catch(e){console.error('Errore riepilogo mensile:',e)}
+}
+
+// ── SELETTORE PERIODO CONDIVISO (esportazioni Excel/PDF) ──────────────
+const PERIODO_ANNO_MIN=2022;
+let PERIODO_CB=null;
+function apriSelettorePeriodo(cb,opts){
+  PERIODO_CB=cb;
+  document.getElementById('periodo-titolo').textContent=(opts&&opts.titolo)||'Seleziona periodo da esportare';
+  const annoMin=(opts&&opts.annoMin)||PERIODO_ANNO_MIN;
+  let optsAnno='';for(let y=ANNO;y>=annoMin;y--)optsAnno+=`<option value="${y}">${y}</option>`;
+  const selDaA=document.getElementById('periodo-da-anno'),selAA=document.getElementById('periodo-a-anno');
+  selDaA.innerHTML=optsAnno;selAA.innerHTML=optsAnno;
+  const optsMese=MESI.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
+  document.getElementById('periodo-da-mese').innerHTML=optsMese;
+  document.getElementById('periodo-a-mese').innerHTML=optsMese;
+  selDaA.value=ANNO;selAA.value=ANNO;
+  document.getElementById('periodo-da-mese').value=0;
+  document.getElementById('periodo-a-mese').value=new Date().getMonth();
+  document.getElementById('modal-periodo').classList.add('open');
+}
+function chiudiSelettorePeriodo(){document.getElementById('modal-periodo').classList.remove('open');PERIODO_CB=null}
+function periodoScegli(tipo){
+  let annoIni,meseIni,annoFin,meseFin;
+  if(tipo==='corrente'){annoIni=ANNO;meseIni=0;annoFin=ANNO;meseFin=11}
+  else if(tipo==='scorso'){annoIni=ANNO-1;meseIni=0;annoFin=ANNO-1;meseFin=11}
+  else{annoIni=PERIODO_ANNO_MIN;meseIni=0;annoFin=ANNO;meseFin=11}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoConferma(){
+  const annoIni=parseInt(document.getElementById('periodo-da-anno').value);
+  const meseIni=parseInt(document.getElementById('periodo-da-mese').value);
+  const annoFin=parseInt(document.getElementById('periodo-a-anno').value);
+  const meseFin=parseInt(document.getElementById('periodo-a-mese').value);
+  if(annoIni*12+meseIni>annoFin*12+meseFin){alert('L\'inizio del periodo deve precedere la fine.');return}
+  const cb=PERIODO_CB;chiudiSelettorePeriodo();
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+}
+function periodoLabel(p){
+  if(p.annoIni===p.annoFin){
+    if(p.meseIni===0&&p.meseFin===11)return String(p.annoIni);
+    return MESI[p.meseIni]+'–'+MESI[p.meseFin]+' '+p.annoIni;
+  }
+  return MESI[p.meseIni]+' '+p.annoIni+' – '+MESI[p.meseFin]+' '+p.annoFin;
+}
+function periodoFile(p){return periodoLabel(p).replace(/\s+/g,'_').replace(/[^\w\-]/g,'')}
+function periodoInRange(dataStr,p){
+  if(!dataStr)return false;
+  const y=parseInt(String(dataStr).substring(0,4)),m=parseInt(String(dataStr).substring(5,7))-1;
+  if(isNaN(y)||isNaN(m))return false;
+  const key=y*12+m,kIni=p.annoIni*12+p.meseIni,kFin=p.annoFin*12+p.meseFin;
+  return key>=kIni&&key<=kFin;
+}
+function periodoAnni(p){const a=[];for(let y=p.annoIni;y<=p.annoFin;y++)a.push(y);return a}
+
+// ══════════════════ STILE UNIFORME ESPORTAZIONI (Excel + PDF) ══════════════════
+// Palette identica all'app (--blu / --blu-dark) + intestazione "PLANT INGEGNERIA" + data/ora esportazione + colonne a larghezza leggibile
+const EXP_BLU=[122,158,142];        // rgb di var(--blu)
+const EXP_BLU_HEX='7A9E8E';
+const EXP_TOT_BG_HEX='EAF2ED';      // var(--blu-light)
+function expDataOra(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function expLarghezzeColonne(headerRow,bodyRows,footRow){
+  const nCols=headerRow.length,cols=[];
+  for(let c=0;c<nCols;c++){
+    let maxLen=String(headerRow[c]??'').length;
+    bodyRows.forEach(r=>{const v=r?r[c]:null;if(v!=null){const l=String(v).length;if(l>maxLen)maxLen=l;}});
+    if(footRow&&footRow[c]!=null){const l=String(footRow[c]).length;if(l>maxLen)maxLen=l;}
+    cols.push({wch:Math.min(Math.max(maxLen+3,10),60)});
+  }
+  return cols;
+}
+function expFoglioExcel(titoloReport,sottotitolo,headerRow,bodyRows,footRow){
+  const nCols=headerRow.length;
+  const aoa=[['PLANT INGEGNERIA'],[titoloReport],[sottotitolo||''],['Esportato il '+expDataOra()],[],headerRow,...bodyRows];
+  if(footRow)aoa.push(footRow);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[0,1,2,3].map(r=>({s:{r,c:0},e:{r,c:Math.max(nCols-1,0)}}));
+  const st=(addr,s)=>{if(ws[addr])ws[addr].s=s};
+  st('A1',{font:{bold:true,sz:16,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center'}});
+  st('A2',{font:{bold:true,sz:12,color:{rgb:'222222'}},alignment:{horizontal:'center'}});
+  st('A3',{font:{sz:10,italic:true,color:{rgb:'6B7280'}},alignment:{horizontal:'center'}});
+  st('A4',{font:{sz:9,color:{rgb:'9CA3AF'}},alignment:{horizontal:'center'}});
+  ws['!rows']=[{hpt:22},{hpt:18},{hpt:15},{hpt:14},{hpt:6}];
+  const headerRowIdx=5;
+  for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:headerRowIdx,c}),{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:EXP_BLU_HEX}},alignment:{horizontal:'center',vertical:'center',wrapText:true}});
+  if(footRow){
+    const footIdx=aoa.length-1;
+    for(let c=0;c<nCols;c++)st(XLSX.utils.encode_cell({r:footIdx,c}),{font:{bold:true},fill:{fgColor:{rgb:EXP_TOT_BG_HEX}}});
+  }
+  ws['!cols']=expLarghezzeColonne(headerRow,bodyRows,footRow);
+  return ws;
+}
+function expIntestazionePDF(doc,titoloReport,sottotitolo){
+  const pageW=doc.internal.pageSize.getWidth();
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(94,127,112);
+  doc.text('PLANT INGEGNERIA',14,14);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(34,34,34);
+  doc.text(titoloReport,14,21);
+  if(sottotitolo){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);doc.text(sottotitolo,14,27);}
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(156,163,175);
+  doc.text('Esportato il '+expDataOra(),pageW-14,14,{align:'right'});
+  doc.setDrawColor(122,158,142);doc.setLineWidth(0.4);doc.line(14,30,pageW-14,30);
+  doc.setTextColor(0,0,0);
+  return 35;
+}
+const EXP_PDF_HEAD_STYLE={fillColor:EXP_BLU,textColor:[255,255,255],fontStyle:'bold'};
+const EXP_PDF_FOOT_STYLE={fillColor:[234,242,237],textColor:[20,20,20],fontStyle:'bold'};
+const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
+
+// Esportazione periodica delle proprie ore (Excel / PDF) — interroga Firestore anno per anno
+function esportaPeriodoDip(formato){
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  apriSelettorePeriodo(async(p)=>{
+    let all={};
+    for(const y of periodoAnni(p)){
+      try{
+        const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(U.username).collection('giorni').get();
+        snap.forEach(d=>{all[d.id]=d.data()});
+      }catch(e){}
+    }
+    // Inietta Ferie/Permesso/ROL/Malattia (richieste approvate + chiusure ufficio + malattie) prima di
+    // calcolare l'elenco dei giorni e i totali, così compaiono nel report esportato — stessa logica già
+    // usata da tempo lato admin per l'export dei singoli dipendenti.
+    iniettaAssenzeInGiorniDip(all,oreGiornoDip(profilo));
+    const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
+    if(formato==='excel')generaExcelPeriodoDip(nome,all,giorni,p);else generaPDFPeriodoDip(nome,all,giorni,p);
+  },{titolo:'Esporta le mie ore'});
+}
+function generaExcelPeriodoDip(nome,all,giorni,p){
+  const wb=XLSX.utils.book_new();
+  const hdr=['Campo','Totale'];
+  const righeRiep=CN_REPORT.map(c=>[c.l,giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)]);
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,periodoLabel(p),hdr,righeRiep),'Riepilogo');
+  const perMese={};
+  giorni.forEach(ds=>{const ym=ds.substring(0,7);if(!perMese[ym])perMese[ym]=[];perMese[ym].push(ds)});
+  Object.keys(perMese).sort().forEach(ym=>{
+    const gg=perMese[ym].sort();
+    const[y,m]=ym.split('-');
+    const hh=['Data',...CN_REPORT.map(c=>c.l),'Totale Ore'];
+    const rr=gg.map(ds=>{const d=all[ds];const[yy,mo,g]=ds.split('-');return[`${g}/${mo}/${yy}`,...CN_REPORT.map(c=>parseFloat(d[c.k])||0),totaleGiornoReport(d)]});
+    const footRow=['TOTALE',...CN_REPORT.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)];
+    const nomeFoglio=(MESI[parseInt(m)-1]+' '+y).substring(0,31);
+    XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nomeFoglio);
+  });
+  XLSX.writeFile(wb,`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
+}
+function generaPDFPeriodoDip(nome,all,giorni,p){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,`Riepilogo Ore — ${nome}`,periodoLabel(p));
+  const totOre=giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0);
+  doc.autoTable({
+    startY,
+    head:[['Data',...CN_REPORT.map(c=>c.l),'Tot.h']],
+    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN_REPORT.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']}),
+    foot:[['TOTALE',...CN_REPORT.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre]],
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,
+    theme:'striped'
+  });
+  doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
+}
+
+// EXPORT EXCEL (mese corrente in vista — non più collegato a un pulsante, sostituito dal periodico)
+function esportaExcel(){
+  const meseAbs=parseInt(document.getElementById('sel-mese-riepilogo').value);
+  const{anno,mese}=annoMese(meseAbs);
+  const pref=anno+'-'+pad(mese+1);
+  const all={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{if(id.startsWith(pref))all[id]=data});
+  const giorni=Object.keys(all).sort();
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
+  const wb=XLSX.utils.book_new();
+  const hh=['Data',...CN.map(c=>c.l),'Totale Ore'];
+  const rr=giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN.map(c=>parseFloat(d[c.k])||0),totaleGiorno(d)]});
+  // Totali
+  const tot=['TOTALE',...CN.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0)];
+  rr.push(tot);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...rr]),MESI[mese]);
+  XLSX.writeFile(wb,`${nome}_${MESI[mese]}_${anno}.xlsx`);
+}
+
+// ARCHIVIO ANNI DIPENDENTE
+async function initArchivioDip(){
+  const sel=document.getElementById('arch-anno-dip');
+  sel.innerHTML='';
+  for(let y=ANNO-1;y>=2024;y--){const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o)}
+  loadArchivioDip();
+}
+
+async function loadArchivioDip(){
+  const anno=parseInt(document.getElementById('arch-anno-dip')?.value)||ANNO-1;
+  const el=document.getElementById('archivio-dip-content');
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  try{
+    // Controlla se modificabile (solo anno precedente e solo in gennaio)
+    const oggi=new Date();
+    const solaLettura=!(anno===ANNO-1&&oggi.getMonth()===0);
+    if(solaLettura){
+      el.innerHTML=`<div class="alert-box" style="background:var(--amber-light);color:var(--amber);margin-bottom:16px;border-radius:6px;padding:10px 14px;font-size:12px">📅 Anno ${anno} — Archivio in sola lettura</div>`;
+    } else {
+      el.innerHTML=`<div class="alert-box alert-ok" style="margin-bottom:16px;border-radius:6px;padding:10px 14px;font-size:12px">✏️ Anno ${anno} — Modificabile fino al 31 gennaio ${ANNO}</div>`;
+    }
+    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(U.username).collection('giorni').get();
+    const all={};snap.forEach(d=>{all[d.id]=d.data()});
+    const giorni=Object.keys(all).sort();
+    if(!giorni.length){el.innerHTML+='<div class="empty-state">Nessun dato per l\'anno '+anno+'.</div>';return}
+    // Riepilogo per mese
+    let html='';
+    const MESI_LOCAL=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    for(let mi=0;mi<12;mi++){
+      const ms=String(mi+1).padStart(2,'0');
+      const gg=giorni.filter(d=>d.startsWith(`${anno}-${ms}`));
+      if(!gg.length)continue;
+      const tots={};CAMPI.filter(c=>c.t==='number').forEach(c=>{tots[c.k]=gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)});
+      const totOre=CAMPI.filter(c=>c.t==='number'&&c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+tots[c.k],0);
+      html+=`<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-family:'Inter',sans-serif;font-weight:700">${MESI_LOCAL[mi]} ${anno}</div>
+          <span style="font-family:'Inter',monospace;font-size:12px;background:var(--blu-light);color:var(--blu);padding:3px 10px;border-radius:6px">${totOre}h · ${gg.length} giorni</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+          ${CAMPI.filter(c=>c.t==='number'&&tots[c.k]>0).map(c=>`<div style="background:var(--paper);border-radius:6px;padding:8px 10px"><div style="font-family:'Inter',monospace;font-size:10px;color:var(--ink4)">${c.l}</div><div style="font-weight:600;font-size:13px;margin-top:2px">${tots[c.k]%1===0?tots[c.k]:tots[c.k].toFixed(1)}${c.k==='kmPercorsi'?' km':c.k==='speseExtra'?' €':' h'}</div></div>`).join('')}
+        </div>
+      </div>`;
+    }
+    el.innerHTML+=html;
+  }catch(e){
+    console.error('Errore caricamento archivio:',e);
+    el.innerHTML='<div class="empty-state" style="color:var(--rosso)">Errore di caricamento: '+e.message+'</div>';
+  }
+}
+
+// EXPORT PDF
+function esportaPDF(){
+  const meseAbs=parseInt(document.getElementById('sel-mese-riepilogo').value);
+  const{anno,mese}=annoMese(meseAbs);
+  const pref=anno+'-'+pad(mese+1);
+  const all={};Object.entries(ALL_GIORNI).forEach(([id,data])=>{if(id.startsWith(pref))all[id]=data});
+  const giorni=Object.keys(all).sort();
+  const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  doc.setFont('helvetica','bold');doc.setFontSize(14);
+  doc.text(`Riepilogo Ore — ${nome}`,14,16);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(`${MESI[mese]} ${anno}`,14,23);
+  let y=32;
+  const cols=['Data',...CN.slice(0,8).map(c=>c.l.substring(0,12)),'Tot.h'];
+  const colW=[18,...Array(8).fill(22),14];
+  // Header
+  doc.setFillColor(26,86,219);doc.rect(14,y,272,7,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(7);
+  let x=14;cols.forEach((c,i)=>{doc.text(c,x+1,y+5,{maxWidth:colW[i]-2});x+=colW[i]});
+  y+=7;doc.setTextColor(0,0,0);
+  giorni.forEach((ds,idx)=>{
+    const d=all[ds];const[yr,m,g]=ds.split('-');
+    if(y>185){doc.addPage();y=20}
+    if(idx%2===0)doc.setFillColor(247,245,240);else doc.setFillColor(255,255,255);
+    doc.rect(14,y,272,6,'F');
+    x=14;doc.setFontSize(7);
+    const row=[`${g}/${m}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?String(v):''}),totaleGiorno(d)>0?String(totaleGiorno(d))+'h':''];
+    row.forEach((val,i)=>{doc.text(val,x+1,y+4,{maxWidth:colW[i]-2});x+=colW[i]});
+    y+=6;
+  });
+  // Totali
+  y+=4;doc.setFont('helvetica','bold');doc.setFontSize(9);
+  const totOre=giorni.reduce((s,ds)=>s+totaleGiorno(all[ds]),0);
+  doc.text(`Totale ore mese: ${totOre}h`,14,y);
+  doc.save(`${nome}_${MESI[mese]}_${ANNO}.pdf`);
+}
+
+// ===================== BUDGET CONTRACT (portale dipendenti) =====================
+// Permessi: il dipendente vede tutte le commesse e il residuo monte ore, può inserire
+// righe di lavoro e stampe/plottaggi solo per sé stesso. Non può creare commesse,
+// modificare tariffe/monte ore, né il listino prezzi (solo admin.html può farlo).
+const BC_DEFAULT_LISTINO=[
+  {nome:'Foglio A0 - B/N',prezzo:2.90},
+  {nome:'Foglio A0 - COLORI',prezzo:7.80},
+  {nome:'Foglio A1 - B/N',prezzo:2.30},
+  {nome:'Foglio A1 - COLORI',prezzo:5.70},
+  {nome:'Foglio A2 - B/N',prezzo:1.40},
+  {nome:'Foglio A2 - COLORI',prezzo:3.90},
+  {nome:'Foglio A3 - B/N',prezzo:0.90},
+  {nome:'Foglio A3 - COLORI',prezzo:2.80},
+  {nome:'Foglio A4 - B/N',prezzo:0.04},
+  {nome:'Astina Costola >10mm',prezzo:1.00},
+  {nome:'Astina Quadrata <10mm',prezzo:2.00},
+  {nome:'Acetato',prezzo:0.25},
+  {nome:'Cartoncino',prezzo:0.30}
+];
+let BC_commesse=[],BC_current=null,BC_currentFaseId=null,BC_righe=[],BC_stampe=[];
+
+// ── FASI (più budget per commessa) — sola consultazione/switch, la creazione
+// di nuove fasi resta un'operazione da admin.html ──
+function bcFasi(c){
+  if(c&&Array.isArray(c.fasi)&&c.fasi.length)return c.fasi;
+  return [{id:'fase1',nome:'Generale',
+    tariffaSenior:parseFloat(c&&c.tariffaSenior)||0,tariffaJunior:parseFloat(c&&c.tariffaJunior)||0,tariffaKm:parseFloat(c&&c.tariffaKm)||0,
+    monteOreEleSenior:parseFloat(c&&c.monteOreEleSenior)||0,monteOreEleJunior:parseFloat(c&&c.monteOreEleJunior)||0,
+    monteOreMecSenior:parseFloat(c&&c.monteOreMecSenior)||0,monteOreMecJunior:parseFloat(c&&c.monteOreMecJunior)||0,
+    listinoStampe:(c&&c.listinoStampe)||JSON.parse(JSON.stringify(BC_DEFAULT_LISTINO))}];
+}
+function bcFaseById(c,faseId){const fasi=bcFasi(c);return fasi.find(f=>f.id===faseId)||fasi[0]}
+function bcRigaFaseId(r,c){return r.faseId||bcFasi(c)[0].id}
+
+// ── TENDINE COMMESSE RICERCABILI (scrivi numero o nome per filtrare) ──
+function makeSearchable(selectEl,placeholder){
+  if(!selectEl)return;
+  if(selectEl.dataset.ssInit){if(selectEl._ssRefresh)selectEl._ssRefresh();return}
+  selectEl.dataset.ssInit='1';
+  selectEl.style.display='none';
+  const wrap=document.createElement('div');wrap.className='ss-wrap';
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='field-input ss-input';inp.autocomplete='off';
+  inp.placeholder=placeholder||'Cerca per numero o nome...';
+  const list=document.createElement('div');list.className='ss-list';
+  wrap.appendChild(inp);wrap.appendChild(list);
+  selectEl.insertAdjacentElement('afterend',wrap);
+  function labelFor(v){const o=[...selectEl.options].find(o=>o.value===v);return o?o.textContent:''}
+  function draw(filter){
+    const f=(filter||'').trim().toLowerCase();
+    const opts=[...selectEl.options];
+    const filtered=f?opts.filter(o=>o.textContent.toLowerCase().includes(f)):opts;
+    list.innerHTML=filtered.length?filtered.map(o=>`<div class="ss-opt${o.value===selectEl.value?' sel':''}" data-v="${(o.value+'').replace(/"/g,'&quot;')}">${o.textContent}</div>`).join(''):'<div class="ss-empty">Nessun risultato</div>';
+  }
+  inp.addEventListener('input',()=>{draw(inp.value);list.classList.add('open')});
+  inp.addEventListener('focus',()=>{inp.select();draw('');list.classList.add('open')});
+  inp.addEventListener('blur',()=>{setTimeout(()=>{list.classList.remove('open');inp.value=labelFor(selectEl.value)},150)});
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){inp.value=labelFor(selectEl.value);list.classList.remove('open');inp.blur()}
+    if(e.key==='Enter'){const first=list.querySelector('.ss-opt');if(first){e.preventDefault();first.dispatchEvent(new Event('mousedown',{bubbles:true}))}}
+  });
+  list.addEventListener('mousedown',e=>{
+    const opt=e.target.closest('.ss-opt');if(!opt)return;
+    e.preventDefault();
+    selectEl.value=opt.dataset.v;
+    selectEl.dispatchEvent(new Event('change',{bubbles:true}));
+    inp.value=labelFor(opt.dataset.v);
+    list.classList.remove('open');
+  });
+  const proto=Object.getPrototypeOf(selectEl);
+  const desc=Object.getOwnPropertyDescriptor(proto,'value')||Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(selectEl,'value',{configurable:true,get(){return desc.get.call(this)},set(v){desc.set.call(this,v);inp.value=labelFor(this.value)}});
+  selectEl._ssRefresh=()=>{inp.value=labelFor(selectEl.value)};
+  inp.value=labelFor(selectEl.value);
+}
+
+// ── RUBRICA COMMESSE (sola consultazione: ricerca per numero/nome, note in sola lettura) ──
+let RUBDIP_anno='tutti';
+function rubDipSetAnno(v,btn){
+  RUBDIP_anno=v;
+  document.querySelectorAll('#rubrica-anni-wrap-dip .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderRubricaDip();
+}
+function renderRubricaAnniBarDip(){
+  const wrap=document.getElementById('rubrica-anni-wrap-dip');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${RUBDIP_anno==='tutti'?'active':''}" onclick="rubDipSetAnno('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(RUBDIP_anno)===String(a)?'active':''}" onclick="rubDipSetAnno(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${RUBDIP_anno==='nd'?'active':''}" onclick="rubDipSetAnno('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function rubDipOrdinaPerAnno(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
+// ── ESPORTAZIONE RUBRICA COMMESSE (Excel / PDF) — rispetta ricerca + filtro anno correnti ──
+function rubricaDipListaFiltrata(){
+  const f=(document.getElementById('rub-search-dip')?.value||'').trim().toLowerCase();
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUBDIP_anno==='tutti')return true;
+    if(RUBDIP_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUBDIP_anno);
+  });
+  return rubDipOrdinaPerAnno(list);
+}
+function rubricaDipEtichettaPeriodo(){return RUBDIP_anno==='tutti'?'Tutti gli anni':(RUBDIP_anno==='nd'?'Anno non definito':String(RUBDIP_anno))}
+function rubricaDipEsportaExcel(){
+  const list=rubricaDipListaFiltrata();
+  const hh=['Anno','Numero Commessa','Committente','Progetto','Note'];
+  const rr=list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Rubrica Commesse',`${rubricaDipEtichettaPeriodo()} · ${list.length} commesse`,hh,rr),'Rubrica');
+  XLSX.writeFile(wb,`Rubrica_Commesse_${rubricaDipEtichettaPeriodo().replace(/\s+/g,'_')}.xlsx`);
+}
+function rubricaDipEsportaPDF(){
+  const list=rubricaDipListaFiltrata();
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Rubrica Commesse',`${rubricaDipEtichettaPeriodo()} · ${list.length} commesse`);
+  doc.autoTable({
+    startY,
+    head:[['Anno','Numero','Committente','Progetto','Note']],
+    body:list.map(c=>[c.anno||'',c.numero||'',c.committente||'',c.progetto||'',c.note||'']),
+    styles:EXP_PDF_BODY_STYLE,
+    headStyles:EXP_PDF_HEAD_STYLE,
+    theme:'striped'
+  });
+  doc.save(`Rubrica_Commesse_${rubricaDipEtichettaPeriodo().replace(/\s+/g,'_')}.pdf`);
+}
+
+function renderRubricaDip(){
+  renderRubricaAnniBarDip();
+  const el=document.getElementById('rubrica-lista-dip');
+  if(!el)return;
+  const f=(document.getElementById('rub-search-dip')?.value||'').trim().toLowerCase();
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(RUBDIP_anno==='tutti')return true;
+    if(RUBDIP_anno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(RUBDIP_anno);
+  });
+  list=rubDipOrdinaPerAnno(list);
+  if(!list.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata.</div>';return}
+  el.innerHTML=list.map(c=>`
+    <div class="commessa-card" style="cursor:default;flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div class="commessa-num">${c.numero}</div>
+        <div class="commessa-info">
+          <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+          <div class="commessa-sub">Anno ${c.anno||'—'}</div>
+        </div>
+      </div>
+      ${c.note?`<div class="rub-note-ro">${String(c.note).replace(/</g,'&lt;')}</div>`:''}
+    </div>`).join('');
+}
+
+
+function bcEuro(v){return '€ '+(Number(v)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+function dipGoPage(pid){
+  closeSidebar();
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  const navBtn=document.querySelector('.nav-item[data-page="'+pid+'"]');
+  if(navBtn)navBtn.classList.add('active');
+  document.getElementById('page-'+pid).classList.add('active');
+  const titles={calendario:'Calendario',assenze:'Ferie & Assenze',riepilogo:'Riepilogo Mensile',budget:'Budget Contract','budget-dettaglio':'Commessa',rubrica:'Rubrica Commesse'};
+  document.getElementById('topbar-title').textContent=titles[pid]||'';
+}
+
+let BC_commesseLoadedDip=false, BC_listAnnoDip='tutti';
+async function loadCommesseDip(forza){
+  const el=document.getElementById('lista-commesse-dip');
+  if(BC_commesseLoadedDip&&!forza){renderListaCommesseDip();return}
+  el.innerHTML='<div class="empty-state">Caricamento...</div>';
+  try{
+    const snap=await db.collection('commesse').get();
+    BC_commesse=snap.docs.map(d=>({numero:d.id,...d.data()})).sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+    BC_commesseLoadedDip=true;
+    renderListaCommesseDip();
+  }catch(e){el.innerHTML='<div class="empty-state">Errore caricamento: '+e.message+'</div>'}
+}
+function bcSetAnnoListDip(v,btn){
+  BC_listAnnoDip=v;
+  document.querySelectorAll('#bc-anni-wrap-dip .btn-filtro').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  renderListaCommesseDip();
+}
+function renderBcAnniBarDip(){
+  const wrap=document.getElementById('bc-anni-wrap-dip');
+  if(!wrap)return;
+  const anni=[...new Set(BC_commesse.map(c=>c.anno).filter(a=>a!=null&&a!==''))].sort((a,b)=>b-a);
+  const haNd=BC_commesse.some(c=>c.anno==null||c.anno==='');
+  let html=`<button class="btn-filtro ${BC_listAnnoDip==='tutti'?'active':''}" onclick="bcSetAnnoListDip('tutti',this)">Tutti</button>`;
+  anni.forEach(a=>{html+=`<button class="btn-filtro ${String(BC_listAnnoDip)===String(a)?'active':''}" onclick="bcSetAnnoListDip(${a},this)">${a}</button>`;});
+  if(haNd)html+=`<button class="btn-filtro ${BC_listAnnoDip==='nd'?'active':''}" onclick="bcSetAnnoListDip('nd',this)">N/D</button>`;
+  wrap.innerHTML=html;
+}
+function bcOrdinaPerAnnoDip(list){
+  return list.slice().sort((a,b)=>{
+    const ay=(a.anno==null||a.anno==='')?-1:Number(a.anno);
+    const by=(b.anno==null||b.anno==='')?-1:Number(b.anno);
+    if(by!==ay)return by-ay;
+    return String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true});
+  });
+}
+function renderListaCommesseDip(){
+  const el=document.getElementById('lista-commesse-dip');
+  renderBcAnniBarDip();
+  if(!BC_commesse.length){el.innerHTML='<div class="empty-state">Nessuna commessa disponibile al momento.</div>';return}
+  const f=(document.getElementById('bc-list-search-dip')?.value||'').trim().toLowerCase();
+  let listaBC=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  listaBC=listaBC.filter(c=>{
+    if(BC_listAnnoDip==='tutti')return true;
+    if(BC_listAnnoDip==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(BC_listAnnoDip);
+  });
+  listaBC=bcOrdinaPerAnnoDip(listaBC);
+  if(!listaBC.length){el.innerHTML='<div class="empty-state">Nessuna commessa trovata per la ricerca.</div>';return}
+  el.innerHTML=listaBC.map(c=>{
+    const fasi=bcFasi(c),fd=fasi[0];
+    return `
+    <div class="commessa-card" onclick="apriCommessaBC('${c.numero}')">
+      <div class="commessa-num">${c.numero}</div>
+      <div class="commessa-info">
+        <div class="commessa-title">${c.committente||'—'}${c.progetto?(' · '+c.progetto):''}</div>
+        <div class="commessa-sub">Anno ${c.anno||'—'} · Monte ore Ele ${(parseFloat(fd.monteOreEleSenior)||0)+(parseFloat(fd.monteOreEleJunior)||0)}h (Sr ${fd.monteOreEleSenior||0}/Jr ${fd.monteOreEleJunior||0}) · Mec ${(parseFloat(fd.monteOreMecSenior)||0)+(parseFloat(fd.monteOreMecJunior)||0)}h (Sr ${fd.monteOreMecSenior||0}/Jr ${fd.monteOreMecJunior||0})</div>
+      </div>
+      <div class="commessa-pills">
+        ${fasi.length>1?`<span class="commessa-pill" style="font-weight:700">${fasi.length} fasi</span>`:''}
+        <span class="commessa-pill">Sr ${bcEuro(fd.tariffaSenior)}/h</span>
+        <span class="commessa-pill">Jr ${bcEuro(fd.tariffaJunior)}/h</span>
+        <span class="commessa-pill">Km ${bcEuro(fd.tariffaKm)}</span>
+      </div>
+    </div>`;}).join('');
+}
+
+async function bcCaricaRighe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('righe').orderBy('data','desc').get();
+  BC_righe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+async function bcCaricaStampe(numero){
+  const snap=await db.collection('commesse').doc(numero).collection('stampe').orderBy('data','desc').get();
+  BC_stampe=snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+async function apriCommessaBC(numero,faseId){
+  BC_current=numero;
+  BC_currentFaseId=faseId||null;
+  dipGoPage('budget-dettaglio');
+  document.getElementById('bc-det-title').textContent='Commessa '+numero;
+  document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Caricamento...</div>';
+  document.getElementById('bc-residui').innerHTML='<div class="empty-state">Caricamento...</div>';
+  document.getElementById('bc-tbody-righe').innerHTML='';
+  document.getElementById('bc-tbody-stampe').innerHTML='';
+  const tabsEl=document.getElementById('bc-fase-tabs');if(tabsEl)tabsEl.innerHTML='';
+  chiudiFormRigaBC();chiudiFormStampaBC();
+  try{
+    const doc=await db.collection('commesse').doc(numero).get();
+    if(!doc.exists){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Commessa non trovata</div>';return}
+    const commessa={numero:doc.id,...doc.data()};
+    BC_commesse=BC_commesse.filter(c=>c.numero!==numero).concat([commessa]);
+    if(!BC_currentFaseId)BC_currentFaseId=bcFasi(commessa)[0].id;
+    // Mostra subito l'anagrafica: non serve aspettare righe/stampe per questi dati
+    bcRenderFaseTabsDip(commessa);
+    bcRenderAnagrafica(commessa,bcFaseById(commessa,BC_currentFaseId));
+    await Promise.all([bcCaricaRighe(numero),bcCaricaStampe(numero)]);
+    bcRenderTutto(commessa);
+  }catch(e){document.getElementById('bc-anagrafica').innerHTML='<div class="empty-state">Errore: '+e.message+'</div>'}
+}
+
+function bcRenderFaseTabsDip(c){
+  const el=document.getElementById('bc-fase-tabs');
+  if(!el)return;
+  const fasi=bcFasi(c);
+  if(fasi.length<=1){el.innerHTML='<div style="font-size:12px;color:var(--ink4)">Fase unica</div>';return}
+  el.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${fasi.map(f=>`<button class="btn btn-sm ${f.id===BC_currentFaseId?'btn-ink':''}" onclick="bcCambiaFaseDip('${f.id}')">${f.nome||f.id}</button>`).join('')}
+  </div>`;
+}
+function bcCambiaFaseDip(faseId){
+  BC_currentFaseId=faseId;
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  if(!c)return;
+  bcRenderFaseTabsDip(c);
+  bcRenderTutto(c);
+}
+
+function bcCalcRiepilogo(fase,righe,stampe){
+  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0,oreNonClassificateTot=0;
+  righe.forEach(r=>{
+    const ore=parseFloat(r.ore)||0;
+    // Ore storiche importate dal vecchio formato Excel (senza distinzione Ele/Mec,
+    // Senior/Junior): tenute visibili ma escluse dai calcoli di monte ore e costo manodopera.
+    if(r.nonClassificato){oreNonClassificateTot+=ore}
+    else if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
+    else{if(r.disciplina==='ele')oreJuniorEle+=ore;else oreJuniorMec+=ore}
+    speseViveTot+=parseFloat(r.speseVive)||0;
+    kmTot+=parseFloat(r.km)||0;
+  });
+  const tariffaSenior=parseFloat(fase.tariffaSenior)||0;
+  const tariffaJunior=parseFloat(fase.tariffaJunior)||0;
+  const tariffaKm=parseFloat(fase.tariffaKm)||0;
+  const oreEleTot=oreSeniorEle+oreJuniorEle;
+  const oreMecTot=oreSeniorMec+oreJuniorMec;
+  const costoSeniorTot=(oreSeniorEle+oreSeniorMec)*tariffaSenior;
+  const costoJuniorTot=(oreJuniorEle+oreJuniorMec)*tariffaJunior;
+  const costoKmTot=kmTot*tariffaKm;
+  const costoTrasferta=costoKmTot+speseViveTot;
+  const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
+  const costoGenerale=costoSeniorTot+costoJuniorTot+costoTrasferta;
+  const monteOreEleSenior=parseFloat(fase.monteOreEleSenior)||0;
+  const monteOreEleJunior=parseFloat(fase.monteOreEleJunior)||0;
+  const monteOreMecSenior=parseFloat(fase.monteOreMecSenior)||0;
+  const monteOreMecJunior=parseFloat(fase.monteOreMecJunior)||0;
+  const monteOreEle=monteOreEleSenior+monteOreEleJunior;
+  const monteOreMec=monteOreMecSenior+monteOreMecJunior;
+  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,oreNonClassificateTot,
+    tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
+    costoStampeTot,costoGenerale,
+    monteOreEleSenior,monteOreEleJunior,monteOreMecSenior,monteOreMecJunior,monteOreEle,monteOreMec,
+    residuoEleSenior:monteOreEleSenior-oreSeniorEle,residuoEleJunior:monteOreEleJunior-oreJuniorEle,
+    residuoMecSenior:monteOreMecSenior-oreSeniorMec,residuoMecJunior:monteOreMecJunior-oreJuniorMec,
+    residuoEle:monteOreEle-oreEleTot,residuoMec:monteOreMec-oreMecTot};
+}
+
+function bcRenderTutto(commessa){
+  const fase=bcFaseById(commessa,BC_currentFaseId);
+  const righeFase=BC_righe.filter(r=>bcRigaFaseId(r,commessa)===fase.id);
+  const stampeFase=BC_stampe.filter(s=>bcRigaFaseId(s,commessa)===fase.id);
+  bcRenderAnagrafica(commessa,fase);
+  const riep=bcCalcRiepilogo(fase,righeFase,stampeFase);
+  bcRenderResidui(riep);
+  bcRenderRighe(righeFase,fase);
+  bcRenderRiepilogo(riep);
+  bcPopolaSelectListino(fase);
+  bcRenderStampe(stampeFase);
+}
+
+function bcRenderAnagrafica(c,fase){
+  fase=fase||bcFaseById(c,BC_currentFaseId);
+  document.getElementById('bc-det-title').textContent='Commessa '+c.numero;
+  document.getElementById('bc-anagrafica').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">COMMITTENTE</span><span class="bc-info-val">${c.committente||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">PROGETTO</span><span class="bc-info-val">${c.progetto||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ANNO</span><span class="bc-info-val">${c.anno||'—'}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">FASE</span><span class="bc-info-val">${fase.nome||fase.id}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA SENIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaSenior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TARIFFA JUNIOR</span><span class="bc-info-val">${bcEuro(fase.tariffaJunior)}/h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM</span><span class="bc-info-val">${bcEuro(fase.tariffaKm)}/km</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE ELE SENIOR</span><span class="bc-info-val">${fase.monteOreEleSenior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE ELE JUNIOR</span><span class="bc-info-val">${fase.monteOreEleJunior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE MEC SENIOR</span><span class="bc-info-val">${fase.monteOreMecSenior||0}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">MONTE ORE MEC JUNIOR</span><span class="bc-info-val">${fase.monteOreMecJunior||0}h</span></div>`;
+}
+
+function bcRenderResidui(riep){
+  function cls(res,tot){if(tot<=0)return 'ok';return res>tot*0.2?'ok':res>0?'warn':'danger'}
+  function card(icona,titolo,monte,usate,residuo){
+    const c=cls(residuo,monte);
+    return `<div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">${icona} ${titolo}</div><div class="saldo-dettaglio">Monte: ${monte}h · Usate: ${usate}h</div>
+        <div class="progress-bar" style="margin-top:8px"><div class="progress-fill fill-${c}" style="width:${monte>0?Math.max(0,Math.min(100,Math.round(residuo/monte*100))):0}%"></div></div>
+      </div>
+      <div class="saldo-numeri"><div class="saldo-residuo ${c}">${residuo}h</div><div class="saldo-sub">${residuo<0?'⚠️ superato':'residue'}</div></div>
+    </div>`;
+  }
+  document.getElementById('bc-residui').innerHTML=
+    card('⚡','Monte Ore Ele Senior',riep.monteOreEleSenior,riep.oreSeniorEle,riep.residuoEleSenior)+
+    card('⚡','Monte Ore Ele Junior',riep.monteOreEleJunior,riep.oreJuniorEle,riep.residuoEleJunior)+
+    card('⚙️','Monte Ore Mec Senior',riep.monteOreMecSenior,riep.oreSeniorMec,riep.residuoMecSenior)+
+    card('⚙️','Monte Ore Mec Junior',riep.monteOreMecJunior,riep.oreJuniorMec,riep.residuoMecJunior)+
+    `<div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">💰 Costo Consuntivato</div><div class="saldo-dettaglio">Manodopera + trasferta</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--blu)">${bcEuro(riep.costoGenerale)}</div><div class="saldo-sub">totale</div></div>
+    </div>`;
+}
+
+function bcRenderRighe(righe,fase){
+  const tb=document.getElementById('bc-tbody-righe');
+  if(!righe.length){tb.innerHTML='<tr><td colspan="9" class="empty-state">Nessuna riga inserita</td></tr>';return}
+  fase=fase||{};
+  const ts=parseFloat(fase.tariffaSenior)||0,tj=parseFloat(fase.tariffaJunior)||0,tk=parseFloat(fase.tariffaKm)||0;
+  tb.innerHTML=righe.map(r=>{
+    const ore=parseFloat(r.ore)||0;
+    const tariffa=r.livello==='senior'?ts:tj;
+    const costo=ore*tariffa+(parseFloat(r.speseVive)||0)+(parseFloat(r.km)||0)*tk;
+    const [y,m,g]=(r.data||'').split('-');
+    const daCalendario=r.origineCalendario===true;
+    const mioBottone=daCalendario?'<span style="font-size:11px;color:var(--ink4)" title="Collegata automaticamente dal calendario ore">📅 auto</span>':(r.username===U.username?`<button class="btn btn-sm" onclick="eliminaRigaBC('${r.id}')">🗑</button>`:'');
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
+      <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
+      <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':'Mec'}</span></td>
+      <td style="font-size:12px;color:var(--ink4)">${r.descrizione||'—'}</td>
+      <td class="td-r">${ore}h</td>
+      <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
+      <td class="td-r">${r.km>0?r.km+' km':'—'}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(costo)}</td>
+      <td>${mioBottone}</td>
+    </tr>`;
+  }).join('');
+}
+
+function bcRenderRiepilogo(riep){
+  document.getElementById('bc-riepilogo').innerHTML=`
+    <div class="bc-info-row"><span class="bc-info-key">ORE SENIOR (Ele ${riep.oreSeniorEle}h + Mec ${riep.oreSeniorMec}h)</span><span class="bc-info-val">${riep.oreSeniorEle+riep.oreSeniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ORE JUNIOR (Ele ${riep.oreJuniorEle}h + Mec ${riep.oreJuniorMec}h)</span><span class="bc-info-val">${riep.oreJuniorEle+riep.oreJuniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO SENIOR</span><span class="bc-info-val">${bcEuro(riep.costoSeniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO JUNIOR</span><span class="bc-info-val">${bcEuro(riep.costoJuniorTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">SPESE VIVE</span><span class="bc-info-val">${bcEuro(riep.speseViveTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">RIMBORSO KM (${bcEuro(riep.tariffaKm)}/km)</span><span class="bc-info-val">${bcEuro(riep.costoKmTot)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">TOTALE SPESE DI TRASFERTA</span><span class="bc-info-val">${bcEuro(riep.costoTrasferta)}</span></div>
+    <div class="bc-info-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px"><span class="bc-info-key" style="font-weight:700;color:var(--ink)">COSTO GENERALE COMMESSA</span><span class="bc-info-val" style="font-size:15px;color:var(--verde)">${bcEuro(riep.costoGenerale)}</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">Costo stampe (voce separata, vedi sotto)</span><span class="bc-info-val">${bcEuro(riep.costoStampeTot)}</span></div>
+    ${riep.oreNonClassificateTot>0?`<div class="bc-info-row"><span class="bc-info-key">Ore storiche non classificate (escluse da monte ore/costo)</span><span class="bc-info-val">${riep.oreNonClassificateTot}h</span></div>`:''}`;
+}
+
+function bcPopolaSelectListino(fase){
+  const sel=document.getElementById('bc-s-voce');
+  const listino=(fase&&fase.listinoStampe)||BC_DEFAULT_LISTINO;
+  sel.innerHTML=listino.map((v,i)=>`<option value="${i}">${v.nome} — ${bcEuro(v.prezzo)}</option>`).join('');
+}
+
+function bcRenderStampe(stampe){
+  const tb=document.getElementById('bc-tbody-stampe');
+  let tot=0;
+  if(!stampe.length){tb.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna riga inserita</td></tr>';document.getElementById('bc-tot-stampe').textContent=bcEuro(0);return}
+  tb.innerHTML=stampe.map(s=>{
+    const totale=(parseFloat(s.costoUnitario)||0)*(parseFloat(s.copie)||0);
+    tot+=totale;
+    const [y,m,g]=(s.data||'').split('-');
+    const mioBottone=s.username===U.username?`<button class="btn btn-sm" onclick="eliminaStampaBC('${s.id}')">🗑</button>`:'';
+    return `<tr>
+      <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(s.data||'—')}</td>
+      <td>${s.voce||'—'}</td>
+      <td class="td-r">${bcEuro(s.costoUnitario)}</td>
+      <td class="td-r">${s.copie||0}</td>
+      <td class="td-r" style="font-weight:600;color:var(--verde)">${bcEuro(totale)}</td>
+      <td style="font-size:12px;color:var(--ink4)">${s.note||'—'}</td>
+      <td>${mioBottone}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('bc-tot-stampe').textContent=bcEuro(tot);
+}
+
+function apriFormRigaBC(){
+  document.getElementById('bc-riga-alert').innerHTML='';
+  document.getElementById('bc-r-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-r-descrizione').value='';
+  document.getElementById('bc-r-ore').value='';
+  document.getElementById('bc-r-spese').value='';
+  document.getElementById('bc-r-km').value='';
+  document.getElementById('bc-form-riga').classList.add('open');
+}
+function chiudiFormRigaBC(){const f=document.getElementById('bc-form-riga');if(f)f.classList.remove('open')}
+
+async function salvaRigaBC(){
+  const alertEl=document.getElementById('bc-riga-alert');
+  const data=document.getElementById('bc-r-data').value;
+  const ore=parseFloat(document.getElementById('bc-r-ore').value);
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!ore||ore<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci le ore lavorate</div>';return}
+  const nomeCompleto=`${profilo.nome||''} ${profilo.cognome||''}`.trim()||U.username;
+  const c0=BC_commesse.find(x=>x.numero===BC_current);
+  const faseId0=BC_currentFaseId||bcFasi(c0)[0].id;
+  const rec={
+    username:U.username,nomeCompleto,tipoPersona:'dipendente',
+    livello:profilo.livello||'senior',disciplina:document.getElementById('bc-r-disciplina').value,data,
+    descrizione:document.getElementById('bc-r-descrizione').value.trim(),
+    ore,speseVive:parseFloat(document.getElementById('bc-r-spese').value)||0,
+    km:parseFloat(document.getElementById('bc-r-km').value)||0,
+    faseId:faseId0,
+    createdBy:U.username,createdAt:new Date().toISOString()
+  };
+  try{
+    await db.collection('commesse').doc(BC_current).collection('righe').add(rec);
+    chiudiFormRigaBC();
+    await bcCaricaRighe(BC_current);
+    const c=BC_commesse.find(x=>x.numero===BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaRigaBC(id){
+  const r=BC_righe.find(x=>x.id===id);
+  if(r&&r.username!==U.username)return; // può eliminare solo le proprie righe
+  if(!confirm('Eliminare questa riga di lavoro?'))return;
+  if(r){const{id:_id,...dati}=r;await spostaNelCestino('riga_bc',['commesse',BC_current,'righe',id],dati,'Riga lavoro '+BC_current+': '+U.username,U.username);}
+  await db.collection('commesse').doc(BC_current).collection('righe').doc(id).delete();
+  await bcCaricaRighe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
+}
+
+function apriFormStampaBC(){
+  document.getElementById('bc-stampa-alert').innerHTML='';
+  document.getElementById('bc-s-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-s-copie').value=1;
+  document.getElementById('bc-s-note').value='';
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcPopolaSelectListino(c?bcFaseById(c,BC_currentFaseId):null);
+  document.getElementById('bc-form-stampa').classList.add('open');
+}
+function chiudiFormStampaBC(){const f=document.getElementById('bc-form-stampa');if(f)f.classList.remove('open')}
+
+async function salvaStampaBC(){
+  const alertEl=document.getElementById('bc-stampa-alert');
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  const faseId1=BC_currentFaseId||(c?bcFasi(c)[0].id:null);
+  const fase1=c?bcFaseById(c,faseId1):null;
+  const listino=(fase1&&fase1.listinoStampe)||[];
+  const idx=parseInt(document.getElementById('bc-s-voce').value);
+  const voce=listino[idx];
+  const data=document.getElementById('bc-s-data').value;
+  const copie=parseFloat(document.getElementById('bc-s-copie').value);
+  if(!voce){alertEl.innerHTML='<div class="alert-box alert-err">Seleziona una voce dal listino</div>';return}
+  if(!data){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci la data</div>';return}
+  if(!copie||copie<=0){alertEl.innerHTML='<div class="alert-box alert-err">Inserisci il numero di copie</div>';return}
+  const rec={data,voce:voce.nome,costoUnitario:voce.prezzo,copie,note:document.getElementById('bc-s-note').value.trim(),faseId:faseId1,username:U.username,createdBy:U.username,createdAt:new Date().toISOString()};
+  try{
+    await db.collection('commesse').doc(BC_current).collection('stampe').add(rec);
+    chiudiFormStampaBC();
+    await bcCaricaStampe(BC_current);
+    bcRenderTutto(c);
+  }catch(e){alertEl.innerHTML='<div class="alert-box alert-err">Errore: '+e.message+'</div>'}
+}
+
+async function eliminaStampaBC(id){
+  const s=BC_stampe.find(x=>x.id===id);
+  if(s&&s.username!==U.username)return;
+  if(!confirm('Eliminare questa riga stampa?'))return;
+  if(s){const{id:_id,...dati}=s;await spostaNelCestino('stampa_bc',['commesse',BC_current,'stampe',id],dati,'Stampa '+BC_current+': '+U.username,U.username);}
+  await db.collection('commesse').doc(BC_current).collection('stampe').doc(id).delete();
+  await bcCaricaStampe(BC_current);
+  const c=BC_commesse.find(x=>x.numero===BC_current);
+  bcRenderTutto(c);
+}
+</script>
+</body>
+</html>
