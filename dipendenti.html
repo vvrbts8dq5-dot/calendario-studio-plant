@@ -853,7 +853,7 @@ function getDays(m){return new Date(ANNO,m+1,0).getDate()}
 function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
 function hasD(d){if(!d)return false;return CN.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
 function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]} ${y}`}
-function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toFixed(2);return n+'h'}
+function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});return n+'h'}
 function totaleGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
 function giorniLavorativi(dal,al){
   let cnt=0;
@@ -2203,7 +2203,7 @@ function renderRubricaDip(){
 }
 
 
-function bcEuro(v){return '€ '+(Number(v)||0).toFixed(2).replace('.',',')}
+function bcEuro(v){return '€ '+(Number(v)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}
 
 function dipGoPage(pid){
   closeSidebar();

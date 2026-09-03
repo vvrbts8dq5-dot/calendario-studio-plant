@@ -10,7 +10,7 @@ const CONTAB_STATO_LABELS={
 };
 let CONTAB_all=[], CONTAB_anno='tutti', CONTAB_filtro='tutti', CONTAB_search='', CONTAB_editId=null;
 
-function ceur(v){return '€'+(parseFloat(v)||0).toFixed(2);}
+function ceur(v){return '€'+(parseFloat(v)||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
 async function loadContabilita(){
   document.getElementById('contab-tbody').innerHTML='<tr><td colspan="11" class="empty-state">Caricamento...</td></tr>';
