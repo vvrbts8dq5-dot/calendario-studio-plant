@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Tutte le collezioni sono consultabili e modificabili da chiunque sia
+    // loggato: tutti i collaboratori hanno le stesse possibilità (vedi
+    // README). Nessun controllo aggiuntivo per-progetto: evita la lettura
+    // extra che rallentava lista/cancellazione delle voci.
+
+    // ─── Magazzini indipendenti (catalogo di voci, per disciplina) ───
+    // Computo, Prezzario DEI e Prezzario Regione Veneto si consultano,
+    // si importano da Excel, si aggiungono voci a mano. Non sono legati a
+    // nessun progetto. Il Computo resta un unico magazzino piatto; i due
+    // Prezzari sono invece organizzati in EDIZIONI (vedi sotto).
+    match /computo_elettrico/{voceId} { allow read, write: if request.auth != null; }
+    match /computo_meccanico/{voceId} { allow read, write: if request.auth != null; }
+
+    // Analisi Prezzi: quarto magazzino, lista piatta (senza edizioni) di
+    // voci "analisi di un nuovo prezzo" — vedi analisi_prezzi_module.js.
+    match /analisi_prezzi_elettrico/{voceId} { allow read, write: if request.auth != null; }
+    match /analisi_prezzi_meccanico/{voceId} { allow read, write: if request.auth != null; }
+
+    // Analisi Prezzi organizzata in annate (edizioni) — aggiunta nella
+    // quattordicesima tornata (analisi_prezzi_module.js, edizioniCollName =
+    // collBase + '_edizioni') ma MAI aggiunta qui: senza questa regola,
+    // creare/leggere/aggiornare un'annata di Analisi Prezzi fallisce con
+    // "permesso negato". Solo sottocollezione "voci" (qui, apposta, NIENTE
+    // "blocchi": i volumi sono piccoli, poche decine di voci per annata, non
+    // migliaia come nei due Prezzari — vedi il commento in cima ad
+    // analisi_prezzi_module.js). Diciottesima tornata: aggiunta ora durante
+    // la verifica del bug sul tasto "aggiorna prezzi" (vedi
+    // stato-progetto) — se il file che hai davvero incollato in precedenza
+    // su Firebase Console non aveva questo blocco, è una causa concreta e
+    // verificabile di malfunzionamenti su quella pagina, da correggere
+    // subito incollando QUESTO file aggiornato.
+    match /analisi_prezzi_elettrico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+    }
+    match /analisi_prezzi_meccanico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+    }
+
+    // Collezioni "piatte" originarie dei prezzari, mantenute SOLO per la
+    // migrazione una tantum verso le edizioni (vedi prezzario_module.js:
+    // migraDatiPrezzario). Una volta migrati i dati restano vuote.
+    match /prezzario_dei_elettrico/{voceId} { allow read, write: if request.auth != null; }
+    match /prezzario_dei_meccanico/{voceId} { allow read, write: if request.auth != null; }
+    match /prezzario_veneto_elettrico/{voceId} { allow read, write: if request.auth != null; }
+    match /prezzario_veneto_meccanico/{voceId} { allow read, write: if request.auth != null; }
+
+    // ─── Prezzari a edizioni (annate) ───
+    // Ogni edizione (es. "2025", "2026") ha le proprie voci raggruppate in
+    // una sottocollezione "blocchi" (pochi documenti, ciascuno con fino a
+    // 450 voci — non più un documento per voce: un prezzario da decine di
+    // migliaia di voci sforava altrimenti facilmente il limite giornaliero
+    // gratuito di scritture Firestore. Vedi import_prezzario.js,
+    // _salvaBlocchiPrezzario). La sottocollezione "voci" resta per la
+    // lettura una tantum dei dati nel vecchio formato, migrati
+    // automaticamente al primo accesso dopo questo cambiamento.
+    match /prezzario_dei_elettrico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+      match /blocchi/{bloccoId} { allow read, write: if request.auth != null; }
+    }
+    match /prezzario_dei_meccanico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+      match /blocchi/{bloccoId} { allow read, write: if request.auth != null; }
+    }
+    match /prezzario_veneto_elettrico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+      match /blocchi/{bloccoId} { allow read, write: if request.auth != null; }
+    }
+    match /prezzario_veneto_meccanico_edizioni/{edizioneId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} { allow read, write: if request.auth != null; }
+      match /blocchi/{bloccoId} { allow read, write: if request.auth != null; }
+    }
+
+    // ─── Progetti (l'unica sezione operativa) ───
+    // Ogni progetto ha una propria sottocollezione "voci": l'area di lavoro
+    // popolata copiando righe da uno dei magazzini sopra, o aggiungendo
+    // voci manuali.
+    match /progetti_elettrico/{progettoId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+    match /progetti_meccanico/{progettoId} {
+      allow read, write: if request.auth != null;
+      match /voci/{voceId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+}
