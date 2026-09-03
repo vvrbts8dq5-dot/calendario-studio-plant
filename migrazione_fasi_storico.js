@@ -90,6 +90,7 @@ function migrCalcolaPiano(){
     const numero=entry.numero;
     const c=numeriMap[numero];
     if(!c){storicoSenzaCommessa.push(entry);return}
+    if(c.storicoImportato)return; // già importato in una migrazione precedente, salta
     let faseId='fase1';
     const labels=MIGR_FASI_LABELS[numero];
     if(labels){
@@ -134,6 +135,13 @@ function migrCalcolaPiano(){
 }
 
 // ── Banner "una tantum" nella pagina Rubrica Commesse ──────────────────
+// NOTA: migrCalcolaPiano() salta le commesse che hanno già il campo
+// commesse/{numero}.storicoImportato=true (scritto da migrEseguiMigrazione
+// alla fine dell'import, vedi sotto), così il banner non ricompare più una
+// volta completata la migrazione. Usiamo un campo diretto sul documento
+// commessa — già dentro una collezione che l'app scrive di continuo — invece
+// di una collezione separata tipo "_migrazioni", che le regole di sicurezza
+// Firestore non permettono di scrivere dal client.
 function renderMigrFasiStoricoBanner(){
   const wrap=document.getElementById('migr-fasi-storico-wrap');
   if(!wrap)return;
@@ -230,6 +238,27 @@ function migrApriAnteprima(){
   </div>`;
 }
 
+// Esegue worker(item) su tutti gli items con un massimo di `concorrenza`
+// richieste in volo contemporaneamente (invece di una alla volta in
+// sequenza) — indispensabile con 1000+ commesse, altrimenti l'operazione
+// richiede decine di minuti e rischia di essere interrotta chiudendo la
+// pagina prima che finisca. onProgress(fatti,totale) è opzionale.
+async function migrPMap(items,worker,concorrenza,onProgress){
+  let idx=0,fatti=0;
+  async function runOne(){
+    while(idx<items.length){
+      const i=idx++;
+      try{await worker(items[i])}
+      catch(e){console.log('Migrazione, errore su',items[i],':',e.message)}
+      fatti++;
+      if(onProgress)onProgress(fatti,items.length);
+    }
+  }
+  const runners=[];
+  for(let k=0;k<concorrenza;k++)runners.push(runOne());
+  await Promise.all(runners);
+}
+
 // ── Scrittura effettiva (solo dopo conferma esplicita) ──────────────────
 async function migrEseguiMigrazione(){
   const {commesseDaMigrare,storicoDocs,storicoSenzaCommessa}=migrCalcolaPiano();
@@ -239,18 +268,24 @@ async function migrEseguiMigrazione(){
     `• ${commesseDaMigrare.length} commesse convertite alla struttura a fasi (le righe/stampe già presenti restano dove sono, solo taggate con la fase)\n`+
     `• ${storicoDocs.length} righe di storico importate dai 249 file Excel\n`+
     (storicoSenzaCommessa.length?`• ${storicoSenzaCommessa.length} file storici SALTATI perché non trovano una commessa corrispondente\n`:'')+
-    `\nL'operazione può richiedere qualche minuto (si leggono/scrivono le righe già registrate di ogni commessa). Confermi?`;
+    `\nConfermi?`;
   if(!confirm(msg))return;
 
   const wrap=document.getElementById('migr-fasi-storico-wrap');
   const setProgress=(txt)=>{if(wrap)wrap.innerHTML='<div class="empty-state">'+txt+'</div>'};
-  setProgress('Migrazione in corso, non chiudere la pagina... (0/'+commesseDaMigrare.length+' commesse)');
 
-  // 1) Conversione a fasi + tag faseId sulle righe/stampe già esistenti
-  let fatte=0;
-  for(const item of commesseDaMigrare){
-    try{
-      await db.collection('commesse').doc(item.numero).update({
+  // 1a) Conversione a fasi sul documento commessa — a BATCH (max 450 per
+  // batch), non una scrittura alla volta: con 1500+ commesse fa una
+  // differenza enorme sui tempi. set(...,{merge:true}) invece di update()
+  // così anche una commessa sparita nel frattempo non fa fallire l'intero
+  // batch (update() su un documento inesistente farebbe fallire tutto il
+  // gruppo di 450).
+  setProgress('Conversione a fasi (1/2): scrittura commesse in corso, non chiudere la pagina...');
+  for(let i=0;i<commesseDaMigrare.length;i+=450){
+    const chunk=commesseDaMigrare.slice(i,i+450);
+    const batch=db.batch();
+    chunk.forEach(item=>{
+      batch.set(db.collection('commesse').doc(item.numero),{
         fasi:item.fasi,
         tariffaSenior:firebase.firestore.FieldValue.delete(),
         tariffaJunior:firebase.firestore.FieldValue.delete(),
@@ -258,19 +293,35 @@ async function migrEseguiMigrazione(){
         monteOreEle:firebase.firestore.FieldValue.delete(),
         monteOreMec:firebase.firestore.FieldValue.delete(),
         listinoStampe:firebase.firestore.FieldValue.delete()
-      });
-      const [righeSnap,stampeSnap]=await Promise.all([
-        db.collection('commesse').doc(item.numero).collection('righe').get(),
-        db.collection('commesse').doc(item.numero).collection('stampe').get()
-      ]);
-      const batch=db.batch();
-      let nBatch=0;
-      righeSnap.docs.forEach(d=>{if(!d.data().faseId){batch.update(d.ref,{faseId:'fase1'});nBatch++}});
-      stampeSnap.docs.forEach(d=>{if(!d.data().faseId){batch.update(d.ref,{faseId:'fase1'});nBatch++}});
-      if(nBatch)await batch.commit();
-    }catch(e){console.log('Migrazione fasi, errore su commessa '+item.numero+':',e.message)}
-    fatte++;
-    if(fatte%5===0||fatte===commesseDaMigrare.length)setProgress('Migrazione in corso, non chiudere la pagina... ('+fatte+'/'+commesseDaMigrare.length+' commesse)');
+      },{merge:true});
+    });
+    await batch.commit();
+    setProgress('Conversione a fasi (1/2): '+Math.min(i+450,commesseDaMigrare.length)+'/'+commesseDaMigrare.length+' commesse scritte...');
+  }
+
+  // 1b) Tag faseId sulle righe/stampe già esistenti: le letture per
+  // commessa vengono fatte IN PARALLELO (30 alla volta) invece che una
+  // alla volta in sequenza, poi le scritture di tag vengono raggruppate
+  // a batch da 450.
+  setProgress('Conversione a fasi (2/2): controllo righe/stampe già registrate (in parallelo)...');
+  const tagRefs=[];
+  let letteFatte=0;
+  await migrPMap(commesseDaMigrare,async(item)=>{
+    const [righeSnap,stampeSnap]=await Promise.all([
+      db.collection('commesse').doc(item.numero).collection('righe').get(),
+      db.collection('commesse').doc(item.numero).collection('stampe').get()
+    ]);
+    righeSnap.docs.forEach(d=>{if(!d.data().faseId)tagRefs.push(d.ref)});
+    stampeSnap.docs.forEach(d=>{if(!d.data().faseId)tagRefs.push(d.ref)});
+  },30,(fatti,totale)=>{
+    letteFatte=fatti;
+    if(fatti%50===0||fatti===totale)setProgress('Conversione a fasi (2/2): controllate '+fatti+'/'+totale+' commesse ('+tagRefs.length+' righe/stampe da taggare finora)...');
+  });
+  for(let i=0;i<tagRefs.length;i+=450){
+    const chunk=tagRefs.slice(i,i+450);
+    const batch=db.batch();
+    chunk.forEach(ref=>batch.set(ref,{faseId:'fase1'},{merge:true}));
+    await batch.commit();
   }
 
   // 2) Scrittura righe storico (batch da 450)
@@ -282,6 +333,16 @@ async function migrEseguiMigrazione(){
       const ref=db.collection('commesse').doc(doc.numero).collection('righe').doc(doc.id);
       batch.set(ref,doc.data,{merge:true});
     });
+    await batch.commit();
+  }
+
+  // Marca ogni commessa appena importata con storicoImportato:true, così
+  // migrCalcolaPiano() non la ripropone più al prossimo giro (vedi sopra).
+  const numeriStoricoScritti=[...new Set(storicoDocs.map(d=>d.numero))];
+  for(let i=0;i<numeriStoricoScritti.length;i+=450){
+    const chunk=numeriStoricoScritti.slice(i,i+450);
+    const batch=db.batch();
+    chunk.forEach(numero=>batch.set(db.collection('commesse').doc(numero),{storicoImportato:true},{merge:true}));
     await batch.commit();
   }
 
