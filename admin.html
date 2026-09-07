@@ -2881,6 +2881,29 @@ function periodoInRange(dataStr,p){
 }
 function periodoAnni(p){const a=[];for(let y=p.annoIni;y<=p.annoFin;y++)a.push(y);return a}
 
+// Sigla giorno della settimana (LUN/MAR/.../DOM) da una data 'YYYY-MM-DD', usata nelle esportazioni
+// per mostrare a colpo d'occhio che giorno era, sabati/domeniche compresi.
+const GIORNI_SETT=['DOM','LUN','MAR','MER','GIO','VEN','SAB'];
+function dateFromDs(ds){const[y,m,g]=ds.split('-').map(Number);return new Date(y,m-1,g)}
+function giornoSett(ds){return GIORNI_SETT[dateFromDs(ds).getDay()]}
+// Elenca TUTTI i giorni di calendario (weekend compresi) tra l'inizio e la fine di un periodo esportazione
+function elencoTuttiGiorniPeriodo(p){
+  const arr=[];
+  const d=new Date(p.annoIni,p.meseIni,1);
+  const fine=new Date(p.annoFin,p.meseFin+1,0);
+  while(d<=fine){arr.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);d.setDate(d.getDate()+1);}
+  return arr;
+}
+// Aggiunge a 'all' un record vuoto (tutto a zero) per ogni sabato/domenica del periodo che non ha già
+// un documento — così sabati/domeniche compaiono sempre nei report esportati, a zero se non lavorati,
+// con i valori reali se il dipendente li ha invece compilati (quel giorno è già in 'all', non viene toccato).
+function aggiungiWeekendMancanti(all,p){
+  elencoTuttiGiorniPeriodo(p).forEach(ds=>{
+    const dow=dateFromDs(ds).getDay();
+    if((dow===0||dow===6)&&!all[ds])all[ds]={};
+  });
+}
+
 // ══════════════════ STILE UNIFORME ESPORTAZIONI (Excel + PDF) ══════════════════
 // Palette identica all'app (--blu / --blu-dark) + intestazione "PLANT INGEGNERIA" + data/ora esportazione + colonne a larghezza leggibile
 const EXP_BLU=[122,158,142];        // rgb di var(--blu)
@@ -3000,6 +3023,7 @@ function esportaDetPeriodo(formato){
       }catch(e){}
     }
     iniettaAssenzeInGiorni(all,detUser,oreGiorno);
+    aggiungiWeekendMancanti(all,p);
     const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
     if(formato==='excel')generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno);else generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno);
   },{titolo:'Esporta Ore — '+nome});
@@ -3030,7 +3054,7 @@ function generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
       const d=all[ds];const[yy,mo,g]=ds.split('-');
       const ore=totGiorno(d);
       const costo=CN.reduce((s,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return s+v*t},0)+(parseFloat(d.speseExtra)||0);
-      return[`${g}/${mo}/${yy}`,...CN.map(c=>parseFloat(d[c.k])||0),ore,costo>0?costo.toFixed(2):''];
+      return[`${giornoSett(ds)} ${g}/${mo}/${yy}`,...CN.map(c=>parseFloat(d[c.k])||0),ore,costo>0?costo.toFixed(2):''];
     });
     const festGgMese=festivitaLavorativeMese(ym).length;
     if(festGgMese>0)rr.push([`🎉 Festività (ex ferie) — ${festGgMese} gg`,...CN.map(()=>''),festGgMese*oreGiorno,'']);
@@ -3051,7 +3075,7 @@ function generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
   doc.autoTable({
     startY,
     head:[['Data',...CN.slice(0,8).map(c=>c.l),'Tot.h']],
-    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${g}/${m}/${y}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totGiorno(d)>0?totGiorno(d):'']}),
+    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totGiorno(d)>0?totGiorno(d):'']}),
     foot:[['TOTALE',...CN.slice(0,8).map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre]],
     styles:EXP_PDF_BODY_STYLE,
     headStyles:EXP_PDF_HEAD_STYLE,
