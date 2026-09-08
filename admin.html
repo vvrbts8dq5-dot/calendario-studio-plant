@@ -2264,6 +2264,21 @@ function loadRichiesteCount(){
 // ── CALENDARIO CONDIVISO FERIE (dipendenti + titolari, tipo ferie/permesso/rol approvati) ──
 let calFerieMese=new Date();calFerieMese.setDate(1);
 const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+// Nome + iniziale cognome (es. "Marco Z.") per distinguere dipendenti con lo stesso nome nel calendario condiviso
+function nomeBreve(nomeCompleto){
+  const parti=(nomeCompleto||'').trim().split(/\s+/).filter(Boolean);
+  if(parti.length<2)return parti[0]||'';
+  return parti[0]+' '+parti[1].charAt(0).toUpperCase()+'.';
+}
+// Popup di dettaglio quando si clicca un nome nel calendario "Chi è in ferie": solo data, ore e orario (se indicato)
+function mostraDettaglioAssenza(id){
+  const r=(tutteR||[]).find(x=>x.id===id);
+  if(!r)return;
+  const periodo=r.dataInizio===r.dataFine?fmtD(r.dataInizio):fmtD(r.dataInizio)+' → '+fmtD(r.dataFine);
+  let msg=`${r.nomeCompleto||r.username}\n${TL[r.tipo]||r.tipo}\n${periodo}\n${r.oreRichieste||0}h`;
+  if(r.oraInizio&&r.oraFine)msg+=`\nOrario: ${r.oraInizio} - ${r.oraFine}`;
+  alert(msg);
+}
 function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
 function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
 function renderCalendarioFerie(){
@@ -2308,8 +2323,8 @@ function renderCalendarioFerie(){
       <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
         const c=COL[r.tipo]||'var(--ink3)';
         const ic=r.daTitolare?'👑 ':'';
-        const nome=(r.nomeCompleto||r.username||'').split(' ')[0];
-        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c}" title="${r.nomeCompleto||r.username} — ${TL[r.tipo]||r.tipo}">${ic}${nome}</span>`;
+        const nome=nomeBreve(r.nomeCompleto||r.username||'');
+        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c};cursor:pointer" title="${r.nomeCompleto||r.username} — ${TL[r.tipo]||r.tipo} (clicca per i dettagli)" onclick="event.stopPropagation();mostraDettaglioAssenza('${r.id}')">${ic}${nome}</span>`;
       }).join('')}${persone.length>3?`<span class="cal-ferie-chip-more">+${persone.length-3}</span>`:''}</div>
     </div>`;
   }
@@ -2471,7 +2486,7 @@ function apriModal(id){
   const r=tutteR.find(r=>r.id===id);
   const sottotipoTitolo=r.tipo==='congedo'&&r.tipoCongedo?' ('+(TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo)+')':'';
   document.getElementById('modal-title').textContent='Gestisci Richiesta — '+(TL[r.tipo]||r.tipo)+sottotipoTitolo;
-  document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine} · ${r.oreRichieste||0}h`;
+  document.getElementById('modal-sub').textContent=`${r.nomeCompleto||r.username} · ${r.dataInizio===r.dataFine?r.dataInizio:r.dataInizio+' → '+r.dataFine} · ${r.oreRichieste||0}h${r.oraInizio&&r.oraFine?' · 🕐 '+r.oraInizio+'-'+r.oraFine:''}`;
   const nd=document.getElementById('modal-nota-dip');
   if(r.note){nd.style.display='block';nd.textContent='💬 Nota dipendente: '+r.note}else{nd.style.display='none'}
   document.getElementById('modal-nota-admin').value=r.notaAdmin||'';

@@ -515,6 +515,8 @@ tbody tr:last-child{border-bottom:none}
             <div class="form-grid">
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-ferie"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-ferie"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Dalle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-dalle-ferie"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Alle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-alle-ferie"></div>
               <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-ferie" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px">
@@ -537,6 +539,8 @@ tbody tr:last-child{border-bottom:none}
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-permesso"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-permesso"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-permesso" placeholder="es. 4" min="0.5" step="0.5"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Dalle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-dalle-permesso"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Alle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-alle-permesso"></div>
               <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-permesso" rows="2"></textarea></div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px">
@@ -559,6 +563,8 @@ tbody tr:last-child{border-bottom:none}
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-rol"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-rol"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Ore richieste</label><input class="f-input" style="margin:0" type="number" id="f-ore-rol" placeholder="es. 8" min="0.5" step="0.5"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Dalle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-dalle-rol"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Alle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-alle-rol"></div>
               <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-rol" rows="2"></textarea></div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px">
@@ -589,6 +595,8 @@ tbody tr:last-child{border-bottom:none}
               </div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="f-inizio-congedo"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="f-fine-congedo"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Dalle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-dalle-congedo"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Alle (opzionale)</label><input class="f-input" style="margin:0" type="time" id="f-alle-congedo"></div>
               <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note</label><textarea class="f-input field-textarea" style="margin:0" id="f-note-congedo" rows="2" placeholder="Aggiungi una nota..."></textarea></div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px">
@@ -1580,6 +1588,21 @@ function segnalaAttivita(tipo){
 let calFerieMese=new Date();calFerieMese.setDate(1);
 const CAL_FERIE_MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const CAL_FERIE_LABEL={ferie:'Ferie',permesso:'Permesso',rol:'ROL',congedo:'Congedo'};
+// Nome + iniziale cognome (es. "Marco Z.") per distinguere dipendenti con lo stesso nome nel calendario condiviso
+function nomeBreve(nomeCompleto){
+  const parti=(nomeCompleto||'').trim().split(/\s+/).filter(Boolean);
+  if(parti.length<2)return parti[0]||'';
+  return parti[0]+' '+parti[1].charAt(0).toUpperCase()+'.';
+}
+// Popup di dettaglio quando si clicca un nome nel calendario "Chi è in ferie": solo data, ore e orario (se indicato)
+function mostraDettaglioAssenza(id){
+  const r=(ALL_ASSENZE_TUTTI||[]).find(x=>x.id===id);
+  if(!r)return;
+  const periodo=r.dataInizio===r.dataFine?fmtD(r.dataInizio):fmtD(r.dataInizio)+' → '+fmtD(r.dataFine);
+  let msg=`${r.nomeCompleto||r.username}\n${CAL_FERIE_LABEL[r.tipo]||r.tipo}\n${periodo}\n${r.oreRichieste||0}h`;
+  if(r.oraInizio&&r.oraFine)msg+=`\nOrario: ${r.oraInizio} - ${r.oraFine}`;
+  alert(msg);
+}
 function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
 function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
 function chiusuraDelGiorno(ds){
@@ -1624,8 +1647,8 @@ function renderCalendarioFerie(){
       <div class="cal-ferie-chips">${persone.slice(0,3).map(r=>{
         const c=COL[r.tipo]||'var(--ink3)';
         const ic=r.daTitolare?'👑 ':'';
-        const nome=(r.nomeCompleto||r.username||'').split(' ')[0];
-        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c}" title="${r.nomeCompleto||r.username} — ${CAL_FERIE_LABEL[r.tipo]||r.tipo}">${ic}${nome}</span>`;
+        const nome=nomeBreve(r.nomeCompleto||r.username||'');
+        return `<span class="cal-ferie-chip" style="background:${c}22;color:${c};cursor:pointer" title="${r.nomeCompleto||r.username} — ${CAL_FERIE_LABEL[r.tipo]||r.tipo} (clicca per i dettagli)" onclick="event.stopPropagation();mostraDettaglioAssenza('${r.id}')">${ic}${nome}</span>`;
       }).join('')}${persone.length>3?`<span class="cal-ferie-chip-more">+${persone.length-3}</span>`:''}</div>
     </div>`;
   }
@@ -1639,6 +1662,10 @@ async function inviaRichiesta(tipo){
   const note=document.getElementById(`f-note-${tipo}`).value;
   const oreEl=document.getElementById(`f-ore-${tipo}`);
   const ore=oreEl?parseFloat(oreEl.value)||0:0;
+  const dalleEl=document.getElementById(`f-dalle-${tipo}`);
+  const alleEl=document.getElementById(`f-alle-${tipo}`);
+  const dalle=dalleEl?dalleEl.value:'';
+  const alle=alleEl?alleEl.value:'';
   const tipoCongedoEl=tipo==='congedo'?document.getElementById('f-tipo-congedo'):null;
   const tipoCongedo=tipoCongedoEl?tipoCongedoEl.value:'';
   const ad=document.getElementById(`alert-form-${tipo}`);ad.innerHTML='';
@@ -1646,11 +1673,14 @@ async function inviaRichiesta(tipo){
   if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
   if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
   if((tipo==='permesso'||tipo==='rol')&&ore<=0){ad.innerHTML='<div class="alert-box alert-err">Inserisci le ore richieste.</div>';return}
+  if(dalle&&alle&&alle<=dalle){ad.innerHTML='<div class="alert-box alert-err">L\'orario di fine deve essere successivo a quello di inizio.</div>';return}
   const oreGiorno=oreGiornoDip(profilo);
   const gg=giorniLavorativi(ini,fin);
   const oreTotali=(tipo==='ferie'||tipo==='congedo')?gg*oreGiorno:ore;
   try{
-    const extra=tipo==='congedo'?{tipoCongedo}:{};
+    // Orario opzionale (dalle/alle): salvato solo se entrambi i campi sono compilati,
+    // è solo un'informazione aggiuntiva — non cambia il calcolo di ore/giorni sopra.
+    const extra={...(tipo==='congedo'?{tipoCongedo}:{}),...((dalle&&alle)?{oraInizio:dalle,oraFine:alle}:{})};
     await db.collection('richieste_assenza').add({
       username:U.username,
       nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),
@@ -1670,6 +1700,8 @@ async function inviaRichiesta(tipo){
     document.getElementById(`f-inizio-${tipo}`).value='';
     document.getElementById(`f-fine-${tipo}`).value='';
     if(oreEl)oreEl.value='';
+    if(dalleEl)dalleEl.value='';
+    if(alleEl)alleEl.value='';
     if(tipoCongedoEl)tipoCongedoEl.value='';
     document.getElementById(`f-note-${tipo}`).value='';
   }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
@@ -1697,7 +1729,7 @@ function renderListaAssenze(tipo,lista){
       <div>
         <div class="r-tipo"><span class="badge ${bc}">${bl}</span></div>
         ${tipoCongLbl}
-        <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h</div>
+        <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h${r.oraInizio&&r.oraFine?' · 🕐 '+r.oraInizio+'-'+r.oraFine:''}</div>
         ${r.note?`<div class="r-nota">${r.note}</div>`:''}
         ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}
       </div>
