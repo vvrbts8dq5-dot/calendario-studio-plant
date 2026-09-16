@@ -4,8 +4,9 @@
 //
 // Sostituisce le vecchie righe "Storico importato" (import del 3 settembre
 // 2026: ore aggregate, ~9.100 h "non classificate", 177 h mancanti) con le
-// nuove righe per persona di storico_budget_v2_data.js (12.116,1 h, tutte
-// le ore dei 249 file Excel).
+// nuove righe per persona di storico_budget_v2_data.js (12.154,1 h: tutte
+// le ore dei 249 file Excel, compreso il foglio "OLD" della 23104, escluse solo le righe d'esempio del modello
+// in 25084 VARIANTE e 25085).
 //
 // COSA TOCCA, e solo quello:
 //  - cancella in commesse/{numero}/righe SOLO le righe dello storico
@@ -65,7 +66,8 @@ function sv2FaseId(c,rec){
 function sv2EStorico(id,d){
   if(d.origineCalendario===true)return false;
   if(['dipendente','admin','titolare'].includes(d.tipoPersona))return false;
-  return id.startsWith('storico_')||id.startsWith('storico2_')||d.origineStorico===true||d.username==='storico';
+  return id.startsWith('storico_')||id.startsWith('storico2_')||d.origineStorico===true||d.username==='storico'
+    ||String(d.descrizione||'').startsWith('Storico importato');
 }
 
 function sv2NuoveRighe(c,rec){
@@ -140,7 +142,10 @@ async function sv2Analizza(){
         oreVecchie:storicoEsistente.reduce((s,r)=>s+(parseFloat(r.ore)||0),0),
         oreNuove:nuove.reduce((s,r)=>s+(r.data.ore||0),0),
         oreUtenti:utenti.reduce((s,r)=>s+(parseFloat(r.ore)||0),0),nUtenti:utenti.length,
-        sospette,recs});
+        sospette,recs,
+        // commessa già importata a inizio settembre ma nessuna vecchia riga riconosciuta:
+        // potrebbero esserci righe storiche scritte in un formato diverso → da controllare
+        nonRiconosciuta:!!c.storicoImportato&&!c.storicoV2Importato&&!storicoEsistente.length});
     },20,(f,t)=>{if(f%20===0||f===t)prog(`Lettura righe esistenti: ${f}/${t} commesse (sola lettura)...`)});
     piano.sort((a,b)=>String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
     SV2_PIANO={piano,mancanti};
@@ -156,13 +161,14 @@ function sv2MostraAnteprima(){
   const {piano,mancanti}=SV2_PIANO;
   const tot=k=>piano.reduce((s,p)=>s+p[k],0);
   const nSosp=piano.reduce((s,p)=>s+p.sospette.length,0);
+  const nonRic=piano.filter(p=>p.nonRiconosciuta).map(p=>p.numero);
   const oreSosp=piano.reduce((s,p)=>s+p.sospette.reduce((a,r)=>a+(parseFloat(r.ore)||0),0),0);
   const th='style="text-align:left;padding:6px 8px"',thr='style="text-align:right;padding:6px 8px"',td='style="padding:5px 8px"',tdr='style="padding:5px 8px;text-align:right"';
   const righe=piano.map(p=>{
     const sosp=p.sospette.length?`<span style="color:#c0392b;font-weight:600">${p.sospette.length} (${sv2Fmt(p.sospette.reduce((a,r)=>a+(parseFloat(r.ore)||0),0))} h)</span>`:'—';
     const dett=p.nuove.filter(r=>r.data.ore>0).map(r=>`${sv2Esc(r.data.nomeCompleto)} ${r.data.livello==='senior'?'Sr':'Jr'} ${r.data.disciplina==='ele'?'Ele':r.data.disciplina==='mec'?'Mec':'n.d.'} ${sv2Fmt(r.data.ore)}h`).join(' · ');
     return `<tr style="border-top:1px solid var(--border)">
-      <td ${td}><b>${sv2Esc(p.numero)}</b></td>
+      <td ${td}><b>${sv2Esc(p.numero)}</b>${p.nonRiconosciuta?' <span style="color:#c0392b">⛔</span>':''}</td>
       <td ${tdr}>${sv2Fmt(p.oreVecchie)} h</td>
       <td ${tdr}><b>${sv2Fmt(p.oreNuove)} h</b></td>
       <td ${tdr}>${p.nUtenti} righe · ${sv2Fmt(p.oreUtenti)} h</td>
@@ -176,6 +182,7 @@ function sv2MostraAnteprima(){
       ${piano.length} commesse · ore storico attuali <b>${sv2Fmt(tot('oreVecchie'))} h</b> → nuove <b>${sv2Fmt(tot('oreNuove'))} h</b> ·
       righe storico da scrivere <b>${piano.reduce((s,p)=>s+p.nuove.length,0)}</b>, vecchie da togliere <b>${piano.reduce((s,p)=>s+p.daCancellare.length,0)}</b>.<br>
       Ore inserite dagli utenti nell'app: <b>${sv2Fmt(tot('oreUtenti'))} h</b> in ${tot('nUtenti')} righe — <b>restano tutte invariate</b>.
+      ${nonRic.length?`<br><span style="color:#c0392b;font-weight:700">⛔ ${nonRic.length} commesse risultano già importate a inizio settembre ma non ho trovato le loro vecchie righe storico (${sv2Esc(nonRic.slice(0,15).join(', '))}${nonRic.length>15?'…':''}): NON confermare, avvisa Claude — rischio di ore contate due volte.</span>`:''}
       ${nSosp?`<br><span style="color:#c0392b">⚠️ ${nSosp} righe utente (${sv2Fmt(oreSosp)} h) hanno una data non successiva all'ultimo salvataggio del file Excel: potrebbero essere già contate nel file. Vengono solo segnalate (elenco sotto), non modificate.</span>`:''}
     </div>
     <div style="max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:8px">
@@ -200,6 +207,7 @@ function sv2MostraAnteprima(){
 async function sv2Esegui(){
   if(!SV2_PIANO){alert('Rifai prima l\'analisi.');return}
   const {piano}=SV2_PIANO;
+  if(piano.some(p=>p.nonRiconosciuta)){alert('⛔ Scrittura bloccata: alcune commesse hanno uno storico precedente non riconosciuto (vedi anteprima). Avvisa Claude prima di procedere.');return}
   const nNuove=piano.reduce((s,p)=>s+p.nuove.length,0),nDel=piano.reduce((s,p)=>s+p.daCancellare.length,0);
   const oreNuove=piano.reduce((s,p)=>s+p.oreNuove,0);
   if(!confirm(`Stai per scrivere su Firestore:\n\n• ${piano.length} commesse\n• ${nDel} vecchie righe di storico rimosse\n• ${nNuove} nuove righe di storico (${sv2Fmt(oreNuove)} h)\n\nLe ore inserite dagli utenti NON vengono toccate.\n\nConfermi?`))return;

@@ -8,7 +8,10 @@
 //  - File vecchi (colonne con nomi): disciplina abituale della persona
 //    (Marco Sorgato, Giovanni = Ele; Zabeo/"Marchetto", Alessio, Enrico, Amine, David = Mec).
 //  - Colonne senza nome e senza indicazione: Junior, disciplina "nd" (non indicata).
-// Totale: 12116,1 ore in 230 file/fasi, 625 righe.
+//  - Escluse le righe d'esempio del modello (MD "Progetto preliminare per comune" +
+//    MS "Leg squat") in 25084 VARIANTE e 25085: record con righe vuote, così lo
+//    strumento toglie anche le 8 h fittizie importate a inizio settembre.
+// Totale: 12154,1 ore in 230 file/fasi, 621 righe.
 // Usato una tantum da migrazione_storico_v2.js.
 // ══════════════════════════════════════════════════════════════════════
 const STORICO_BUDGET_V2 = [
@@ -528,7 +531,7 @@ const STORICO_BUDGET_V2 = [
 "persona": "Marco Sorgato",
 "livello": "junior",
 "disciplina": "ele",
-"ore": 5.5
+"ore": 59.5
 }
 ]
 },
@@ -3275,20 +3278,7 @@ const STORICO_BUDGET_V2 = [
 "salvatoIl": "2025-10-07",
 "km": 0,
 "speseVive": 0,
-"righe": [
-{
-"persona": "Marco Dante",
-"livello": "senior",
-"disciplina": "ele",
-"ore": 4.0
-},
-{
-"persona": "Marco Sorgato",
-"livello": "junior",
-"disciplina": "ele",
-"ore": 4.0
-}
-]
+"righe": []
 },
 {
 "numero": "25085",
@@ -3297,20 +3287,7 @@ const STORICO_BUDGET_V2 = [
 "salvatoIl": "2025-10-07",
 "km": 0,
 "speseVive": 0,
-"righe": [
-{
-"persona": "Marco Dante",
-"livello": "senior",
-"disciplina": "ele",
-"ore": 4.0
-},
-{
-"persona": "Marco Sorgato",
-"livello": "junior",
-"disciplina": "ele",
-"ore": 4.0
-}
-]
+"righe": []
 },
 {
 "numero": "25086",
