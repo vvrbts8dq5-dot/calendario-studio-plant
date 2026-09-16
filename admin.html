@@ -668,8 +668,8 @@ tbody tr:hover{background:var(--paper)}
             <div><label class="fl">Monte ROL (ore)</label><input class="fi" id="new-rol" placeholder="es. 32" type="number"></div>
             <div><label class="fl">Livello (Budget Contract)</label>
               <select class="fi" id="new-livello">
+                <option value="junior" selected>Junior</option>
                 <option value="senior">Senior</option>
-                <option value="junior">Junior</option>
               </select>
             </div>
           </div>
@@ -756,6 +756,7 @@ tbody tr:hover{background:var(--paper)}
         <div id="corr-nomi-commesse-wrap"></div>
         <div id="migr-fasi-storico-wrap"></div>
         <div id="migr-monte-ore-wrap"></div>
+        <div id="storico-v2-wrap"></div>
         <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
         <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -1917,7 +1918,7 @@ function goPage(pid,btn){
   if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
-  if(pid==='rubrica')loadCommesse().then(()=>{renderRubrica();if(typeof renderCorrNomiCommesseBanner==='function')renderCorrNomiCommesseBanner();if(typeof renderMigrFasiStoricoBanner==='function')renderMigrFasiStoricoBanner();if(typeof renderMigrMonteOreBanner==='function')renderMigrMonteOreBanner();});
+  if(pid==='rubrica')loadCommesse().then(()=>{renderRubrica();if(typeof renderCorrNomiCommesseBanner==='function')renderCorrNomiCommesseBanner();if(typeof renderMigrFasiStoricoBanner==='function')renderMigrFasiStoricoBanner();if(typeof renderMigrMonteOreBanner==='function')renderMigrMonteOreBanner();if(typeof renderStoricoV2Banner==='function')renderStoricoV2Banner();});
   if(pid==='statistiche')initStatistiche();
   if(pid==='cestino')loadCestino();
 }
@@ -2628,7 +2629,7 @@ async function creaDipendente(){
     document.getElementById('alert-dip').innerHTML='<div class="alert-box alert-ok" style="margin-bottom:14px">✓ Dipendente "'+n+' '+c+'" creato con successo. Può accedere con l\'email '+email+'.</div>';
     setTimeout(()=>document.getElementById('alert-dip').innerHTML='',5000);
     ['new-u','new-n','new-c','new-email','new-p','new-ferie','new-permessi','new-rol'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('new-livello').value='senior';
+    document.getElementById('new-livello').value='junior';
     chiudiFormDip();loadDipendenti();renderDashboardFromCache();
   }catch(e){
     if(e.code==='auth/email-already-in-use'){ad.innerHTML='<div class="alert-box alert-err">Questa email ha già un account di accesso. Usa un\'altra email o elimina prima il vecchio account da Firebase Console → Authentication.</div>'}
@@ -2653,7 +2654,7 @@ function apriModificaDip(username){
   document.getElementById('edit-permessi').value=emp.montePermesso||0;
   document.getElementById('edit-rol').value=emp.monteRol||0;
   document.getElementById('edit-giorni-inattivita').value=emp.giorniInattivita||2;
-  document.getElementById('edit-livello').value=emp.livello||'senior';
+  document.getElementById('edit-livello').value=emp.livello||'junior';
   // Tariffe
   const t=emp.tariffe||{};
   ['oreElectriciMD','oreStraordinariElettrico','oreMeccaniciMA','oreStraordinariMeccanico',
@@ -4642,12 +4643,15 @@ async function salvaNuovaFase(){
 }
 
 function bcCalcRiepilogo(fase,righe,stampe){
-  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,speseViveTot=0,kmTot=0,oreNonClassificateTot=0;
+  let oreSeniorEle=0,oreSeniorMec=0,oreJuniorEle=0,oreJuniorMec=0,oreSeniorNd=0,oreJuniorNd=0,speseViveTot=0,kmTot=0,oreNonClassificateTot=0;
   righe.forEach(r=>{
     const ore=parseFloat(r.ore)||0;
     // Ore storiche importate dal vecchio formato Excel (senza distinzione Ele/Mec,
     // Senior/Junior): tenute visibili ma escluse dai calcoli di monte ore e costo manodopera.
     if(r.nonClassificato){oreNonClassificateTot+=ore}
+    // Ore storiche con livello noto ma disciplina non indicata nel file Excel: entrano nel costo
+    // del livello ma non nei monte ore Ele/Mec (non si sa a quale dei due appartengano).
+    else if(r.disciplina==='nd'){if(r.livello==='senior')oreSeniorNd+=ore;else oreJuniorNd+=ore}
     else if(r.livello==='senior'){if(r.disciplina==='ele')oreSeniorEle+=ore;else oreSeniorMec+=ore}
     else{if(r.disciplina==='ele')oreJuniorEle+=ore;else oreJuniorMec+=ore}
     speseViveTot+=parseFloat(r.speseVive)||0;
@@ -4658,8 +4662,8 @@ function bcCalcRiepilogo(fase,righe,stampe){
   const tariffaKm=parseFloat(fase.tariffaKm)||0;
   const oreEleTot=oreSeniorEle+oreJuniorEle;
   const oreMecTot=oreSeniorMec+oreJuniorMec;
-  const costoSeniorTot=(oreSeniorEle+oreSeniorMec)*tariffaSenior;
-  const costoJuniorTot=(oreJuniorEle+oreJuniorMec)*tariffaJunior;
+  const costoSeniorTot=(oreSeniorEle+oreSeniorMec+oreSeniorNd)*tariffaSenior;
+  const costoJuniorTot=(oreJuniorEle+oreJuniorMec+oreJuniorNd)*tariffaJunior;
   const costoKmTot=kmTot*tariffaKm;
   const costoTrasferta=costoKmTot+speseViveTot;
   const costoStampeTot=stampe.reduce((s,x)=>s+(parseFloat(x.costoUnitario)||0)*(parseFloat(x.copie)||0),0);
@@ -4671,7 +4675,7 @@ function bcCalcRiepilogo(fase,righe,stampe){
   const monteOreMecJunior=parseFloat(fase.monteOreMecJunior)||0;
   const monteOreEle=monteOreEleSenior+monteOreEleJunior;
   const monteOreMec=monteOreMecSenior+monteOreMecJunior;
-  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreEleTot,oreMecTot,oreNonClassificateTot,
+  return{oreSeniorEle,oreSeniorMec,oreJuniorEle,oreJuniorMec,oreSeniorNd,oreJuniorNd,oreEleTot,oreMecTot,oreNonClassificateTot,
     tariffaSenior,tariffaJunior,tariffaKm,costoSeniorTot,costoJuniorTot,costoKmTot,speseViveTot,costoTrasferta,
     costoStampeTot,costoGenerale,
     monteOreEleSenior,monteOreEleJunior,monteOreMecSenior,monteOreMecJunior,monteOreEle,monteOreMec,
@@ -4764,7 +4768,7 @@ function bcRenderRighe(righe,fase){
     return `<tr>
       <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
       <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
-      <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':'Mec'}</span></td>
+      <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':r.disciplina==='nd'?'disc. n.d.':'Mec'}</span></td>
       <td style="font-size:12px;color:var(--ink4)">${r.descrizione||'—'}</td>
       <td class="td-r">${ore}h</td>
       <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
@@ -4777,8 +4781,8 @@ function bcRenderRighe(righe,fase){
 
 function bcRenderRiepilogo(riep){
   document.getElementById('bc-riepilogo').innerHTML=`
-    <div class="bc-info-row"><span class="bc-info-key">ORE SENIOR (Ele ${riep.oreSeniorEle}h + Mec ${riep.oreSeniorMec}h)</span><span class="bc-info-val">${riep.oreSeniorEle+riep.oreSeniorMec}h</span></div>
-    <div class="bc-info-row"><span class="bc-info-key">ORE JUNIOR (Ele ${riep.oreJuniorEle}h + Mec ${riep.oreJuniorMec}h)</span><span class="bc-info-val">${riep.oreJuniorEle+riep.oreJuniorMec}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ORE SENIOR (Ele ${riep.oreSeniorEle}h + Mec ${riep.oreSeniorMec}h${riep.oreSeniorNd?' + disc. n.d. '+riep.oreSeniorNd+'h':''})</span><span class="bc-info-val">${riep.oreSeniorEle+riep.oreSeniorMec+riep.oreSeniorNd}h</span></div>
+    <div class="bc-info-row"><span class="bc-info-key">ORE JUNIOR (Ele ${riep.oreJuniorEle}h + Mec ${riep.oreJuniorMec}h${riep.oreJuniorNd?' + disc. n.d. '+riep.oreJuniorNd+'h':''})</span><span class="bc-info-val">${riep.oreJuniorEle+riep.oreJuniorMec+riep.oreJuniorNd}h</span></div>
     <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO SENIOR</span><span class="bc-info-val">${bcEuro(riep.costoSeniorTot)}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">COSTO VIVO JUNIOR</span><span class="bc-info-val">${bcEuro(riep.costoJuniorTot)}</span></div>
     <div class="bc-info-row"><span class="bc-info-key">SPESE VIVE</span><span class="bc-info-val">${bcEuro(riep.speseViveTot)}</span></div>
@@ -4962,7 +4966,7 @@ async function salvaRigaBC(){
   if(isDip){
     const d=dipList.find(x=>x.username===username);
     nomeCompleto=d?`${d.nome||''} ${d.cognome||''}`.trim():username;
-    livello=(d&&d.livello)||'senior';
+    livello=(d&&d.livello)||'junior';
   }else{
     const a=BC_admins.find(x=>x.username===username);
     nomeCompleto=a?(a.nome||username):username;
@@ -5248,9 +5252,9 @@ function statEsportaCommessePDF(){
 <script src="correzione_storico_orario.js" defer></script>
 <script src="pulizia_duplicati.js" defer></script>
 <script src="correzione_nomi_commesse.js" defer></script>
-<script src="storico_budget_import_data.js" defer></script>
-<script src="migrazione_fasi_storico.js" defer></script>
 <script src="monte_ore_preventivato_data.js" defer></script>
 <script src="migrazione_monte_ore_split.js" defer></script>
+<script src="storico_budget_v2_data.js" defer></script>
+<script src="migrazione_storico_v2.js" defer></script>
 </body>
 </html>
