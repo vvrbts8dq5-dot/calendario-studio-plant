@@ -858,6 +858,19 @@ const CAMPI=[
   {k:'speseExtra',l:'Spese Extra (€)',t:'number'},
   {k:'note',l:'Note',t:'textarea'},
 ];
+// Sotto-categorie selezionabili (facoltative) per "Ore Attività Generali": permettono di
+// dividere le ore di attività varie per tipologia nei report/dashboard amministratore.
+// Salvate come due campi extra sul giorno (tipoAttivitaGenerali, tipoAttivitaGeneraliAltro),
+// non fanno parte di CAMPI/CN quindi non entrano nei totali/esportazioni esistenti.
+// Le ore inserite prima dell'introduzione di questa funzionalità restano "Non classificate"
+// nei report, dato che non hanno nessuna di queste due chiavi valorizzata.
+const TIPI_ATTIVITA_GENERALI=[
+  {k:'formazione',l:'Corso di formazione'},
+  {k:'manutenzione',l:'Manutenzione'},
+  {k:'riunioneEle',l:'Riunione Ele'},
+  {k:'riunioneMec',l:'Riunione Mec'},
+  {k:'altro',l:'Altro'},
+];
 const CN=CAMPI.filter(c=>c.t==='number');
 // Colonne virtuali di assenza (Ferie/Permesso/ROL/Malattia): NON fanno parte dei campi compilabili
 // nel form del giorno (CAMPI) — vengono calcolate al volo dal sistema "Ferie & Assenze" solo per i
@@ -1396,6 +1409,21 @@ function renderForm(ds,dati){
       html+=`<div class="field-group full"><label class="field-label">${c.l}</label><textarea class="field-input field-textarea" id="f-${c.k}" oninput="fieldChange('${c.k}',this.value)">${v}</textarea></div>`;
     }else{
       html+=`<div class="field-group"><label class="field-label">${c.l}</label><input class="field-input" type="${c.t}" id="f-${c.k}" value="${v}" ${c.t==='number'?'min="0" step="0.5"':''} placeholder="${c.ph||'0'}" oninput="fieldChange('${c.k}',this.value)"></div>`;
+      if(c.k==='oreAttivitaGenerali'){
+        const tipoV=dati.tipoAttivitaGenerali||'';
+        const altroV=dati.tipoAttivitaGeneraliAltro||'';
+        html+=`<div class="field-group">
+          <label class="field-label">Tipo Attività Generali</label>
+          <select class="field-input" id="f-tipoAttivitaGenerali" onchange="fieldChange('tipoAttivitaGenerali',this.value);toggleAttGenAltro(this.value)">
+            <option value="">— Non specificato —</option>
+            ${TIPI_ATTIVITA_GENERALI.map(t=>`<option value="${t.k}" ${tipoV===t.k?'selected':''}>${t.l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field-group full" id="f-tipoAttivitaGeneraliAltro-wrap" style="display:${tipoV==='altro'?'':'none'}">
+          <label class="field-label">Specifica attività (Altro)</label>
+          <input class="field-input" type="text" id="f-tipoAttivitaGeneraliAltro" value="${String(altroV).replace(/"/g,'&quot;')}" placeholder="Descrivi brevemente l'attività" oninput="fieldChange('tipoAttivitaGeneraliAltro',this.value)">
+        </div>`;
+      }
     }
   });
   html+=`</div>`;
@@ -1417,6 +1445,12 @@ function renderForm(ds,dati){
     const selRc=document.getElementById('rc-commessa-'+i);
     if(selRc)makeSearchable(selRc,'Cerca per numero o nome...');
   }
+}
+// Mostra/nasconde il campo di testo libero "Specifica attività" quando si sceglie "Altro"
+// nel menu Tipo Attività Generali.
+function toggleAttGenAltro(v){
+  const w=document.getElementById('f-tipoAttivitaGeneraliAltro-wrap');
+  if(w)w.style.display=(v==='altro')?'':'none';
 }
 
 // ── COLLEGAMENTO CALENDARIO → BUDGET CONTRACT ──────────────────────────

@@ -814,6 +814,15 @@ tbody tr:hover{background:var(--paper)}
               </select>
             </div>
             <div><label class="fl">Data</label><input class="fi" id="bc-r-data" type="date"></div>
+            <div><label class="fl">Tipo attività (facoltativo)</label>
+              <select class="fi" id="bc-r-tipo-attivita" onchange="toggleBcRTipoAltro(this.value)">
+                <option value="">— Non specificato —</option>
+              </select>
+            </div>
+            <div style="grid-column:1/-1;display:none" id="bc-r-tipo-altro-wrap">
+              <label class="fl">Specifica attività (Altro)</label>
+              <input class="fi" id="bc-r-tipo-attivita-altro" type="text" placeholder="Descrivi brevemente l'attività">
+            </div>
             <div style="grid-column:1/-1"><label class="fl">Attività (breve descrizione)</label><input class="fi" id="bc-r-descrizione" type="text" placeholder="es. Sopralluogo cantiere"></div>
             <div><label class="fl">Ore</label><input class="fi" id="bc-r-ore" type="number" step="0.5" min="0"></div>
             <div><label class="fl">Spese vive (€)</label><input class="fi" id="bc-r-spese" type="number" step="0.01" min="0"></div>
@@ -1063,6 +1072,23 @@ tbody tr:hover{background:var(--paper)}
             <table>
               <thead><tr><th>Dipendente</th><th class="td-r">Ferie (h)</th><th class="td-r">Permessi (h)</th><th class="td-r">ROL (h)</th><th class="td-r">Malattia (giorni)</th></tr></thead>
               <tbody id="stat-assenze-tbody"><tr><td colspan="5" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="page-header" style="margin-bottom:10px">
+            <div class="section-title">Ore Attività Generali per tipologia (per dipendente)</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-verde btn-sm" onclick="statEsportaAttGenExcel()">📥 Excel</button>
+              <button class="btn btn-rosso btn-sm" onclick="statEsportaAttGenPDF()">📄 PDF</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Suddivisione delle ore "Attività Generali" per categoria scelta nel calendario. "Non classificato" = ore inserite senza categoria (anche storiche, prima dell'introduzione di questa funzione).</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Dipendente</th>${STAT_TIPI_ATTGEN.map(t=>`<th class="td-r">${t.l}</th>`).join('')}<th class="td-r">Totale</th></tr></thead>
+              <tbody id="stat-attgen-tbody"><tr><td colspan="8" class="empty-state">Seleziona un periodo per calcolare</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1530,6 +1556,18 @@ const CN=CAMPI.filter(c=>c.t==='n');
 const TL={ferie:'🏖️ Ferie',permesso:'🕐 Permesso',rol:'🔄 ROL',malattia:'🤒 Malattia',congedo:'🗂️ Congedo'};
 // Etichette dei sottotipi di congedo (stesse chiavi usate nel portale dipendenti)
 const TIPI_CONGEDO={parentale:'Congedo parentale',lutto:'Lutto o grave infermità',matrimoniale:'Congedo matrimoniale',formativo:'Congedo formativo/studio'};
+// Sotto-categorie selezionabili (facoltative) per "Ore Attività Generali" (calendario) e per
+// le righe di Budget Contract — stesse chiavi usate in dipendenti.html — permettono di dividere
+// le ore di attività varie per tipologia nella dashboard Statistiche. Le ore inserite prima
+// dell'introduzione di questa funzionalità restano "Non classificate" nei report.
+const TIPI_ATTIVITA_GENERALI=[
+  {k:'formazione',l:'Corso di formazione'},
+  {k:'manutenzione',l:'Manutenzione'},
+  {k:'riunioneEle',l:'Riunione Ele'},
+  {k:'riunioneMec',l:'Riunione Mec'},
+  {k:'altro',l:'Altro'},
+];
+function labelTipoAttGen(k){return (TIPI_ATTIVITA_GENERALI.find(t=>t.k===k)||{}).l||''}
 
 let ADM=null,dipList=[],dipDataCache={},tutteR=[],tutteMalattie=[],filtroF='in_attesa',filtroTipoF='tutti',chiusureUfficio=[];
 // Cache globale richieste/malattie per utente — riempita da loadDashboard
@@ -4776,7 +4814,7 @@ function bcRenderRighe(righe,fase){
       <td style="font-family:'Inter',monospace;font-size:12px">${g&&m&&y?`${g}/${m}/${y}`:(r.data||'—')}</td>
       <td style="font-weight:500">${r.nomeCompleto||r.username||'—'}</td>
       <td><span class="commessa-pill">${r.livello==='senior'?'Senior':'Junior'} · ${r.disciplina==='ele'?'Ele':r.disciplina==='nd'?'disc. n.d.':'Mec'}</span></td>
-      <td style="font-size:12px;color:var(--ink4)">${r.descrizione||'—'}</td>
+      <td style="font-size:12px;color:var(--ink4)">${r.tipoAttivita?`<span style="color:var(--blu);font-weight:600">${r.tipoAttivita==='altro'?(r.tipoAttivitaAltro||'Altro'):labelTipoAttGen(r.tipoAttivita)}</span>${r.descrizione?' — '+r.descrizione:''}`:(r.descrizione||'—')}</td>
       <td class="td-r">${ore}h</td>
       <td class="td-r">${r.speseVive>0?bcEuro(r.speseVive):'—'}</td>
       <td class="td-r">${r.km>0?r.km+' km':'—'}</td>
@@ -4954,10 +4992,21 @@ function apriFormRigaBC(){
   document.getElementById('bc-r-ore').value='';
   document.getElementById('bc-r-spese').value='';
   document.getElementById('bc-r-km').value='';
+  const selTipo=document.getElementById('bc-r-tipo-attivita');
+  selTipo.innerHTML='<option value="">— Non specificato —</option>'+TIPI_ATTIVITA_GENERALI.map(t=>`<option value="${t.k}">${t.l}</option>`).join('');
+  selTipo.value='';
+  document.getElementById('bc-r-tipo-attivita-altro').value='';
+  toggleBcRTipoAltro('');
   bcPopolaSelectPersona();
   document.getElementById('bc-form-riga').style.display='block';
 }
 function chiudiFormRigaBC(){const f=document.getElementById('bc-form-riga');if(f)f.style.display='none'}
+// Mostra/nasconde il campo di testo libero "Specifica attività" quando si sceglie "Altro"
+// nel menu Tipo attività della riga Budget Contract.
+function toggleBcRTipoAltro(v){
+  const w=document.getElementById('bc-r-tipo-altro-wrap');
+  if(w)w.style.display=(v==='altro')?'':'none';
+}
 
 async function salvaRigaBC(){
   const alertEl=document.getElementById('bc-riga-alert');
@@ -4981,10 +5030,13 @@ async function salvaRigaBC(){
   }
   const c0=BC_commesse.find(x=>x.numero===BC_current);
   const faseId0=BC_currentFaseId||bcFasi(c0)[0].id;
+  const tipoAttivita=document.getElementById('bc-r-tipo-attivita').value;
   const rec={
     username,nomeCompleto,tipoPersona:isDip?'dipendente':'admin',
     livello,disciplina:document.getElementById('bc-r-disciplina').value,data,
     descrizione:document.getElementById('bc-r-descrizione').value.trim(),
+    tipoAttivita,
+    tipoAttivitaAltro:tipoAttivita==='altro'?document.getElementById('bc-r-tipo-attivita-altro').value.trim():'',
     ore,speseVive:parseFloat(document.getElementById('bc-r-spese').value)||0,
     km:parseFloat(document.getElementById('bc-r-km').value)||0,
     faseId:faseId0,
@@ -5076,7 +5128,7 @@ async function statCalcolaTutto(){
   const p=STAT_periodo;if(!p)return;
   document.getElementById('stat-loading').style.display='';
   try{
-    await Promise.all([statCalcolaTipologia(p),statCalcolaAssenze(p),statCalcolaCommesse(p)]);
+    await Promise.all([statCalcolaTipologia(p),statCalcolaAssenze(p),statCalcolaCommesse(p),statCalcolaAttGen(p)]);
   }catch(e){console.error('Errore statistiche:',e)}
   document.getElementById('stat-loading').style.display='none';
 }
@@ -5198,6 +5250,74 @@ function statEsportaAssenzePDF(){
     styles:EXP_PDF_BODY_STYLE,headStyles:EXP_PDF_HEAD_STYLE,theme:'striped'
   });
   doc.save(`Statistiche_Assenze_${periodoFile(STAT_periodo)}.pdf`);
+}
+
+// ── 2bis) Ore Attività Generali per tipologia, per dipendente ──
+const STAT_TIPI_ATTGEN=[
+  {k:'formazione',l:'Corso formazione'},
+  {k:'manutenzione',l:'Manutenzione'},
+  {k:'riunioneEle',l:'Riunione Ele'},
+  {k:'riunioneMec',l:'Riunione Mec'},
+  {k:'altro',l:'Altro'},
+  {k:'nc',l:'Non classificato'},
+];
+let STAT_attgen=[];
+async function statCalcolaAttGen(p){
+  const perUser={};
+  const assicura=(u,nome)=>{if(!perUser[u]){perUser[u]={nome};STAT_TIPI_ATTGEN.forEach(t=>perUser[u][t.k]=0)}return perUser[u]};
+  const tasks=[];
+  periodoAnni(p).forEach(y=>(dipList||[]).forEach(emp=>tasks.push({y,emp})));
+  const risultati=await Promise.all(tasks.map(async({y,emp})=>{
+    try{
+      const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(emp.username).collection('giorni').get();
+      const giorni=[];snap.forEach(d=>giorni.push(d.data()));
+      return {emp,giorni};
+    }catch(e){return {emp,giorni:[]}}
+  }));
+  risultati.forEach(({emp,giorni})=>{
+    giorni.forEach(dd=>{
+      const ore=parseFloat(dd.oreAttivitaGenerali)||0;
+      if(ore<=0)return;
+      if(!periodoInRange(dd.data,p))return;
+      const u=assicura(emp.username,`${emp.nome||''} ${emp.cognome||''}`.trim()||emp.username);
+      const tipo=dd.tipoAttivitaGenerali;
+      const key=(tipo&&STAT_TIPI_ATTGEN.some(t=>t.k===tipo))?tipo:'nc';
+      u[key]+=ore;
+    });
+  });
+  STAT_attgen=Object.values(perUser).sort((a,b)=>a.nome.localeCompare(b.nome));
+  statRenderAttGen();
+}
+function statRenderAttGen(){
+  const tbody=document.getElementById('stat-attgen-tbody');
+  if(!STAT_attgen.length){tbody.innerHTML=`<tr><td colspan="${STAT_TIPI_ATTGEN.length+2}" class="empty-state">Nessun dato per il periodo selezionato</td></tr>`;return}
+  tbody.innerHTML=STAT_attgen.map(r=>{
+    const tot=STAT_TIPI_ATTGEN.reduce((s,t)=>s+r[t.k],0);
+    return `<tr><td>${r.nome}</td>${STAT_TIPI_ATTGEN.map(t=>`<td class="td-r">${fmtTitN(r[t.k])}</td>`).join('')}<td class="td-r" style="font-weight:600">${fmtTitN(tot)}</td></tr>`;
+  }).join('')
+  +`<tr class="td-bold"><td>TOTALE</td>${STAT_TIPI_ATTGEN.map(t=>`<td class="td-r">${fmtTitN(STAT_attgen.reduce((s,r)=>s+r[t.k],0))}</td>`).join('')}<td class="td-r">${fmtTitN(STAT_attgen.reduce((s,r)=>s+STAT_TIPI_ATTGEN.reduce((ss,t)=>ss+r[t.k],0),0))}</td></tr>`;
+}
+function statEsportaAttGenExcel(){
+  const hh=['Dipendente',...STAT_TIPI_ATTGEN.map(t=>t.l),'Totale'];
+  const rr=STAT_attgen.map(r=>{const tot=STAT_TIPI_ATTGEN.reduce((s,t)=>s+r[t.k],0);return[r.nome,...STAT_TIPI_ATTGEN.map(t=>r[t.k]),tot]});
+  const footRow=['TOTALE',...STAT_TIPI_ATTGEN.map(t=>STAT_attgen.reduce((s,r)=>s+r[t.k],0)),STAT_attgen.reduce((s,r)=>s+STAT_TIPI_ATTGEN.reduce((ss,t)=>ss+r[t.k],0),0)];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,expFoglioExcel('Statistiche — Attività Generali per tipologia',periodoLabel(STAT_periodo),hh,rr,footRow),'Attività Generali');
+  XLSX.writeFile(wb,`Statistiche_AttivitaGenerali_${periodoFile(STAT_periodo)}.xlsx`);
+}
+function statEsportaAttGenPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const startY=expIntestazionePDF(doc,'Statistiche — Attività Generali per tipologia',periodoLabel(STAT_periodo));
+  doc.autoTable({
+    startY,
+    head:[['Dipendente',...STAT_TIPI_ATTGEN.map(t=>t.l),'Totale']],
+    body:STAT_attgen.map(r=>{const tot=STAT_TIPI_ATTGEN.reduce((s,t)=>s+r[t.k],0);return[r.nome,...STAT_TIPI_ATTGEN.map(t=>fmtTitN(r[t.k])),fmtTitN(tot)]}),
+    foot:[['TOTALE',...STAT_TIPI_ATTGEN.map(t=>fmtTitN(STAT_attgen.reduce((s,r)=>s+r[t.k],0))),fmtTitN(STAT_attgen.reduce((s,r)=>s+STAT_TIPI_ATTGEN.reduce((ss,t)=>ss+r[t.k],0),0))]],
+    styles:EXP_PDF_BODY_STYLE,headStyles:EXP_PDF_HEAD_STYLE,
+    footStyles:EXP_PDF_FOOT_STYLE,theme:'striped'
+  });
+  doc.save(`Statistiche_AttivitaGenerali_${periodoFile(STAT_periodo)}.pdf`);
 }
 
 // ── 3) Ore lavorate per commessa ──
