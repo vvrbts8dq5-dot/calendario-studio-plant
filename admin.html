@@ -757,6 +757,13 @@ tbody tr:hover{background:var(--paper)}
         <div id="migr-fasi-storico-wrap"></div>
         <div id="migr-monte-ore-wrap"></div>
         <div id="storico-v2-wrap"></div>
+        <div id="tariffe-standard-wrap"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <span style="font-size:11px;color:var(--ink4);font-weight:600">📊 Tutti i Budget Contract (riepilogo costi/ore, rispetta ricerca e filtro anno):</span>
+          <button class="btn btn-blu btn-sm" onclick="bcEsportaTuttiExcel()">📥 Excel</button>
+          <button class="btn btn-rosso btn-sm" onclick="bcEsportaTuttiPDF()">📄 PDF</button>
+          <span id="bc-exp-status" style="font-size:11px;color:var(--ink4)"></span>
+        </div>
         <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
         <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -1226,8 +1233,8 @@ tbody tr:hover{background:var(--paper)}
     </div>
     <div style="height:.5px;background:var(--border);margin:14px 0"></div>
     <div class="form-grid" style="margin-bottom:6px">
-      <div><label class="fl">Tariffa Senior (€/h)</label><input class="fi" id="bc-n-tsenior" type="number" step="0.01" value="98"></div>
-      <div><label class="fl">Tariffa Junior (€/h)</label><input class="fi" id="bc-n-tjunior" type="number" step="0.01" value="31"></div>
+      <div><label class="fl">Tariffa Senior (€/h)</label><input class="fi" id="bc-n-tsenior" type="number" step="0.01" value="125"></div>
+      <div><label class="fl">Tariffa Junior (€/h)</label><input class="fi" id="bc-n-tjunior" type="number" step="0.01" value="39"></div>
       <div><label class="fl">Rimborso Km (€/km)</label><input class="fi" id="bc-n-tkm" type="number" step="0.001" value="0.45"></div>
       <div><label class="fl">Monte Ore Ele Senior</label><input class="fi" id="bc-n-monteele-sr" type="number" step="1" value="0"></div>
       <div><label class="fl">Monte Ore Ele Junior</label><input class="fi" id="bc-n-monteele-jr" type="number" step="1" value="0"></div>
@@ -1918,7 +1925,7 @@ function goPage(pid,btn){
   if(pid==='titolare'){loadTitolarePage();loadCommesse();}
   if(pid==='budget')loadCommesse();
   if(pid==='contabilita')loadContabilita();
-  if(pid==='rubrica')loadCommesse().then(()=>{renderRubrica();if(typeof renderCorrNomiCommesseBanner==='function')renderCorrNomiCommesseBanner();if(typeof renderMigrFasiStoricoBanner==='function')renderMigrFasiStoricoBanner();if(typeof renderMigrMonteOreBanner==='function')renderMigrMonteOreBanner();if(typeof renderStoricoV2Banner==='function')renderStoricoV2Banner();});
+  if(pid==='rubrica')loadCommesse().then(()=>{renderRubrica();if(typeof renderCorrNomiCommesseBanner==='function')renderCorrNomiCommesseBanner();if(typeof renderMigrFasiStoricoBanner==='function')renderMigrFasiStoricoBanner();if(typeof renderMigrMonteOreBanner==='function')renderMigrMonteOreBanner();if(typeof renderStoricoV2Banner==='function')renderStoricoV2Banner();if(typeof renderTariffeStandardBanner==='function')renderTariffeStandardBanner();});
   if(pid==='statistiche')initStatistiche();
   if(pid==='cestino')loadCestino();
 }
@@ -4485,8 +4492,8 @@ function apriModalNuovaCommessa(){
   document.getElementById('bc-n-committente').value='';
   document.getElementById('bc-n-progetto').value='';
   document.getElementById('bc-n-note').value='';
-  document.getElementById('bc-n-tsenior').value=98;
-  document.getElementById('bc-n-tjunior').value=31;
+  document.getElementById('bc-n-tsenior').value=125;
+  document.getElementById('bc-n-tjunior').value=39;
   document.getElementById('bc-n-tkm').value=0.45;
   document.getElementById('bc-n-monteele-sr').value=0;
   document.getElementById('bc-n-monteele-jr').value=0;
@@ -4602,8 +4609,8 @@ function apriModalNuovaFase(){
   const c=BC_commesse.find(x=>x.numero===BC_current);
   if(!c)return;
   document.getElementById('bc-fase-nome').value='';
-  document.getElementById('bc-fase-tsenior').value=98;
-  document.getElementById('bc-fase-tjunior').value=31;
+  document.getElementById('bc-fase-tsenior').value=125;
+  document.getElementById('bc-fase-tjunior').value=39;
   document.getElementById('bc-fase-tkm').value=0.45;
   document.getElementById('bc-fase-monteele-sr').value=0;
   document.getElementById('bc-fase-monteele-jr').value=0;
@@ -5256,5 +5263,7 @@ function statEsportaCommessePDF(){
 <script src="migrazione_monte_ore_split.js" defer></script>
 <script src="storico_budget_v2_data.js" defer></script>
 <script src="migrazione_storico_v2.js" defer></script>
+<script src="aggiorna_tariffe_standard.js" defer></script>
+<script src="bc_esporta_tutti.js" defer></script>
 </body>
 </html>
