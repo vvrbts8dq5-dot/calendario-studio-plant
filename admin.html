@@ -738,6 +738,12 @@ tbody tr:hover{background:var(--paper)}
             <button class="btn btn-ink" onclick="apriModalNuovaCommessa()">+ Nuova Commessa</button>
           </div>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <span style="font-size:11px;color:var(--ink4);font-weight:600">📊 Esporta tutti i Budget Contract (riepilogo costi/ore, rispetta ricerca e filtro anno qui sotto):</span>
+          <button class="btn btn-blu btn-sm" onclick="bcEsportaTuttiExcel()">📥 Excel</button>
+          <button class="btn btn-rosso btn-sm" onclick="bcEsportaTuttiPDF()">📄 PDF</button>
+          <span id="bc-exp-status" style="font-size:11px;color:var(--ink4)"></span>
+        </div>
         <div class="filtri" id="bc-anni-wrap" style="margin-bottom:14px"></div>
         <div id="lista-commesse"><div class="empty-state">Caricamento...</div></div>
       </div>
@@ -758,12 +764,6 @@ tbody tr:hover{background:var(--paper)}
         <div id="migr-monte-ore-wrap"></div>
         <div id="storico-v2-wrap"></div>
         <div id="tariffe-standard-wrap"></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-          <span style="font-size:11px;color:var(--ink4);font-weight:600">📊 Tutti i Budget Contract (riepilogo costi/ore, rispetta ricerca e filtro anno):</span>
-          <button class="btn btn-blu btn-sm" onclick="bcEsportaTuttiExcel()">📥 Excel</button>
-          <button class="btn btn-rosso btn-sm" onclick="bcEsportaTuttiPDF()">📄 PDF</button>
-          <span id="bc-exp-status" style="font-size:11px;color:var(--ink4)"></span>
-        </div>
         <div class="filtri" id="rubrica-anni-wrap" style="margin-bottom:14px"></div>
         <div id="rubrica-lista"><div class="empty-state">Caricamento...</div></div>
       </div>

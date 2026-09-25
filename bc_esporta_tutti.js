@@ -1,9 +1,10 @@
 // ══════════════════════════════════════════════════════════════════════
-// ESPORTAZIONE MASSIVA BUDGET CONTRACT — un pulsante in Rubrica Commesse
-// che esporta in un unico file (Excel o PDF) il RIEPILOGO di tutti i
-// Budget Contract che rispettano il filtro anno/ricerca già impostato
-// nella pagina (stessa lista di rubricaEsportaExcel/PDF, funzione
-// rubricaListaFiltrata() già esistente in admin.html).
+// ESPORTAZIONE MASSIVA BUDGET CONTRACT — un pulsante nella pagina
+// "📁 Budget Contract" (page-budget, l'elenco commesse con le card) che
+// esporta in un unico file (Excel o PDF) il RIEPILOGO di tutti i Budget
+// Contract che rispettano la ricerca (bc-list-search) e il filtro anno
+// (BC_listAnno / bc-anni-wrap) già impostati in quella pagina — stesso
+// filtro usato da renderListaCommesse().
 //
 // Per ogni commessa e per ognuna delle sue fasi, viene scritta UNA riga
 // con lo stesso riepilogo che si vede aprendo la singola commessa
@@ -30,10 +31,28 @@ function bcExpSetStatus(t){
   if(el)el.textContent=t||'';
 }
 
+// Stessa logica di filtro (ricerca + anno) usata da renderListaCommesse()
+// nella pagina Budget Contract, riproposta qui perché lì è scritta inline
+// e non esposta come funzione riutilizzabile.
+function bcExpListaFiltrata(){
+  const f=(document.getElementById('bc-list-search')?.value||'').trim().toLowerCase();
+  let list=BC_commesse.filter(c=>!f||String(c.numero).toLowerCase().includes(f)||String(c.committente||'').toLowerCase().includes(f)||String(c.progetto||'').toLowerCase().includes(f));
+  list=list.filter(c=>{
+    if(typeof BC_listAnno==='undefined'||BC_listAnno==='tutti')return true;
+    if(BC_listAnno==='nd')return c.anno==null||c.anno==='';
+    return String(c.anno)===String(BC_listAnno);
+  });
+  return bcOrdinaPerAnno(list);
+}
+function bcExpEtichettaPeriodo(){
+  if(typeof BC_listAnno==='undefined'||BC_listAnno==='tutti')return 'Tutti gli anni';
+  return BC_listAnno==='nd'?'Anno non definito':String(BC_listAnno);
+}
+
 // Legge righe+stampe di tutte le commesse della lista filtrata corrente e
 // costruisce un array di {commessa, fase, riep} — una voce per commessa/fase.
 async function bcEsportaTuttiPrepara(){
-  const list=rubricaListaFiltrata(); // stesso filtro (ricerca + anno) già in uso nella Rubrica
+  const list=bcExpListaFiltrata(); // stesso filtro (ricerca + anno) già in uso nella pagina Budget Contract
   const righe=[];
   await bcExpPMap(list,async c=>{
     const [righeSnap,stampeSnap]=await Promise.all([
@@ -79,7 +98,7 @@ function bcExpRigaArray(x){
 }
 
 async function bcEsportaTuttiExcel(){
-  if(typeof rubricaListaFiltrata!=='function'){alert('Errore: apri prima la pagina Rubrica Commesse.');return}
+  if(typeof BC_commesse==='undefined'||!BC_commesseLoaded){alert('Errore: apri prima la pagina Budget Contract e attendi il caricamento.');return}
   bcExpSetStatus('Lettura Budget Contract in corso...');
   try{
     const righe=await bcEsportaTuttiPrepara();
@@ -92,8 +111,8 @@ async function bcEsportaTuttiExcel(){
     footRow[18]=totGenerale; // colonna "Costo Generale €"
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,expFoglioExcel('Budget Contract — Riepilogo tutte le commesse',
-      `${rubricaEtichettaPeriodo()} · ${righe.length} righe (commessa/fase)`,BC_EXP_HEADER,rr,footRow),'Budget Contract');
-    XLSX.writeFile(wb,`Budget_Contract_Tutti_${rubricaEtichettaPeriodo().replace(/\s+/g,'_')}.xlsx`);
+      `${bcExpEtichettaPeriodo()} · ${righe.length} righe (commessa/fase)`,BC_EXP_HEADER,rr,footRow),'Budget Contract');
+    XLSX.writeFile(wb,`Budget_Contract_Tutti_${bcExpEtichettaPeriodo().replace(/\s+/g,'_')}.xlsx`);
   }catch(e){
     console.error(e);
     alert('Errore durante l\'esportazione: '+e.message);
@@ -102,7 +121,7 @@ async function bcEsportaTuttiExcel(){
 }
 
 async function bcEsportaTuttiPDF(){
-  if(typeof rubricaListaFiltrata!=='function'){alert('Errore: apri prima la pagina Rubrica Commesse.');return}
+  if(typeof BC_commesse==='undefined'||!BC_commesseLoaded){alert('Errore: apri prima la pagina Budget Contract e attendi il caricamento.');return}
   bcExpSetStatus('Lettura Budget Contract in corso...');
   try{
     const righe=await bcEsportaTuttiPrepara();
@@ -111,7 +130,7 @@ async function bcEsportaTuttiPDF(){
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     const startY=expIntestazionePDF(doc,'Tutti i Budget Contract — Riepilogo',
-      `${rubricaEtichettaPeriodo()} · ${righe.length} righe (commessa/fase)`);
+      `${bcExpEtichettaPeriodo()} · ${righe.length} righe (commessa/fase)`);
     const totGenerale=righe.reduce((s,x)=>s+x.riep.costoGenerale,0);
     const footRow=['','','','','TOTALE','','','','','','','','',bcEuro(totGenerale)];
     doc.autoTable({
@@ -131,7 +150,7 @@ async function bcEsportaTuttiPDF(){
       footStyles:EXP_PDF_FOOT_STYLE,
       theme:'striped'
     });
-    doc.save(`Budget_Contract_Tutti_${rubricaEtichettaPeriodo().replace(/\s+/g,'_')}.pdf`);
+    doc.save(`Budget_Contract_Tutti_${bcExpEtichettaPeriodo().replace(/\s+/g,'_')}.pdf`);
   }catch(e){
     console.error(e);
     alert('Errore durante l\'esportazione: '+e.message);
