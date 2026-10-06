@@ -615,7 +615,8 @@ tbody tr:last-child{border-bottom:none}
             <div class="form-grid">
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="mal-inizio"></div>
               <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="mal-fine"></div>
-              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note / Numero certificato</label><textarea class="f-input field-textarea" style="margin:0" id="mal-note" rows="2" placeholder="es. Certificato n. 12345..."></textarea></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Numero di protocollo * (obbligatorio)</label><input class="f-input" style="margin:0" type="text" id="mal-protocollo" placeholder="es. numero di protocollo del certificato medico" autocomplete="off"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note (facoltative)</label><textarea class="f-input field-textarea" style="margin:0" id="mal-note" rows="2" placeholder="Eventuali note..."></textarea></div>
             </div>
             <button class="btn btn-viola" style="margin-top:12px" onclick="inserisciMalattia()">🤒 Registra Malattia</button>
           </div>
@@ -784,7 +785,16 @@ tbody tr:last-child{border-bottom:none}
 <div class="modal-overlay" id="modal-periodo">
   <div class="modal" style="max-width:460px">
     <div class="modal-title" id="periodo-titolo">Seleziona periodo da esportare</div>
-    <div class="modal-sub">Scegli una scorciatoia oppure un intervallo personalizzato.</div>
+    <div class="modal-sub">Scegli formato e nota (se previsti), poi una scorciatoia oppure un intervallo personalizzato.</div>
+    <div id="periodo-extra" style="display:none;margin-bottom:16px;padding-bottom:14px;border-bottom:.5px solid var(--border)">
+      <label class="field-label">Formato esportazione</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin:6px 0 12px;font-size:13px">
+        <label style="cursor:pointer"><input type="radio" name="periodo-formato" value="completo" checked> Come ora (dettaglio Elettrici / Meccanici / Attività Generali)</label>
+        <label style="cursor:pointer"><input type="radio" name="periodo-formato" value="contabile"> Per contabile (ore lavorative · ore straordinarie · recupero)</label>
+      </div>
+      <label class="field-label">Nota a piè di pagina (facoltativa)</label>
+      <textarea class="field-input" id="periodo-nota" rows="2" placeholder="Compare in fondo al documento esportato" style="resize:vertical"></textarea>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
       <button class="btn" onclick="periodoScegli('corrente')">📅 Anno corrente</button>
       <button class="btn" onclick="periodoScegli('scorso')">📅 Anno scorso</button>
@@ -872,6 +882,8 @@ const TIPI_ATTIVITA_GENERALI=[
   {k:'altro',l:'Altro'},
 ];
 const CN=CAMPI.filter(c=>c.t==='number');
+// Colonne che NON entrano nei totali ore: km, spese e Malattia (la malattia ha il suo totale separato)
+const ESCL_TOT_ORE=['kmPercorsi','speseExtra','oreFestivitaMalattia'];
 // Colonne virtuali di assenza (Ferie/Permesso/ROL/Malattia): NON fanno parte dei campi compilabili
 // nel form del giorno (CAMPI) — vengono calcolate al volo dal sistema "Ferie & Assenze" solo per i
 // report (Riepilogo Mensile a schermo + esportazioni), esattamente come già avviene in admin.html.
@@ -883,7 +895,7 @@ const CN_ASSENZE=[
 ];
 // CN con le colonne di assenza inserite dopo "Ore Attività Generali", stesso ordine usato in admin.html
 const CN_REPORT=(()=>{const i=CN.findIndex(c=>c.k==='oreAttivitaGenerali');const a=CN.slice();a.splice(i+1,0,...CN_ASSENZE);return a})();
-function totaleGiornoReport(d){if(!d)return 0;return CN_REPORT.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
+function totaleGiornoReport(d){if(!d)return 0;return CN_REPORT.filter(c=>!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
 
 let U=null,profilo=null,meseSel=new Date().getMonth(),giornoSel=null,cache={},saveTimer=null;
 let assenzeProprie=[];
@@ -906,7 +918,7 @@ function getPrimo(m){const d=new Date(ANNO,m,1).getDay();return d===0?6:d-1}
 function hasD(d){if(!d)return false;return CN.some(c=>{const v=d[c.k];return v!==undefined&&v!==''&&v!==0&&v!=='0'})}
 function fmtD(s){if(!s)return '';const[y,m,g]=s.split('-');return `${g} ${MESI[parseInt(m)-1]} ${y}`}
 function fmtN(v,k){if(!v||v===0)return '—';const n=v%1===0?v:parseFloat(v).toFixed(1);if(k==='kmPercorsi')return n+' km';if(k==='speseExtra')return '€'+parseFloat(v).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});return n+'h'}
-function totaleGiorno(d){if(!d)return 0;return CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
+function totaleGiorno(d){if(!d)return 0;return CN.filter(c=>!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
 function giorniLavorativi(dal,al){
   let cnt=0;
   const d=new Date(dal),fine=new Date(al);
@@ -1787,16 +1799,18 @@ async function inserisciMalattia(){
   const ini=document.getElementById('mal-inizio').value;
   const fin=document.getElementById('mal-fine').value;
   const note=document.getElementById('mal-note').value;
+  const protocollo=(document.getElementById('mal-protocollo').value||'').trim();
   const ad=document.getElementById('alert-malattia');ad.innerHTML='';
   if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
   if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  if(!protocollo){ad.innerHTML='<div class="alert-box alert-err">Inserisci il numero di protocollo: è obbligatorio per registrare una malattia.</div>';return}
   const gg=giorniLavorativi(ini,fin);
   try{
-    await db.collection('malattie').add({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
+    await db.collection('malattie').add({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,protocollo,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
     segnalaAttivita('malattia');
     // Aggiorna cache locale con la nuova malattia
-    ALL_MALATTIE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
-    document.getElementById('mal-inizio').value='';document.getElementById('mal-fine').value='';document.getElementById('mal-note').value='';
+    ALL_MALATTIE.push({username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),dataInizio:ini,dataFine:fin,protocollo,note,giorniLavorativi:gg,createdAt:new Date().toISOString()});
+    document.getElementById('mal-inizio').value='';document.getElementById('mal-fine').value='';document.getElementById('mal-note').value='';document.getElementById('mal-protocollo').value='';
     ad.innerHTML='<div class="alert-box alert-ok">Malattia registrata ('+gg+' giorni lavorativi).</div>';
     setTimeout(()=>ad.innerHTML='',3000);
     loadMalattie();aggiornaRiepilogoSaldi();
@@ -1811,7 +1825,7 @@ function loadMalattie(){
     <div class="mal-item">
       <div>
         <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
-        <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi</div>
+        <div class="mal-giorni">${r.giorniLavorativi||0} giorni lavorativi${r.protocollo?' · <b>Prot. n. '+String(r.protocollo).replace(/</g,'&lt;')+'</b>':''}</div>
         ${r.note?`<div class="mal-nota">${r.note}</div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
@@ -1845,7 +1859,7 @@ function loadRiepilogoMese(meseAbs){
 
   // KPI (solo ore/km, nessun dato economico: i costi sono riservati all'amministrazione)
   const totMensili={};CN_REPORT.forEach(c=>{totMensili[c.k]=giorni.reduce((s,d)=>s+(parseFloat(all[d][c.k])||0),0)});
-  const totOre=CN_REPORT.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+totMensili[c.k],0);
+  const totOre=CN_REPORT.filter(c=>!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+totMensili[c.k],0);
   const highlights=[
     {l:'Ore Totali Mese',v:totOre+'h'},
     {l:'Ore Elettrici M.D.',v:(totMensili.oreElectriciMD||0)+'h'},
@@ -1899,6 +1913,11 @@ function apriSelettorePeriodo(cb,opts){
   selDaA.value=ANNO;selAA.value=ANNO;
   document.getElementById('periodo-da-mese').value=0;
   document.getElementById('periodo-a-mese').value=new Date().getMonth();
+  // Blocco "formato + nota" mostrato solo per gli export del conteggio ore (opts.exportOre)
+  const ex=document.getElementById('periodo-extra');
+  if(ex){ex.style.display=(opts&&opts.exportOre)?'block':'none';
+    const rc=document.querySelector('input[name="periodo-formato"][value="completo"]');if(rc)rc.checked=true;
+    const nt=document.getElementById('periodo-nota');if(nt)nt.value='';}
   document.getElementById('modal-periodo').classList.add('open');
 }
 function chiudiSelettorePeriodo(){document.getElementById('modal-periodo').classList.remove('open');PERIODO_CB=null}
@@ -1907,8 +1926,9 @@ function periodoScegli(tipo){
   if(tipo==='corrente'){annoIni=ANNO;meseIni=0;annoFin=ANNO;meseFin=11}
   else if(tipo==='scorso'){annoIni=ANNO-1;meseIni=0;annoFin=ANNO-1;meseFin=11}
   else{annoIni=PERIODO_ANNO_MIN;meseIni=0;annoFin=ANNO;meseFin=11}
+  const extra=expLeggiExtraPeriodo();
   const cb=PERIODO_CB;chiudiSelettorePeriodo();
-  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin,...extra});
 }
 function periodoConferma(){
   const annoIni=parseInt(document.getElementById('periodo-da-anno').value);
@@ -1916,8 +1936,9 @@ function periodoConferma(){
   const annoFin=parseInt(document.getElementById('periodo-a-anno').value);
   const meseFin=parseInt(document.getElementById('periodo-a-mese').value);
   if(annoIni*12+meseIni>annoFin*12+meseFin){alert('L\'inizio del periodo deve precedere la fine.');return}
+  const extra=expLeggiExtraPeriodo();
   const cb=PERIODO_CB;chiudiSelettorePeriodo();
-  if(cb)cb({annoIni,meseIni,annoFin,meseFin});
+  if(cb)cb({annoIni,meseIni,annoFin,meseFin,...extra});
 }
 function periodoLabel(p){
   if(p.annoIni===p.annoFin){
@@ -2019,7 +2040,9 @@ const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
 // Intestazione su una riga, margini ridotti, dimensione font/righe calcolata in automatico
 // (provando su un documento di prova) in modo che tutti i giorni del mese + riga TOTALE stiano
 // in una sola pagina e restino leggibili. Sabato/domenica evidenziati in grigio.
-// cfg: {titolo, giorni:[ds], head:[...], rowFn(ds)->[celle], footFn(giorniDelMese)->[celle], righeFinali:[testo]}
+// cfg: {titolo, giorni:[ds], head:[...], rowFn(ds)->[celle], footFn(giorniDelMese)->[celle],
+//       righeFinali:[testo], nota:'testo libero a piè di pagina', idxTot:indice colonna Tot.h (grassetto),
+//       idxTesto:indice di una colonna di testo (allineata a sinistra, es. protocollo malattia)}
 function expPDFOreCompatto(doc,cfg){
   const {jsPDF}=window.jspdf;
   const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=8;
@@ -2027,24 +2050,27 @@ function expPDFOreCompatto(doc,cfg){
   cfg.giorni.forEach(ds=>{const ym=ds.substring(0,7);(gruppi[ym]=gruppi[ym]||[]).push(ds)});
   const mesi=Object.keys(gruppi).sort();
   const righeFin=cfg.righeFinali||[];
+  doc.setFont('helvetica','italic');doc.setFontSize(8.5);
+  const righeNota=cfg.nota?doc.splitTextToSize('Nota: '+cfg.nota,W-2*M):[];
   const isWE=ds=>{const [y,m,g]=ds.split('-').map(Number);const w=new Date(y,m-1,g).getDay();return w===0||w===6};
   const nCol=cfg.head.length;
+  const idxTot=cfg.idxTot!=null?cfg.idxTot:nCol-1;
   const opzioni=(gg,fs,pad,bottom)=>({
     startY:16,margin:{left:M,right:M,top:M,bottom},
     head:[cfg.head],body:gg.map(cfg.rowFn),foot:[cfg.footFn(gg)],theme:'striped',
     styles:{fontSize:fs,cellPadding:{top:pad,bottom:pad,left:1.4,right:1.4},overflow:'linebreak',valign:'middle',halign:'center'},
     headStyles:{...EXP_PDF_HEAD_STYLE,fontSize:Math.min(fs,nCol>10?6.5:7.5)},
     footStyles:EXP_PDF_FOOT_STYLE,
-    columnStyles:{0:{halign:'left',cellWidth:nCol>10?30:34},[nCol-1]:{fontStyle:'bold'}},
+    columnStyles:{0:{halign:'left',cellWidth:nCol>10?30:34},[idxTot]:{fontStyle:'bold'},...(cfg.idxTesto!=null?{[cfg.idxTesto]:{halign:'left',cellWidth:'wrap'}}:{})},
     didParseCell:d=>{
-      if(d.column.index===0)d.cell.styles.halign='left';
+      if(d.column.index===0||d.column.index===cfg.idxTesto)d.cell.styles.halign='left';
       if(d.section==='body'&&isWE(gg[d.row.index])){d.cell.styles.fillColor=[226,230,228];d.cell.styles.textColor=[110,110,110]}
     }
   });
   mesi.forEach((ym,idx)=>{
     const gg=gruppi[ym].slice().sort();
     const ultimo=idx===mesi.length-1;
-    const riserva=ultimo?(4+5*righeFin.length):0;
+    const riserva=ultimo?(4+5*righeFin.length+(righeNota.length?3+4*righeNota.length:0)):0;
     // cerca la combinazione font/padding più grande che entra in UNA pagina
     let scelta={fs:6,pad:0.3};
     outer:for(let fs=8;fs>=6;fs-=0.25){
@@ -2069,12 +2095,63 @@ function expPDFOreCompatto(doc,cfg){
     doc.setDrawColor(122,158,142);doc.setLineWidth(0.4);doc.line(M,14,W-M,14);
     doc.setTextColor(0,0,0);
     doc.autoTable(opzioni(gg,scelta.fs,scelta.pad,M+riserva));
-    if(ultimo&&righeFin.length){
+    if(ultimo){
       let yy=doc.lastAutoTable.finalY+5;
       doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,0,0);
       righeFin.forEach(t=>{doc.text(t,M,yy);yy+=5});
+      if(righeNota.length){
+        yy+=1;doc.setFont('helvetica','italic');doc.setFontSize(8.5);doc.setTextColor(60,60,60);
+        righeNota.forEach(t=>{doc.text(t,M,yy);yy+=4});
+      }
     }
   });
+}
+
+// ── EXPORT "PER CONTABILE", NOTA A PIÈ DI PAGINA, PROTOCOLLO MALATTIA ──────
+// Raggruppamento delle colonne per l'export "per contabile": le ore lavorative sommano
+// Elettrici + Meccanici + Attività Generali; gli straordinari sommano Straord. Elettrici + Meccanici;
+// i Recuperi restano in una colonna separata; le assenze restano distinte. La somma di tutti i
+// gruppi coincide con il totale giornaliero già usato nell'export "come ora" (km e spese esclusi).
+const EXP_CONT_GRUPPI=[
+  {l:'Ore lavorative',ks:['oreElectriciMD','oreMeccaniciMA','oreAttivitaGenerali']},
+  {l:'Ore straordinarie',ks:['oreStraordinariElettrico','oreStraordinariMeccanico']},
+  {l:'Ore recupero',ks:['oreRecuperoElettrico','oreRecuperoMeccanico']},
+  {l:'Ore Ferie',ks:['oreFerie']},
+  {l:'Ore Permesso',ks:['orePermesso']},
+  {l:'Ore ROL',ks:['oreRol']},
+  {l:'Ore Malattia',ks:['oreFestivitaMalattia']}
+];
+function expValGruppo(d,g){return g.ks.reduce((s,k)=>s+(parseFloat(d&&d[k])||0),0)}
+// Mappa giorno -> numero di protocollo, per i giorni lavorativi coperti da una malattia con protocollo
+function expProtocolliPerGiorno(malattie){
+  const m={};
+  (malattie||[]).forEach(x=>{
+    if(!x.protocollo)return;
+    espandiGiorniLavorativi(x.dataInizio,x.dataFine).forEach(ds=>{m[ds]=m[ds]&&m[ds]!==x.protocollo?m[ds]+' / '+x.protocollo:x.protocollo});
+  });
+  return m;
+}
+function expTestoProt(prot,ds){return prot&&prot[ds]?'Prot. n. '+prot[ds]:''}
+// Aggiunge una riga di nota (unita su tutta la larghezza) in fondo a un foglio Excel
+function expNotaExcel(ws,nota,nCols){
+  if(!nota)return ws;
+  const ref=XLSX.utils.decode_range(ws['!ref']);
+  const r=ref.e.r+2;
+  ws[XLSX.utils.encode_cell({r,c:0})]={t:'s',v:'Nota: '+nota,s:{font:{italic:true},alignment:{wrapText:true,vertical:'top'}}};
+  ws['!merges']=(ws['!merges']||[]).concat([{s:{r,c:0},e:{r,c:Math.max(nCols-1,0)}}]);
+  ref.e.r=r;ws['!ref']=XLSX.utils.encode_range(ref);
+  const rows=ws['!rows']||[];
+  for(let i=0;i<r;i++)if(!rows[i])rows[i]={};
+  rows[r]={hpt:Math.max(15,13*Math.ceil(nota.length/Math.max(40,nCols*12)))};
+  ws['!rows']=rows;
+  return ws;
+}
+// Legge formato e nota scelti nel selettore periodo (solo se il selettore li mostra)
+function expLeggiExtraPeriodo(){
+  const box=document.getElementById('periodo-extra');
+  if(!box||box.style.display==='none')return {};
+  const f=document.querySelector('input[name="periodo-formato"]:checked');
+  return {formato:f?f.value:'completo',nota:(document.getElementById('periodo-nota').value||'').trim()};
 }
 
 
@@ -2094,41 +2171,78 @@ function esportaPeriodoDip(formato){
     // usata da tempo lato admin per l'export dei singoli dipendenti.
     iniettaAssenzeInGiorniDip(all,oreGiornoDip(profilo));
     aggiungiWeekendMancanti(all,p);
+    p.prot=expProtocolliPerGiorno(ALL_MALATTIE); // giorno -> n. protocollo malattia
     const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
     if(formato==='excel')generaExcelPeriodoDip(nome,all,giorni,p);else generaPDFPeriodoDip(nome,all,giorni,p);
-  },{titolo:'Esporta le mie ore'});
+  },{titolo:'Esporta le mie ore',exportOre:true});
 }
 function generaExcelPeriodoDip(nome,all,giorni,p){
+  const cont=p.formato==='contabile',nota=p.nota||'',prot=p.prot||{};
+  const haProt=giorni.some(ds=>prot[ds]);
+  const titolo=`Riepilogo Ore — ${nome}`+(cont?' (per contabile)':'');
   const wb=XLSX.utils.book_new();
   const hdr=['Campo','Totale'];
-  const righeRiep=CN_REPORT.map(c=>[c.l,giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)]);
-  XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,periodoLabel(p),hdr,righeRiep),'Riepilogo');
+  const somma=(k)=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][k])||0),0);
+  const righeRiep=cont
+    ?[...EXP_CONT_GRUPPI.map(g=>[g.l,giorni.reduce((s,ds)=>s+expValGruppo(all[ds],g),0)]),['Km Percorsi',somma('kmPercorsi')],['Spese Extra (€)',somma('speseExtra')]]
+    :CN_REPORT.map(c=>[c.l,somma(c.k)]);
+  XLSX.utils.book_append_sheet(wb,expNotaExcel(expFoglioExcel(titolo,periodoLabel(p),hdr,righeRiep),nota,hdr.length),'Riepilogo');
   const perMese={};
   giorni.forEach(ds=>{const ym=ds.substring(0,7);if(!perMese[ym])perMese[ym]=[];perMese[ym].push(ds)});
   Object.keys(perMese).sort().forEach(ym=>{
     const gg=perMese[ym].sort();
     const[y,m]=ym.split('-');
-    const hh=['Data',...CN_REPORT.map(c=>c.l),'Totale Ore'];
-    const rr=gg.map(ds=>{const d=all[ds];const[yy,mo,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${mo}/${yy}`,...CN_REPORT.map(c=>parseFloat(d[c.k])||0),totaleGiornoReport(d)]});
-    const footRow=['TOTALE',...CN_REPORT.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)];
+    const lbl=ds=>{const[yy,mo,g]=ds.split('-');return `${giornoSett(ds)} ${g}/${mo}/${yy}`};
+    const sm=(k)=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][k])||0),0);
+    const totMese=gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0);
+    let hh,rr,footRow;
+    if(cont){
+      hh=['Data',...EXP_CONT_GRUPPI.map(g=>g.l),'Km Percorsi','Spese Extra (€)','Totale Ore (escl. malattia)'];
+      rr=gg.map(ds=>{const d=all[ds];return[lbl(ds),...EXP_CONT_GRUPPI.map(g=>expValGruppo(d,g)),parseFloat(d.kmPercorsi)||0,parseFloat(d.speseExtra)||0,totaleGiornoReport(d)]});
+      footRow=['TOTALE',...EXP_CONT_GRUPPI.map(g=>gg.reduce((s,ds)=>s+expValGruppo(all[ds],g),0)),sm('kmPercorsi'),sm('speseExtra'),totMese];
+    }else{
+      hh=['Data',...CN_REPORT.map(c=>c.l),'Totale Ore (escl. malattia)'];
+      rr=gg.map(ds=>{const d=all[ds];return[lbl(ds),...CN_REPORT.map(c=>parseFloat(d[c.k])||0),totaleGiornoReport(d)]});
+      footRow=['TOTALE',...CN_REPORT.map(c=>sm(c.k)),totMese];
+    }
+    if(haProt){hh.push('Protocollo malattia');rr=rr.map((r,i)=>[...r,prot[gg[i]]||'']);footRow.push('')}
     const nomeFoglio=(MESI[parseInt(m)-1]+' '+y).substring(0,31);
-    XLSX.utils.book_append_sheet(wb,expFoglioExcel(`Riepilogo Ore — ${nome}`,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nomeFoglio);
+    XLSX.utils.book_append_sheet(wb,expNotaExcel(expFoglioExcel(titolo,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nota,hh.length),nomeFoglio);
   });
-  XLSX.writeFile(wb,`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.xlsx`);
+  XLSX.writeFile(wb,`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}${cont?'_contabile':''}.xlsx`);
 }
 function generaPDFPeriodoDip(nome,all,giorni,p){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const cont=p.formato==='contabile',prot=p.prot||{};
+  const haProt=giorni.some(ds=>prot[ds]);
+  const lbl=ds=>{const[y,m,g]=ds.split('-');return `${giornoSett(ds)} ${g}/${m}/${y}`};
+  let head,rowFn,footFn;
+  if(cont){
+    head=['Data',...EXP_CONT_GRUPPI.map(g=>g.l),'Tot.h'];
+    rowFn=ds=>{const d=all[ds];return[lbl(ds),...EXP_CONT_GRUPPI.map(g=>{const v=expValGruppo(d,g);return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']};
+    footFn=gg=>['TOTALE',...EXP_CONT_GRUPPI.map(g=>gg.reduce((s,ds)=>s+expValGruppo(all[ds],g),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)];
+  }else{
+    head=['Data',...CN_REPORT.map(c=>c.l),'Tot.h'];
+    rowFn=ds=>{const d=all[ds];return[lbl(ds),...CN_REPORT.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']};
+    footFn=gg=>['TOTALE',...CN_REPORT.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)];
+  }
+  const idxTot=head.length-1;
+  let idxTesto;
+  if(haProt){
+    head.push('Protocollo malattia');idxTesto=head.length-1;
+    const rf=rowFn,ff=footFn;
+    rowFn=ds=>[...rf(ds),expTestoProt(prot,ds)];
+    footFn=gg=>[...ff(gg),''];
+  }
   // Una pagina per mese: tutti i giorni + TOTALE su un solo foglio A4 (vedi expPDFOreCompatto)
   expPDFOreCompatto(doc,{
-    titolo:`Riepilogo Ore — ${nome}`,
-    giorni,
-    head:['Data',...CN_REPORT.map(c=>c.l),'Tot.h'],
-    rowFn:ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...CN_REPORT.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']},
-    footFn:gg=>['TOTALE',...CN_REPORT.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)],
-    righeFinali:['Totale ore periodo: '+giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)+'h']
+    titolo:`Riepilogo Ore${cont?' (per contabile)':''} — ${nome}`,
+    giorni,head,rowFn,footFn,
+    righeFinali:['Totale ore periodo: '+giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)+'h (escluse le ore di malattia)','Totale ore malattia: '+giorni.reduce((s,ds)=>s+(parseFloat(all[ds].oreFestivitaMalattia)||0),0)+'h (separato dal totale)'],
+    nota:p.nota||'',idxTot,idxTesto
   });
-  doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
+  doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}${cont?'_contabile':''}.pdf`);
 }
 
 // EXPORT EXCEL (mese corrente in vista — non più collegato a un pulsante, sostituito dal periodico)
@@ -2182,7 +2296,7 @@ async function loadArchivioDip(){
       const gg=giorni.filter(d=>d.startsWith(`${anno}-${ms}`));
       if(!gg.length)continue;
       const tots={};CAMPI.filter(c=>c.t==='number').forEach(c=>{tots[c.k]=gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)});
-      const totOre=CAMPI.filter(c=>c.t==='number'&&c.k!=='kmPercorsi'&&c.k!=='speseExtra').reduce((s,c)=>s+tots[c.k],0);
+      const totOre=CAMPI.filter(c=>c.t==='number'&&!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+tots[c.k],0);
       html+=`<div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div style="font-family:'Inter',sans-serif;font-weight:700">${MESI_LOCAL[mi]} ${anno}</div>
