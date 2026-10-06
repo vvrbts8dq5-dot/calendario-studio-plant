@@ -2015,6 +2015,68 @@ function expIntestazionePDF(doc,titoloReport,sottotitolo){
 const EXP_PDF_HEAD_STYLE={fillColor:EXP_BLU,textColor:[255,255,255],fontStyle:'bold'};
 const EXP_PDF_FOOT_STYLE={fillColor:[234,242,237],textColor:[20,20,20],fontStyle:'bold'};
 const EXP_PDF_BODY_STYLE={fontSize:8,cellPadding:1.6,overflow:'linebreak'};
+// ── PDF ORE COMPATTO: una pagina A4 orizzontale per ogni mese ──────────────
+// Intestazione su una riga, margini ridotti, dimensione font/righe calcolata in automatico
+// (provando su un documento di prova) in modo che tutti i giorni del mese + riga TOTALE stiano
+// in una sola pagina e restino leggibili. Sabato/domenica evidenziati in grigio.
+// cfg: {titolo, giorni:[ds], head:[...], rowFn(ds)->[celle], footFn(giorniDelMese)->[celle], righeFinali:[testo]}
+function expPDFOreCompatto(doc,cfg){
+  const {jsPDF}=window.jspdf;
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=8;
+  const gruppi={};
+  cfg.giorni.forEach(ds=>{const ym=ds.substring(0,7);(gruppi[ym]=gruppi[ym]||[]).push(ds)});
+  const mesi=Object.keys(gruppi).sort();
+  const righeFin=cfg.righeFinali||[];
+  const isWE=ds=>{const [y,m,g]=ds.split('-').map(Number);const w=new Date(y,m-1,g).getDay();return w===0||w===6};
+  const nCol=cfg.head.length;
+  const opzioni=(gg,fs,pad,bottom)=>({
+    startY:16,margin:{left:M,right:M,top:M,bottom},
+    head:[cfg.head],body:gg.map(cfg.rowFn),foot:[cfg.footFn(gg)],theme:'striped',
+    styles:{fontSize:fs,cellPadding:{top:pad,bottom:pad,left:1.4,right:1.4},overflow:'linebreak',valign:'middle',halign:'center'},
+    headStyles:{...EXP_PDF_HEAD_STYLE,fontSize:Math.min(fs,nCol>10?6.5:7.5)},
+    footStyles:EXP_PDF_FOOT_STYLE,
+    columnStyles:{0:{halign:'left',cellWidth:nCol>10?30:34},[nCol-1]:{fontStyle:'bold'}},
+    didParseCell:d=>{
+      if(d.column.index===0)d.cell.styles.halign='left';
+      if(d.section==='body'&&isWE(gg[d.row.index])){d.cell.styles.fillColor=[226,230,228];d.cell.styles.textColor=[110,110,110]}
+    }
+  });
+  mesi.forEach((ym,idx)=>{
+    const gg=gruppi[ym].slice().sort();
+    const ultimo=idx===mesi.length-1;
+    const riserva=ultimo?(4+5*righeFin.length):0;
+    // cerca la combinazione font/padding più grande che entra in UNA pagina
+    let scelta={fs:6,pad:0.3};
+    outer:for(let fs=8;fs>=6;fs-=0.25){
+      for(const pad of [1.0,0.8,0.6,0.4,0.3]){
+        const prova=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+        prova.autoTable(opzioni(gg,fs,pad,M+riserva));
+        if(prova.getNumberOfPages()===1){scelta={fs,pad};break outer}
+      }
+    }
+    if(idx>0)doc.addPage();
+    // intestazione compatta su una riga
+    const [y,m]=ym.split('-');
+    const etich=MESI[parseInt(m)-1]+' '+y;
+    doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(94,127,112);
+    doc.text('PLANT INGEGNERIA',M,11);
+    let x=M+doc.getTextWidth('PLANT INGEGNERIA')+6;
+    doc.setFontSize(10);doc.setTextColor(34,34,34);doc.text(cfg.titolo,x,11);
+    x+=doc.getTextWidth(cfg.titolo)+6;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);doc.text(etich,x,11);
+    doc.setFontSize(8);doc.setTextColor(156,163,175);
+    doc.text('Esportato il '+expDataOra()+(mesi.length>1?'  ·  pag. '+(idx+1)+'/'+mesi.length:''),W-M,11,{align:'right'});
+    doc.setDrawColor(122,158,142);doc.setLineWidth(0.4);doc.line(M,14,W-M,14);
+    doc.setTextColor(0,0,0);
+    doc.autoTable(opzioni(gg,scelta.fs,scelta.pad,M+riserva));
+    if(ultimo&&righeFin.length){
+      let yy=doc.lastAutoTable.finalY+5;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(0,0,0);
+      righeFin.forEach(t=>{doc.text(t,M,yy);yy+=5});
+    }
+  });
+}
+
 
 // Esportazione periodica delle proprie ore (Excel / PDF) — interroga Firestore anno per anno
 function esportaPeriodoDip(formato){
@@ -2057,17 +2119,14 @@ function generaExcelPeriodoDip(nome,all,giorni,p){
 function generaPDFPeriodoDip(nome,all,giorni,p){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const startY=expIntestazionePDF(doc,`Riepilogo Ore — ${nome}`,periodoLabel(p));
-  const totOre=giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0);
-  doc.autoTable({
-    startY,
-    head:[['Data',...CN_REPORT.map(c=>c.l),'Tot.h']],
-    body:giorni.map(ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...CN_REPORT.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']}),
-    foot:[['TOTALE',...CN_REPORT.map(c=>giorni.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),totOre]],
-    styles:EXP_PDF_BODY_STYLE,
-    headStyles:EXP_PDF_HEAD_STYLE,
-    footStyles:EXP_PDF_FOOT_STYLE,
-    theme:'striped'
+  // Una pagina per mese: tutti i giorni + TOTALE su un solo foglio A4 (vedi expPDFOreCompatto)
+  expPDFOreCompatto(doc,{
+    titolo:`Riepilogo Ore — ${nome}`,
+    giorni,
+    head:['Data',...CN_REPORT.map(c=>c.l),'Tot.h'],
+    rowFn:ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...CN_REPORT.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totaleGiornoReport(d)>0?totaleGiornoReport(d):'']},
+    footFn:gg=>['TOTALE',...CN_REPORT.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)],
+    righeFinali:['Totale ore periodo: '+giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)+'h']
   });
   doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
 }
