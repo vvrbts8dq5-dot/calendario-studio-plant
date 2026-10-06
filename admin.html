@@ -3201,6 +3201,8 @@ function generaDetExcelPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
 function generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  // Tutte le colonne ORE (Malattia e Recuperi compresi): così Tot.h è sempre la somma di ciò che si vede. Km e spese restano solo nell'Excel.
+  const colsPDF=CN.filter(c=>c.k!=='kmPercorsi'&&c.k!=='speseExtra');
   const totOre=giorni.reduce((s,ds)=>s+totGiorno(all[ds]),0);
   const totCosto=giorni.reduce((s,ds)=>{const d=all[ds];return s+CN.reduce((ss,c)=>{const v=parseFloat(d[c.k])||0;const t=tariffe[c.k]||0;return ss+v*t},0)+(parseFloat(d.speseExtra)||0)},0);
   const festOrePeriodo=periodoAnni(p).reduce((s,y)=>s+festivitaLavorativeAnno(y).filter(ds=>periodoInRange(ds,p)).length,0)*oreGiorno;
@@ -3211,9 +3213,9 @@ function generaDetPDFPeriodo(nome,tariffe,all,giorni,p,oreGiorno){
   expPDFOreCompatto(doc,{
     titolo:`Riepilogo Ore — ${nome}`,
     giorni,
-    head:['Data',...CN.slice(0,8).map(c=>c.l),'Tot.h'],
-    rowFn:ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...CN.slice(0,8).map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totGiorno(d)>0?totGiorno(d):'']},
-    footFn:gg=>['TOTALE',...CN.slice(0,8).map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totGiorno(all[ds]),0)],
+    head:['Data',...colsPDF.map(c=>c.l),'Tot.h'],
+    rowFn:ds=>{const d=all[ds];const[y,m,g]=ds.split('-');return[`${giornoSett(ds)} ${g}/${m}/${y}`,...colsPDF.map(c=>{const v=parseFloat(d[c.k])||0;return v>0?v:''}),totGiorno(d)>0?totGiorno(d):'']},
+    footFn:gg=>['TOTALE',...colsPDF.map(c=>gg.reduce((s,ds)=>s+(parseFloat(all[ds][c.k])||0),0)),gg.reduce((s,ds)=>s+totGiorno(all[ds]),0)],
     righeFinali
   });
   doc.save(`Timesheet_${nome.replace(/\s+/g,'_')}_${periodoFile(p)}.pdf`);
