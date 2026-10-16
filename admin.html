@@ -583,6 +583,8 @@ tbody tr:hover{background:var(--paper)}
           <button class="btn-filtro active" onclick="setFiltro(this,'in_attesa')">⏳ In attesa <span id="cnt-attesa">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'approvata')">✓ Approvate <span id="cnt-approvata">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'rifiutata')">✕ Rifiutate <span id="cnt-rifiutata">0</span></button>
+          <button class="btn-filtro" onclick="setFiltro(this,'modifiche')">✎ Modifiche richieste <span id="cnt-modifiche">0</span></button>
+          <button class="btn-filtro" onclick="setFiltro(this,'annullata')">⊘ Annullate <span id="cnt-annullata">0</span></button>
           <button class="btn-filtro" onclick="setFiltro(this,'tutte')">Tutte <span id="cnt-tutte">0</span></button>
         </div>
         <div class="filtri" id="filtri-tipo-ferie" style="margin-top:8px">
@@ -1174,6 +1176,7 @@ tbody tr:hover{background:var(--paper)}
     <div class="modal-title" id="modal-title">Gestisci Richiesta</div>
     <div class="modal-sub" id="modal-sub"></div>
     <div id="modal-nota-dip" style="background:var(--paper);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none"></div>
+    <div id="modal-modifica" style="background:var(--amber-light);border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none"></div>
     <label class="fl" style="margin-bottom:6px">Nota per il dipendente (opzionale)</label>
     <textarea class="fi" id="modal-nota-admin" rows="3" placeholder="Aggiungi una nota..." style="resize:vertical;margin-bottom:0;width:100%"></textarea>
     <div class="modal-actions" id="modal-ferie-actions">
@@ -1181,6 +1184,8 @@ tbody tr:hover{background:var(--paper)}
       <button class="btn btn-rosso" id="modal-btn-rifiuta" onclick="decidi('rifiutata')">✕ Rifiuta</button>
       <button class="btn btn-amber" id="modal-btn-annulla-appr" onclick="decidi('in_attesa')" style="display:none">↩ Rimetti in attesa</button>
       <button class="btn btn-verde" id="modal-btn-approva" onclick="decidi('approvata')">✓ Approva</button>
+      <button class="btn btn-rosso" id="modal-btn-mod-rifiuta" onclick="decidiModifica(false)" style="display:none">✕ Rifiuta richiesta</button>
+      <button class="btn btn-verde" id="modal-btn-mod-approva" onclick="decidiModifica(true)" style="display:none">✓ Approva richiesta</button>
     </div>
   </div>
 </div>
@@ -1944,13 +1949,11 @@ function startApp(){
     .finally(()=>checkInattivita());
   attivaListenerAttivita();
   // Notifiche real-time richieste ferie
+  // (badge = richieste nuove in attesa + richieste di modifica/annullamento in attesa)
   db.collection('richieste_assenza').where('stato','==','in_attesa')
-    .onSnapshot(snap=>{
-      const cnt=snap.size;
-      const badge=document.getElementById('badge-ferie');
-      badge.textContent=cnt;
-      badge.className='nav-badge'+(cnt>0?' alert':'');
-    });
+    .onSnapshot(snap=>{BADGE_FERIE.attesa=snap.size;disegnaBadgeFerie()});
+  db.collection('richieste_assenza').where('modifica.stato','==','in_attesa')
+    .onSnapshot(snap=>{BADGE_FERIE.modifiche=snap.size;disegnaBadgeFerie()},e=>console.log('Listener modifiche:',e.message));
   // Notifiche real-time richieste di sblocco per inattività
   db.collection('richieste_sblocco').where('stato','==','in_attesa')
     .onSnapshot(snap=>{
@@ -2193,6 +2196,7 @@ async function loadDashboard(){
   const saldiP=Promise.all([
     db.collection('richieste_assenza').where('dataFine','>=',inizioAnno).get(),
     db.collection('richieste_assenza').where('stato','==','in_attesa').get(),
+    db.collection('richieste_assenza').where('modifica.stato','==','in_attesa').get(),
     db.collection('malattie').where('dataFine','>=',inizioAnno).get(),
     db.collection('chiusure').where('dataFine','>=',inizioAnno).get()
   ]);
@@ -2200,11 +2204,11 @@ async function loadDashboard(){
       db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get(),
       db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
     ]).then(r=>({emp,snaps:r})).catch(e=>{console.error('Timesheet '+emp.username,e);return {emp,snaps:null}})));
-  const [[richSnap,pendSnap,malSnap,chiusSnap],tsRes]=await Promise.all([saldiP,tsP]);
+  const [[richSnap,pendSnap,modSnap,malSnap,chiusSnap],tsRes]=await Promise.all([saldiP,tsP]);
 
   // Richieste: unione (senza doppioni) di quelle dell'anno in uso e di quelle in attesa
   const richMap=new Map();
-  [richSnap,pendSnap].forEach(sn=>sn.docs.forEach(d=>richMap.set(d.id,{id:d.id,...d.data()})));
+  [richSnap,pendSnap,modSnap].forEach(sn=>sn.docs.forEach(d=>richMap.set(d.id,{id:d.id,...d.data()})));
   impostaAssenze([...richMap.values()],malSnap.docs.map(d=>({id:d.id,...d.data()})),chiusSnap.docs.map(d=>({id:d.id,...d.data()})));
   // Da qui in memoria c'è solo l'anno in uso: lo storico va ricaricato alla prossima richiesta.
   // (Azzerato qui e non all'inizio: uno storico scaricato mentre loadDashboard era in corso verrebbe
@@ -2505,11 +2509,62 @@ function renderDetGiorno(){
 }
 
 // FERIE & ASSENZE
-function loadRichiesteCount(){
-  const cnt=tutteR.filter(r=>r.stato==='in_attesa').length;
+const BADGE_FERIE={attesa:0,modifiche:0};
+function disegnaBadgeFerie(){
+  const cnt=BADGE_FERIE.attesa+BADGE_FERIE.modifiche;
   const badge=document.getElementById('badge-ferie');
+  if(!badge)return;
   badge.textContent=cnt;
   badge.className='nav-badge'+(cnt>0?' alert':'');
+}
+function loadRichiesteCount(){
+  BADGE_FERIE.attesa=tutteR.filter(r=>r.stato==='in_attesa').length;
+  BADGE_FERIE.modifiche=tutteR.filter(modificaInAttesa).length;
+  disegnaBadgeFerie();
+}
+// ── MODIFICHE / ANNULLAMENTI richiesti dal dipendente su ferie/permessi/ROL già approvati ──
+function modificaInAttesa(r){return !!(r&&r.modifica&&r.modifica.stato==='in_attesa')}
+function escTxt(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+// Dopo un cambio di stato o di date: azzera le ore iniettate sui vecchi giorni, re-inietta le assenze del
+// dipendente, ricalcola i totali e ridisegna dashboard/dettaglio (prima restavano vecchi fino ad "Aggiorna")
+function ricalcolaAssenzeDip(username,intervalli){
+  const c=dipDataCache[username],emp=dipList.find(e=>e.username===username);
+  if(!c||c.errore||!emp)return;
+  (intervalli||[]).forEach(([a,b,campo])=>espandiGiorniLavorativi(a,b).forEach(ds=>{if(c.days[ds]&&campo)c.days[ds][campo]=0}));
+  iniettaAssenzeInGiorni(c.days,username,oreGiornoDip(emp));
+  const totals={};CN.forEach(k=>{totals[k.k]=Object.entries(c.days).filter(([id])=>id.startsWith(String(ANNO)+'-')).reduce((s,[,d])=>s+(parseFloat(d[k.k])||0),0)});
+  c.totals=totals;
+  try{renderDashboardFromCache()}catch(e){}
+  try{if(detUser===username&&document.getElementById('page-dettaglio')?.classList.contains('active')){caricaDetSaldi(emp);loadDetMese()}}catch(e){}
+}
+const CAMPO_ASSENZA={ferie:'oreFerie',permesso:'orePermesso',rol:'oreRol'};
+// Applica lo stesso aggiornamento a tutteR e ADM_richPerUser (sono copie separate)
+function aggiornaRichiestaInCache(id,username,campi,rimuovi){
+  const ap=o=>{Object.assign(o,campi);(rimuovi||[]).forEach(k=>delete o[k])};
+  const r=tutteR.find(x=>x.id===id);if(r)ap(r);
+  const r2=(ADM_richPerUser[username]||[]).find(x=>x.id===id);if(r2)ap(r2);
+}
+async function decidiModifica(approva){
+  if(!modalRichiestaId)return;
+  const r=tutteR.find(x=>x.id===modalRichiestaId);if(!modificaInAttesa(r))return;
+  const m=r.modifica,nota=document.getElementById('modal-nota-admin').value.trim(),ora=new Date().toISOString();
+  const esito={...m,stato:approva?'approvata':'rifiutata',decisoIl:ora,decisoDa:ADM?ADM.username:'',notaAdmin:nota};
+  const upd={modifica:esito};
+  const vecchio=[r.dataInizio,r.dataFine,CAMPO_ASSENZA[r.tipo]];
+  if(approva&&m.tipo==='annullamento'){
+    Object.assign(upd,{stato:'annullata',annullataIl:ora});
+  }else if(approva){
+    Object.assign(upd,{dataInizio:m.dataInizio,dataFine:m.dataFine,oreRichieste:m.oreRichieste,giorniLavorativi:m.giorniLavorativi});
+    // Date originali (solo la prima volta) + storico di tutte le modifiche approvate
+    if(!r.dateOriginali)upd.dateOriginali={dataInizio:r.dataInizio,dataFine:r.dataFine,oreRichieste:r.oreRichieste||0,giorniLavorativi:r.giorniLavorativi||0};
+    upd.storicoModifiche=[...(r.storicoModifiche||[]),{da:{dataInizio:r.dataInizio,dataFine:r.dataFine,oreRichieste:r.oreRichieste||0},a:{dataInizio:m.dataInizio,dataFine:m.dataFine,oreRichieste:m.oreRichieste},motivo:m.motivo||'',decisoIl:ora,decisoDa:esito.decisoDa}];
+  }
+  try{
+    await db.collection('richieste_assenza').doc(r.id).update(upd);
+    aggiornaRichiestaInCache(r.id,r.username,upd);
+    if(approva)ricalcolaAssenzeDip(r.username,[vecchio]);
+    chiudiModal();loadRichieste();loadRichiesteCount();
+  }catch(e){alert('Errore: '+e.message)}
 }
 
 // ── CALENDARIO CONDIVISO FERIE (dipendenti + titolari, tipo ferie/permesso/rol approvati) ──
@@ -2675,6 +2730,8 @@ function loadRichieste(){
   document.getElementById('cnt-approvata').textContent=tutteR.filter(r=>r.stato==='approvata').length;
   document.getElementById('cnt-rifiutata').textContent=tutteR.filter(r=>r.stato==='rifiutata').length;
   document.getElementById('cnt-tutte').textContent=tutteR.length;
+  document.getElementById('cnt-modifiche').textContent=tutteR.filter(modificaInAttesa).length;
+  document.getElementById('cnt-annullata').textContent=tutteR.filter(r=>r.stato==='annullata').length;
   const df=document.getElementById('ferie-dip-filter');
   if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=d.nomeCompleto||d.username;df.appendChild(o)});
   renderCalendarioFerie();
@@ -2723,7 +2780,8 @@ function renderFerie(){
     return;
   }
   lista=tutteR;
-  if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
+  if(filtroF==='modifiche')lista=lista.filter(modificaInAttesa);
+  else if(filtroF!=='tutte')lista=lista.filter(r=>r.stato===filtroF);
   if(filtroTipoF!=='tutti')lista=lista.filter(r=>r.tipo===filtroTipoF);
   if(dipFiltro)lista=lista.filter(r=>r.username===dipFiltro);
   if(testoRicerca)lista=lista.filter(r=>(r.nomeCompleto||r.username||'').toLowerCase().includes(testoRicerca));
@@ -2732,7 +2790,9 @@ function renderFerie(){
   if(!lista.length){tbody.innerHTML='<tr><td colspan="7" class="empty-state">Nessuna richiesta.</td></tr>';return}
   tbody.innerHTML=lista.map(r=>{
     const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
-    const bl=r.stato==='in_attesa'?'⏳ In attesa':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
+    const bl=r.stato==='in_attesa'?'⏳ In attesa':r.stato==='approvata'?'✓ Approvata':r.stato==='annullata'?'⊘ Annullata':'✕ Rifiutata';
+    const inMod=modificaInAttesa(r);
+    const blMod=inMod?`<div style="margin-top:4px"><span class="badge badge-attesa">${r.modifica.tipo==='annullamento'?'⊘ Chiede annullamento':'✎ Chiede modifica'}</span></div>`:'';
     const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
     const sottotipo=r.tipo==='congedo'&&r.tipoCongedo?`<div style="font-size:11px;color:var(--ink4);margin-top:2px">${TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo}</div>`:'';
     return `<tr style="cursor:default">
@@ -2740,10 +2800,10 @@ function renderFerie(){
       <td>${TL[r.tipo]||r.tipo}${sottotipo}</td>
       <td style="font-family:'Inter',monospace;font-size:11px">${per}</td>
       <td class="td-r">${r.oreRichieste||0}h · ${r.giorniLavorativi||0} gg</td>
-      <td><span class="badge ${bc}">${bl}</span></td>
+      <td><span class="badge ${bc}">${bl}</span>${blMod}</td>
       <td style="font-size:12px;color:var(--ink4);max-width:130px">${r.note||'—'}</td>
       <td style="display:flex;gap:6px;align-items:center">
-        ${r.daTitolare?'<span style="font-size:11px;color:var(--ink4)">👑 auto</span>':`<button class="btn btn-sm" style="${r.stato==='in_attesa'?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button>`}
+        ${r.daTitolare?'<span style="font-size:11px;color:var(--ink4)">👑 auto</span>':`<button class="btn btn-sm" style="${r.stato==='in_attesa'||inMod?'background:var(--blu);color:#fff':''}" onclick="apriModal('${r.id}')">Gestisci</button>`}
         <button class="btn btn-sm" style="color:var(--rosso)" title="Elimina (cestino)" onclick="eliminaRichiestaAdmin('${r.id}')">🗑️</button>
       </td>
     </tr>`;
@@ -2766,6 +2826,21 @@ function apriModal(id){
   document.getElementById('modal-btn-approva').style.display=isAppr?'none':'';
   document.getElementById('modal-btn-rifiuta').style.display=isRif?'none':'';
   document.getElementById('modal-btn-annulla-appr').style.display=(!isAttesa)?'':'none';
+  // Richiesta di modifica/annullamento in sospeso: si decide solo su quella
+  const box=document.getElementById('modal-modifica'),inMod=modificaInAttesa(r);
+  if(inMod){
+    const m=r.modifica;
+    const dt=x=>String(x||'').split('-').reverse().join('/');
+    const per=(a,b)=>a===b?dt(a):dt(a)+' → '+dt(b);
+    box.innerHTML=m.tipo==='annullamento'
+      ?`<b>⊘ Il dipendente chiede di ANNULLARE questa richiesta già approvata.</b><br>Motivo: ${escTxt(m.motivo)}`
+      :`<b>✎ Il dipendente chiede di MODIFICARE questa richiesta già approvata.</b><br>Ora: ${per(r.dataInizio,r.dataFine)} · ${r.oreRichieste||0}h<br>Nuova: <b>${per(m.dataInizio,m.dataFine)} · ${m.oreRichieste||0}h</b> (${m.giorniLavorativi||0} gg)<br>Motivo: ${escTxt(m.motivo)}`;
+    document.getElementById('modal-nota-admin').value='';
+    ['modal-btn-approva','modal-btn-rifiuta','modal-btn-annulla-appr'].forEach(i=>document.getElementById(i).style.display='none');
+  }
+  box.style.display=inMod?'':'none';
+  document.getElementById('modal-btn-mod-rifiuta').style.display=inMod?'':'none';
+  document.getElementById('modal-btn-mod-approva').style.display=inMod?'':'none';
   document.getElementById('modal-ferie').classList.add('open');
 }
 function chiudiModal(){document.getElementById('modal-ferie').classList.remove('open');modalRichiestaId=null}
@@ -2774,9 +2849,12 @@ async function decidi(stato){
   const nota=document.getElementById('modal-nota-admin').value;
   const decisionAt=new Date().toISOString();
   await db.collection('richieste_assenza').doc(modalRichiestaId).update({stato,notaAdmin:nota,decisionAt});
-  // Aggiorna subito la cache locale, altrimenti la tabella resta con lo stato vecchio finché non si ricarica la pagina
-  const idx=tutteR.findIndex(r=>r.id===modalRichiestaId);
-  if(idx>-1)tutteR[idx]={...tutteR[idx],stato,notaAdmin:nota,decisionAt};
+  // Aggiorna subito le cache locali (lista, saldi e totali), altrimenti restano vecchie fino ad "Aggiorna"
+  const r=tutteR.find(x=>x.id===modalRichiestaId);
+  if(r){
+    aggiornaRichiestaInCache(r.id,r.username,{stato,notaAdmin:nota,decisionAt});
+    ricalcolaAssenzeDip(r.username,[[r.dataInizio,r.dataFine,CAMPO_ASSENZA[r.tipo]]]);
+  }
   chiudiModal();loadRichieste();loadRichiesteCount();
 }
 
@@ -4167,7 +4245,7 @@ async function esportaFerieExcel(){
   try{await assicuraStoricoAssenze()}catch(e){alert('Errore caricamento storico assenze: '+e.message);return}
   const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL',malattia:'Malattia'};
   const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Ore/Giorni','Stato','Note','Nota Admin'];
-  const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']),
+  const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':r.stato==='annullata'?'Annullata':'In attesa',r.note||'',r.notaAdmin||'']),
     ...tutteMalattie.map(r=>[r.nomeCompleto||r.username,'Malattia',r.dataInizio,r.dataFine,(r.giorniLavorativi||0)+' gg','Registrata',(r.protocollo?'Prot. n. '+r.protocollo+(r.note?' · ':''):'')+(r.note||''),''])];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Ferie e Assenze','Anno '+ANNO,hh,rr),'Ferie e Assenze');

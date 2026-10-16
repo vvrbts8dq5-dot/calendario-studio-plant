@@ -779,6 +779,32 @@ tbody tr:last-child{border-bottom:none}
 </div>
 
 <!-- MODAL SELEZIONE PERIODO (esportazione) -->
+<!-- MODAL MODIFICA / ANNULLAMENTO DI UNA RICHIESTA GIÀ APPROVATA -->
+<div class="modal-overlay" id="modal-modifica-rich">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title" id="mod-titolo">Chiedi modifica</div>
+    <div class="modal-sub" id="mod-attuale"></div>
+    <div style="display:flex;gap:16px;margin-bottom:14px;font-size:13px">
+      <label style="cursor:pointer"><input type="radio" name="mod-tipo" value="modifica" onchange="modCambiaTipo()"> ✎ Cambia date/ore</label>
+      <label style="cursor:pointer"><input type="radio" name="mod-tipo" value="annullamento" onchange="modCambiaTipo()"> ⊘ Annulla</label>
+    </div>
+    <div id="mod-campi-date">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Nuova data inizio</label><input class="f-input" style="margin:0" type="date" id="mod-inizio"></div>
+        <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Nuova data fine</label><input class="f-input" style="margin:0" type="date" id="mod-fine"></div>
+      </div>
+      <div id="mod-campo-ore" style="margin-bottom:10px"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Nuove ore richieste</label><input class="f-input" style="margin:0" type="number" id="mod-ore" min="0.5" step="0.5"></div>
+    </div>
+    <label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Motivo (obbligatorio)</label>
+    <textarea class="f-input" id="mod-motivo" rows="2" style="margin:0;resize:vertical;width:100%" placeholder="Spiega all'amministrazione perché"></textarea>
+    <div id="mod-alert" style="margin-top:10px"></div>
+    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn" onclick="chiudiRichiestaModifica()">Chiudi</button>
+      <button class="btn btn-blu" id="mod-btn-invia" onclick="inviaRichiestaModifica()">Invia richiesta</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-periodo">
   <div class="modal" style="max-width:460px">
     <div class="modal-title" id="periodo-titolo">Seleziona periodo da esportare</div>
@@ -1825,7 +1851,7 @@ function renderListaAssenze(tipo,lista){
   if(!lista.length){el.innerHTML='<div class="empty-state">Nessuna richiesta di '+tipo+'.</div>';return}
   el.innerHTML='<div class="richieste-list">'+lista.map(r=>{
     const bc=r.stato==='in_attesa'?'badge-attesa':r.stato==='approvata'?'badge-approvata':'badge-rifiutata';
-    const bl=r.stato==='in_attesa'?'In fase di approvazione':r.stato==='approvata'?'✓ Approvata':'✕ Rifiutata';
+    const bl=r.stato==='in_attesa'?'In fase di approvazione':r.stato==='approvata'?'✓ Approvata':r.stato==='annullata'?'⊘ Annullata':'✕ Rifiutata';
     const per=r.dataInizio===r.dataFine?fmtD(r.dataInizio):`${fmtD(r.dataInizio)} → ${fmtD(r.dataFine)}`;
     const tipoCongLbl=r.tipo==='congedo'&&r.tipoCongedo?`<div style="font-size:12px;font-weight:600;color:var(--gc-congedo);margin-top:2px">${TIPI_CONGEDO[r.tipoCongedo]||r.tipoCongedo}</div>`:'';
     return `<div class="richiesta-row">
@@ -1835,17 +1861,110 @@ function renderListaAssenze(tipo,lista){
         <div class="r-date" style="margin-top:4px">${per} · ${r.oreRichieste||0}h${r.oraInizio&&r.oraFine?' · 🕐 '+r.oraInizio+'-'+r.oraFine:''}</div>
         ${r.note?`<div class="r-nota">${r.note}</div>`:''}
         ${r.notaAdmin?`<div class="r-admin-nota">💬 Admin: ${r.notaAdmin}</div>`:''}
+        ${infoModificaRichiesta(r)}
       </div>
-      <button class="btn btn-rosso btn-sm" title="Elimina richiesta" onclick="eliminaRichiesta('${r.id}')">🗑️ Elimina</button>
+      ${azioniRichiesta(r)}
     </div>`;
   }).join('')+'</div>';
 }
 
+// ── RICHIESTE GIÀ APPROVATE: niente eliminazione, solo richiesta di modifica/annullamento all'admin ──
+// Ferie, permessi e ROL approvati restano validi (saldi, calendario) finché l'admin non decide.
+// I congedi restano come prima. La richiesta di modifica si salva nel campo 'modifica' dello stesso documento.
+const TIPI_MODIFICABILI=['ferie','permesso','rol'];
+function escTxt(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function richiestaBloccata(r){return r&&r.stato==='approvata'&&TIPI_MODIFICABILI.includes(r.tipo)}
+function modificaInAttesa(r){return !!(r&&r.modifica&&r.modifica.stato==='in_attesa')}
+function periodoTxt(a,b){return a===b?fmtD(a):fmtD(a)+' → '+fmtD(b)}
+function azioniRichiesta(r){
+  if(richiestaBloccata(r)){
+    if(modificaInAttesa(r))return `<button class="btn btn-sm" onclick="ritiraRichiestaModifica('${r.id}')" title="Ritira la richiesta di modifica/annullamento">↩ Ritira richiesta</button>`;
+    return `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="apriRichiestaModifica('${r.id}','modifica')">✎ Chiedi modifica</button>
+      <button class="btn btn-rosso btn-sm" onclick="apriRichiestaModifica('${r.id}','annullamento')">⊘ Chiedi annullamento</button>
+    </div>`;
+  }
+  if(r.stato==='annullata')return '';
+  return `<button class="btn btn-rosso btn-sm" title="Elimina richiesta" onclick="eliminaRichiesta('${r.id}')">🗑️ Elimina</button>`;
+}
+function infoModificaRichiesta(r){
+  const m=r.modifica;if(!m)return '';
+  const cosa=m.tipo==='annullamento'?'annullamento':`modifica (${periodoTxt(m.dataInizio,m.dataFine)} · ${m.oreRichieste||0}h)`;
+  if(m.stato==='in_attesa')return `<div class="r-admin-nota" style="background:var(--amber-light);border-radius:6px;padding:4px 8px;margin-top:6px">⏳ Richiesta di ${cosa} in attesa di approvazione</div>`;
+  if(m.stato==='rifiutata')return `<div class="r-admin-nota" style="color:var(--rosso)">✕ Richiesta di ${cosa} non accettata${m.notaAdmin?' — '+escTxt(m.notaAdmin):''}</div>`;
+  if(m.stato==='approvata')return `<div class="r-admin-nota" style="color:var(--verde)">✓ ${m.tipo==='annullamento'?'Annullamento approvato':'Modifica approvata'}${m.notaAdmin?' — '+escTxt(m.notaAdmin):''}</div>`;
+  return '';
+}
+let MOD_RICH_ID=null;
+function apriRichiestaModifica(id,tipoMod){
+  const r=ALL_ASSENZE.find(x=>x.id===id);if(!richiestaBloccata(r))return;
+  MOD_RICH_ID=id;
+  document.getElementById('mod-titolo').textContent='Richiesta all\u2019amministrazione — '+(CAL_FERIE_LABEL[r.tipo]||r.tipo);
+  document.getElementById('mod-attuale').textContent='Approvata: '+periodoTxt(r.dataInizio,r.dataFine)+' · '+(r.oreRichieste||0)+'h';
+  document.querySelectorAll('input[name="mod-tipo"]').forEach(x=>{x.checked=x.value===tipoMod});
+  document.getElementById('mod-inizio').value=r.dataInizio||'';
+  document.getElementById('mod-fine').value=r.dataFine||'';
+  document.getElementById('mod-ore').value=r.oreRichieste||'';
+  document.getElementById('mod-campo-ore').style.display=r.tipo==='ferie'?'none':'';
+  document.getElementById('mod-motivo').value='';
+  document.getElementById('mod-alert').innerHTML='';
+  modCambiaTipo();
+  document.getElementById('modal-modifica-rich').classList.add('open');
+}
+function modCambiaTipo(){
+  const t=(document.querySelector('input[name="mod-tipo"]:checked')||{}).value;
+  document.getElementById('mod-campi-date').style.display=t==='modifica'?'':'none';
+}
+function chiudiRichiestaModifica(){document.getElementById('modal-modifica-rich').classList.remove('open');MOD_RICH_ID=null}
+async function inviaRichiestaModifica(){
+  const r=ALL_ASSENZE.find(x=>x.id===MOD_RICH_ID);if(!richiestaBloccata(r))return;
+  const ad=document.getElementById('mod-alert');ad.innerHTML='';
+  const err=t=>{ad.innerHTML='<div class="alert-box alert-err">'+t+'</div>'};
+  const tipoMod=(document.querySelector('input[name="mod-tipo"]:checked')||{}).value;
+  const motivo=document.getElementById('mod-motivo').value.trim();
+  if(!tipoMod){err('Scegli se cambiare le date o annullare.');return}
+  if(!motivo){err('Scrivi il motivo della richiesta.');return}
+  const m={tipo:tipoMod,motivo,stato:'in_attesa',richiestaIl:new Date().toISOString()};
+  if(tipoMod==='modifica'){
+    const ini=document.getElementById('mod-inizio').value,fin=document.getElementById('mod-fine').value;
+    if(!ini||!fin){err('Seleziona le nuove date.');return}
+    if(fin<ini){err('La data fine deve essere uguale o successiva alla data inizio.');return}
+    const gg=giorniLavorativi(ini,fin);
+    if(gg<=0){err('Nel periodo scelto non ci sono giorni lavorativi.');return}
+    const ore=r.tipo==='ferie'?gg*oreGiornoDip(profilo):(parseFloat(document.getElementById('mod-ore').value)||0);
+    if(ore<=0){err('Inserisci le ore richieste.');return}
+    if(ini===r.dataInizio&&fin===r.dataFine&&ore===(parseFloat(r.oreRichieste)||0)){err('Le date e le ore sono uguali a quelle già approvate.');return}
+    Object.assign(m,{dataInizio:ini,dataFine:fin,oreRichieste:ore,giorniLavorativi:gg});
+  }
+  const btn=document.getElementById('mod-btn-invia');btn.disabled=true;
+  try{
+    await db.collection('richieste_assenza').doc(r.id).update({modifica:m});
+    r.modifica=m;
+    segnalaAttivita('modifica_richiesta');
+    chiudiRichiestaModifica();
+    loadTutteAssenze();
+  }catch(e){err('Invio non riuscito: '+e.message)}
+  finally{btn.disabled=false}
+}
+async function ritiraRichiestaModifica(id){
+  const r=ALL_ASSENZE.find(x=>x.id===id);if(!modificaInAttesa(r))return;
+  if(!confirm('Ritirare la richiesta di modifica/annullamento? La richiesta approvata resta com\u2019è.'))return;
+  try{
+    await db.collection('richieste_assenza').doc(id).update({modifica:firebase.firestore.FieldValue.delete()});
+    delete r.modifica;
+    loadTutteAssenze();
+  }catch(e){alert('Errore: '+e.message)}
+}
+
 async function eliminaRichiesta(id){
+  if(richiestaBloccata(ALL_ASSENZE.find(x=>x.id===id))){alert('Questa richiesta è già approvata: usa "Chiedi modifica" o "Chiedi annullamento".');return}
   if(!confirm('Eliminare questa richiesta? Verrà spostata nel Cestino, come se non fosse mai stata inviata.'))return;
   const r=ALL_ASSENZE.find(x=>x.id===id);
+  // Prima la cancellazione (può essere rifiutata dalle regole di sicurezza), poi la copia nel Cestino:
+  // così non restano copie orfane nel Cestino di richieste mai cancellate
+  try{await db.collection('richieste_assenza').doc(id).delete()}
+  catch(e){alert('Impossibile eliminare la richiesta: '+e.message);return}
   if(r){const{id:_id,...dati}=r;await spostaNelCestino('richiesta_assenza',['richieste_assenza',id],dati,'Richiesta '+(dati.tipo||'')+': '+U.username,U.username);}
-  await db.collection('richieste_assenza').doc(id).delete();
   // Rimuovere dalla cache locale
   ALL_ASSENZE=ALL_ASSENZE.filter(r=>r.id!==id);
   loadTutteAssenze();
