@@ -9,10 +9,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="xlsx-style.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <style>
 :root{
   --ink:#222222;--ink2:#3A3A3A;--ink3:#6B7280;--ink4:#9CA3AF;
@@ -457,7 +453,7 @@ tbody tr:hover{background:var(--paper)}
           <div class="page-title" id="dash-title">Dashboard 2026</div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-verde" onclick="esportaTuttiExcel()">📥 Esporta tutti Excel</button>
-            <button class="btn btn-ink" onclick="eseguiBackup()">💾 Backup Completo</button>
+            <button class="btn btn-ink" onclick="eseguiBackup(event)">💾 Backup Completo</button>
           </div>
         </div>
         <div id="storico-import-wrap"></div>
@@ -541,6 +537,7 @@ tbody tr:hover{background:var(--paper)}
             <select class="f-select" id="ferie-dip-filter" onchange="renderFerie()" style="font-size:12px"><option value="">Tutti i dipendenti</option></select>
             <button class="btn btn-viola btn-sm" onclick="malAdminApri()">🤒 Registra malattia</button>
             <button class="btn btn-verde btn-sm" onclick="esportaFerieExcel()">📥 Excel</button>
+            <button class="btn btn-sm" id="btn-ferie-storico" onclick="caricaStoricoFerie()" title="Mostra anche le richieste e le malattie degli anni precedenti">📚 Anni precedenti</button>
           </div>
         </div>
         <div class="cal-ferie-wrap">
@@ -1170,17 +1167,6 @@ tbody tr:hover{background:var(--paper)}
 </div>
 
 <!-- MODAL GESTIONE ANNO NUOVO -->
-<div class="modal-overlay" id="modal-anno-nuovo">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-title">🎉 Nuovo Anno — Gestione Ferie Residue</div>
-    <div class="modal-sub" id="modal-anno-sub"></div>
-    <div id="modal-anno-content"></div>
-    <div class="modal-actions">
-      <button class="btn" onclick="document.getElementById('modal-anno-nuovo').classList.remove('open')">Dopo</button>
-      <button class="btn btn-ink" onclick="salvaDecisioneAnno()">✓ Conferma e Salva</button>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL FERIE -->
 <div class="modal-overlay" id="modal-ferie">
@@ -1701,13 +1687,25 @@ const ANNO_PREC_MODIFICABILE=(oggi_check.getMonth()===0); // gennaio=0
 const FESTIVITA=[...festivitaAnno(ANNO),...festivitaAnno(ANNO+1)];
 
 // Espande un intervallo di date nei singoli giorni lavorativi (esclude weekend e festività) come array 'YYYY-MM-DD'
+// Festività di qualsiasi anno: FESTIVITA copre solo ANNO e ANNO+1, per gli anni precedenti
+// (archivio, statistiche, consuntivo di gennaio) si calcolano al volo e si tengono in memoria.
+const FESTIVITA_ALTRI_ANNI={};
+function isFestivitaNazionale(ds){
+  const y=parseInt(ds);
+  if(y===ANNO||y===ANNO+1)return FESTIVITA.includes(ds);
+  if(!FESTIVITA_ALTRI_ANNI[y])FESTIVITA_ALTRI_ANNI[y]=festivitaAnno(y);
+  return FESTIVITA_ALTRI_ANNI[y].includes(ds);
+}
+// Data locale 'YYYY-MM-DD' (senza passare da UTC: con toISOString il cambio dell'ora legale
+// faceva saltare o ripetere un giorno nei periodi a cavallo di fine marzo / fine ottobre)
+function dsLocale(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function espandiGiorniLavorativi(dal,al){
   const out=[];
   if(!dal||!al)return out;
-  const d=new Date(dal),fine=new Date(al);
+  const d=new Date(String(dal).slice(0,10)+'T12:00:00'),fine=new Date(String(al).slice(0,10)+'T12:00:00');
   while(d<=fine){
-    const dow=d.getDay(),ds=d.toISOString().split('T')[0];
-    if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))out.push(ds);
+    const dow=d.getDay(),ds=dsLocale(d);
+    if(dow!==0&&dow!==6&&!isFestivitaNazionale(ds))out.push(ds);
     d.setDate(d.getDate()+1);
   }
   return out;
@@ -1760,6 +1758,174 @@ function iniettaAssenzeInGiorni(days,username,oreGiorno){
   malattie.forEach(m=>espandiGiorniLavorativi(m.dataInizio,m.dataFine).forEach(ds=>aggiungi(ds,'oreFestivitaMalattia',oreGiorno)));
 }
 
+// ══ DATI SU RICHIESTA ═══════════════════════════════════════════════════════
+// All'avvio si scarica solo l'anno in uso (vedi loadDashboard). Quello che serve degli anni
+// precedenti si scarica la prima volta che serve e resta in memoria fino al prossimo "Aggiorna".
+let GIORNI_ALTRI_ANNI={};      // 'anno|username' -> {YYYY-MM-DD: dati} come su Firestore
+let STORICO_ASSENZE_P=null;    // Promise del caricamento completo di richieste/malattie/chiusure
+let STAT_RIGHE_CACHE={};       // numero commessa -> righe (pagina Statistiche)
+
+function ordinaPerCreazione(arr){
+  const t=x=>x.createdAt&&x.createdAt.toDate?x.createdAt.toDate().getTime():new Date(x.createdAt||0).getTime();
+  return arr.sort((a,b)=>t(b)-t(a));
+}
+// Imposta in un colpo solo tutte le cache delle assenze usate dalle varie pagine
+function impostaAssenze(richieste,malattie,chiusure){
+  chiusureUfficio=chiusure;
+  ADM_richPerUser={};ADM_malPerUser={};
+  richieste.forEach(r=>{(ADM_richPerUser[r.username]=ADM_richPerUser[r.username]||[]).push(r)});
+  malattie.forEach(r=>{(ADM_malPerUser[r.username]=ADM_malPerUser[r.username]||[]).push(r)});
+  // tutteR e tutteMalattie per la pagina Ferie & Assenze (copie separate, più recenti prima)
+  tutteR=ordinaPerCreazione(richieste.map(r=>({...r})));
+  tutteMalattie=ordinaPerCreazione(malattie.map(r=>({...r})));
+}
+function mostraPulsanteStoricoFerie(vis){
+  const b=document.getElementById('btn-ferie-storico');
+  if(!b)return;
+  b.style.display=vis?'':'none';b.disabled=false;b.textContent='📚 Anni precedenti';
+}
+// Scarica TUTTE le richieste/malattie/chiusure (anche degli anni precedenti), una volta sola
+function assicuraStoricoAssenze(){
+  if(!STORICO_ASSENZE_P){
+    STORICO_ASSENZE_P=(async()=>{
+      const [r,m,c]=await Promise.all([
+        db.collection('richieste_assenza').get(),
+        db.collection('malattie').get(),
+        db.collection('chiusure').get()
+      ]);
+      impostaAssenze(r.docs.map(d=>({id:d.id,...d.data()})),m.docs.map(d=>({id:d.id,...d.data()})),c.docs.map(d=>({id:d.id,...d.data()})));
+      // Storico arrivato (da qualsiasi pagina): pulsante nascosto e, se si è in Ferie & Assenze, lista aggiornata
+      mostraPulsanteStoricoFerie(false);
+      if(document.getElementById('page-ferie')?.classList.contains('active'))renderFerie();
+    })().catch(e=>{STORICO_ASSENZE_P=null;throw e});
+  }
+  return STORICO_ASSENZE_P;
+}
+// Giorni (copia, senza assenze iniettate per gli anni non in cache) di un dipendente per un anno:
+// anno in uso e successivo da dipDataCache, gli altri da Firestore la prima volta poi da memoria.
+// Per gli anni precedenti assicura anche lo storico assenze, così iniettaAssenzeInGiorni è completa.
+async function giorniAnnoDip(username,anno){
+  anno=parseInt(anno);
+  const out={};
+  const c=dipDataCache[username];
+  if((anno===ANNO||anno===ANNO+1)&&c&&!c.errore){
+    const pref=anno+'-';
+    Object.entries(c.days).forEach(([id,d])=>{if(id.startsWith(pref))out[id]={...d}});
+    return out;
+  }
+  const key=anno+'|'+username;
+  if(!GIORNI_ALTRI_ANNI[key]){
+    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(username).collection('giorni').get();
+    const days={};snap.forEach(d=>{days[d.id]=d.data()});
+    GIORNI_ALTRI_ANNI[key]=days;
+  }
+  if(anno<ANNO)await assicuraStoricoAssenze();
+  Object.entries(GIORNI_ALTRI_ANNI[key]).forEach(([id,d])=>{out[id]={...d}});
+  return out;
+}
+// Come sopra ma con le assenze già iniettate e SOLO i giorni di quell'anno (le assenze di altri anni
+// non devono finire nei totali dell'anno richiesto)
+async function giorniAnnoConAssenze(emp,anno){
+  const days=await giorniAnnoDip(emp.username,anno);
+  iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
+  const pref=parseInt(anno)+'-';
+  Object.keys(days).forEach(id=>{if(!id.startsWith(pref))delete days[id]});
+  return days;
+}
+
+// ══ SALDI ANNUALI ═══════════════════════════════════════════════════════════
+// Ogni anno ferie, permessi e ROL ripartono dal monte da contratto: si conta solo quanto goduto
+// nell'anno indicato. Una richiesta a cavallo d'anno (es. 29/12→3/1) conta per la parte che cade
+// in quell'anno (ferie a giorni; permessi/ROL ripartiti in proporzione ai giorni lavorativi).
+function inAnno(ds,anno){return String(ds||'').startsWith(anno+'-')}
+function giorniLavInAnno(r,anno){
+  const gg=espandiGiorniLavorativi(r.dataInizio,r.dataFine);
+  return{tot:gg.length,inAnno:gg.filter(d=>inAnno(d,anno)).length};
+}
+function quotaOreInAnno(r,anno){
+  const ore=parseFloat(r.oreRichieste)||0;
+  if(inAnno(r.dataInizio,anno)&&inAnno(r.dataFine,anno))return ore;
+  const g=giorniLavInAnno(r,anno);
+  return g.tot?ore*g.inAnno/g.tot:0;
+}
+// fonte (opzionale): {rich:{username:[...]},mal:{username:[...]},chius:[...]}; di default le cache in memoria
+function calcolaSaldiAnno(emp,anno,fonte){
+  const u=emp.username,oreGiorno=oreGiornoDip(emp);
+  const richU=fonte?(fonte.rich[u]||[]):(ADM_richPerUser[u]||[]);
+  const malU=fonte?(fonte.mal[u]||[]):(ADM_malPerUser[u]||[]);
+  const chius=fonte?fonte.chius:chiusureUfficio;
+  const giorniFerie=new Set();
+  let perm=0,rol=0,mal=0;
+  richU.forEach(r=>{
+    if(r.stato!=='approvata')return;
+    if(r.tipo==='ferie')espandiGiorniLavorativi(r.dataInizio,r.dataFine).forEach(d=>{if(inAnno(d,anno))giorniFerie.add(d)});
+    else if(r.tipo==='permesso')perm+=quotaOreInAnno(r,anno);
+    else if(r.tipo==='rol')rol+=quotaOreInAnno(r,anno);
+  });
+  // Chiusure ufficio scalate a tutti, senza contare due volte un giorno già in ferie
+  chius.forEach(c=>espandiGiorniLavorativi(c.dataInizio,c.dataFine).forEach(d=>{if(inAnno(d,anno))giorniFerie.add(d)}));
+  malU.forEach(m=>{
+    if(inAnno(m.dataInizio,anno)&&inAnno(m.dataFine,anno))mal+=parseFloat(m.giorniLavorativi)||0;
+    else mal+=giorniLavInAnno(m,anno).inAnno;
+  });
+  const r2=x=>Math.round(x*100)/100;
+  const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
+  const ferieUsate=r2(giorniFerie.size*oreGiorno),permessiUsati=r2(perm),rolUsato=r2(rol);
+  return{monteFerie,ferieUsate,ferieRes:r2(monteFerie-ferieUsate),
+    montePermesso,permessiUsati,permRes:r2(montePermesso-permessiUsati),
+    monteRol,rolUsato,rolRes:r2(monteRol-rolUsato),giorniMal:r2(mal)};
+}
+
+// ══ LIBRERIE PESANTI (Excel, PDF, grafici): scaricate solo al primo uso ═══════
+function caricaScript(src){
+  return new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src=src;sc.onload=ok;sc.onerror=()=>ko(new Error('impossibile scaricare '+src));document.head.appendChild(sc)});
+}
+const LIBRERIE_DEF={
+  xlsx:()=>caricaScript('xlsx-style.min.js'),
+  pdf:()=>caricaScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+    .then(()=>caricaScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js')),
+  chart:()=>caricaScript('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js')
+};
+const LIBRERIE_CARICATE={};
+// tipi: ['xlsx','pdf','chart'] (default tutte). Ogni libreria è indipendente: se una non si scarica
+// le altre funzionano comunque.
+function caricaLibrerie(tipi){
+  tipi=tipi&&tipi.length?tipi:Object.keys(LIBRERIE_DEF);
+  return Promise.all(tipi.map(t=>{
+    if(!LIBRERIE_CARICATE[t])LIBRERIE_CARICATE[t]=LIBRERIE_DEF[t]().catch(e=>{delete LIBRERIE_CARICATE[t];alert('Errore: '+e.message+'. Controlla la connessione e riprova.');throw e});
+    return LIBRERIE_CARICATE[t];
+  }));
+}
+// Ogni funzione globale che usa XLSX / jsPDF / Chart viene avvolta: al primo clic aspetta le librerie,
+// poi prosegue normalmente. Le funzioni di supporto che RESTITUISCONO un valore (chiamate dentro
+// altre funzioni già avvolte) restano come sono.
+const LIB_FUNZIONI_SUPPORTO=new Set(['expFoglioExcel','expFoglioExcelLibero','expPDFOreCompatto','expNotaExcel','expIntestazionePDF']);
+function avvolgiFunzioniConLibrerie(){
+  Object.getOwnPropertyNames(window).forEach(n=>{
+    if(LIB_FUNZIONI_SUPPORTO.has(n)||n==='caricaLibrerie'||n==='avvolgiFunzioniConLibrerie')return;
+    let f;try{f=window[n]}catch(e){return}
+    if(typeof f!=='function'||f.__conLibrerie)return;
+    let src;try{src=Function.prototype.toString.call(f)}catch(e){return}
+    if(src.indexOf('[native code]')>-1||!/XLSX\.|window\.jspdf|new Chart\(/.test(src))return;
+    const tipi=[];
+    if(src.indexOf('XLSX.')>-1)tipi.push('xlsx');
+    if(src.indexOf('window.jspdf')>-1)tipi.push('pdf');
+    if(src.indexOf('new Chart(')>-1)tipi.push('chart');
+    const w=async function(...a){
+      try{await caricaLibrerie(tipi)}
+      catch(e){
+        // Solo i grafici mancanti: la funzione disegna comunque le tabelle (salta il grafico da sola)
+        if(!(tipi.length===1&&tipi[0]==='chart'))throw e;
+      }
+      return f.apply(this,a);
+    };
+    w.__conLibrerie=true;
+    window[n]=w;
+  });
+}
+// DOMContentLoaded arriva dopo gli script "defer" (contab_module.js, bc_esporta_tutti.js)
+document.addEventListener('DOMContentLoaded',avvolgiFunzioniConLibrerie);
+
 let APP_AVVIATA=false; // evita il doppio avvio (doLogin + onAuthStateChanged scattano entrambi al login)
 function startApp(){
   if(APP_AVVIATA)return;APP_AVVIATA=true;
@@ -1770,7 +1936,12 @@ function startApp(){
   document.getElementById('logo-anno').textContent=ANNO;
   document.getElementById('dash-title').textContent='Dashboard '+ANNO;
   initRuoloTitolare();
-  checkInattivita().then(()=>loadDashboard());
+  // Prima si disegna la dashboard (anno in uso), poi si controlla l'inattività sugli stessi dati già
+  // scaricati (nessuna seconda lettura di 'dipendenti'); in gennaio si archivia il consuntivo dell'anno chiuso.
+  loadDashboard()
+    .then(()=>{if(ANNO_PREC_MODIFICABILE)archiviaConsuntivoAnnoPrec()})
+    .catch(e=>{console.error('Errore avvio dashboard:',e);const k=document.getElementById('kpi-row');if(k)k.innerHTML='<div class="alert-box alert-err">Errore caricamento dati: '+e.message+'. Premi "Aggiorna".</div>'})
+    .finally(()=>checkInattivita());
   attivaListenerAttivita();
   // Notifiche real-time richieste ferie
   db.collection('richieste_assenza').where('stato','==','in_attesa')
@@ -1789,13 +1960,7 @@ function startApp(){
       RICHIESTE_SBLOCCO=snap.docs.map(d=>({id:d.id,...d.data()}));
       renderRichiesteSblocco();
     });
-  // Notifiche real-time straordinari da convalidare
-  aggiornaBadgeStraord();
-  // Controlla se è 1 gennaio → mostra modal gestione ferie
-  const oggi=new Date();
-  if(oggi.getMonth()===0&&oggi.getDate()===1){
-    setTimeout(()=>mostraModalAnnoNuovo(),1500);
-  }
+  // Badge straordinari: calcolato da dipDataCache alla fine di loadDashboard()
   // Init selettori costi/archivio
   const costiAnno=document.getElementById('costi-anno');
   for(let y=ANNO;y>=2026;y--){const o=document.createElement('option');o.value=y;o.textContent=y;costiAnno.appendChild(o);}
@@ -1812,19 +1977,23 @@ function startApp(){
 const FESTIVITA_CHECK=FESTIVITA; // stesso calcolo automatico Pasqua/Pasquetta di FESTIVITA
 
 async function checkInattivita(){
+  // Usa dipList già scaricato da loadDashboard(): nessuna lettura aggiuntiva di 'dipendenti'
+  // (se la dashboard non è riuscita a caricarlo, lo legge qui)
   try{
-    const snap=await db.collection('dipendenti').get();
+    let lista=dipList;
+    if(!lista.length){const sn=await db.collection('dipendenti').get();lista=sn.docs.map(d=>({username:d.id,...d.data()}))}
     const oggi=new Date();
     oggi.setHours(0,0,0,0);
     const promises=[];
-    snap.forEach(docSnap=>{
-      const d=docSnap.data();
+    const bloccati=[];
+    lista.forEach(d=>{
       // Salta già bloccati o disabilitati manualmente
       if(d.bloccatoInattivita||!d.abilitato)return;
       // Se non ha MAI avuto un accesso registrato non blocchiamo retroattivamente
       // (evita il blocco di massa al primo avvio del controllo): iniziamo a contare da oggi.
       if(!d.ultimoAccesso){
-        promises.push(db.collection('dipendenti').doc(docSnap.id).update({ultimoAccesso:new Date().toISOString()}));
+        const nowIso=new Date().toISOString();
+        promises.push(db.collection('dipendenti').doc(d.username).update({ultimoAccesso:nowIso}).then(()=>{d.ultimoAccesso=nowIso}));
         return;
       }
       const ultimo=new Date(d.ultimoAccesso);
@@ -1841,18 +2010,17 @@ async function checkInattivita(){
       }
       const sogliaGiorni=parseInt(d.giorniInattivita)||2;
       if(ggLav>=sogliaGiorni){
+        const bloccatoIl=new Date().toISOString();
         promises.push(
-          db.collection('dipendenti').doc(docSnap.id).update({
-            bloccatoInattivita:true,
-            abilitato:false,
-            bloccatoIl:new Date().toISOString(),
-          })
+          db.collection('dipendenti').doc(d.username).update({bloccatoInattivita:true,abilitato:false,bloccatoIl})
+            .then(()=>{d.bloccatoInattivita=true;d.abilitato=false;d.bloccatoIl=bloccatoIl;bloccati.push(d.username)})
         );
       }
     });
     if(promises.length>0){
       await Promise.all(promises);
       console.log(`Controllo inattività: ${promises.length} aggiornamenti applicati`);
+      if(bloccati.length&&dipList.length)renderDashboardFromCache(); // mostra subito i nuovi bloccati
     }
   }catch(e){console.log('Check inattività errore:',e.message)}
 }
@@ -1949,6 +2117,7 @@ async function aggiornaGlobale(){
     else if(pid==='costi')await loadCostiMensili();
     else if(pid==='archivio')await loadArchivio();
     else if(pid==='titolare')await loadTitolarePage(true);
+    else if(pid==='statistiche')await statCalcolaTutto();
     await loadRichiesteCount();
     try{
       const snap=await db.collection('meta').doc('lastActivity').get();
@@ -2012,25 +2181,36 @@ async function loadDashboard(){
   const usersSnap=await db.collection('dipendenti').get();
   dipList=usersSnap.docs.map(d=>({username:d.id,...d.data()}));
 
-  // Timesheet e saldi (richieste/malattie/chiusure) in parallelo; le assenze si iniettano
-  // nei giorni solo DOPO che i saldi sono arrivati (prima venivano iniettate con dati vuoti o vecchi)
-  dipDataCache={};
+  // Svuota le cache "su richiesta" (anni precedenti, storico assenze, righe commesse statistiche):
+  // "Aggiorna" deve rileggere tutto da Firestore.
+  dipDataCache={};GIORNI_ALTRI_ANNI={};STAT_RIGHE_CACHE={};
+
+  // Anno in uso: timesheet di ANNO (+ ANNO+1 per la finestra mobile di 12 mesi) e assenze che finiscono
+  // da gennaio di ANNO in poi, più le richieste ancora in attesa di qualsiasi anno. Gli anni precedenti
+  // si scaricano solo entrando nelle pagine che li mostrano (assicuraStoricoAssenze / giorniAnnoDip).
+  // Tutte le query partono insieme; le assenze si iniettano nei giorni solo DOPO che sono arrivate.
+  const inizioAnno=ANNO+'-01-01';
   const saldiP=Promise.all([
-    db.collection('richieste_assenza').get(),
-    db.collection('malattie').get(),
-    db.collection('chiusure').get()
+    db.collection('richieste_assenza').where('dataFine','>=',inizioAnno).get(),
+    db.collection('richieste_assenza').where('stato','==','in_attesa').get(),
+    db.collection('malattie').where('dataFine','>=',inizioAnno).get(),
+    db.collection('chiusure').where('dataFine','>=',inizioAnno).get()
   ]);
   const tsP=Promise.all(dipList.map(emp=>Promise.all([
       db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get(),
       db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
     ]).then(r=>({emp,snaps:r})).catch(e=>{console.error('Timesheet '+emp.username,e);return {emp,snaps:null}})));
-  const [[richSnap,malSnap,chiusSnap],tsRes]=await Promise.all([saldiP,tsP]);
+  const [[richSnap,pendSnap,malSnap,chiusSnap],tsRes]=await Promise.all([saldiP,tsP]);
 
-  // Carica saldi per tutti
-  chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
-  ADM_richPerUser={};ADM_malPerUser={};
-  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_richPerUser[r.username])ADM_richPerUser[r.username]=[];ADM_richPerUser[r.username].push(r)});
-  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_malPerUser[r.username])ADM_malPerUser[r.username]=[];ADM_malPerUser[r.username].push(r)});
+  // Richieste: unione (senza doppioni) di quelle dell'anno in uso e di quelle in attesa
+  const richMap=new Map();
+  [richSnap,pendSnap].forEach(sn=>sn.docs.forEach(d=>richMap.set(d.id,{id:d.id,...d.data()})));
+  impostaAssenze([...richMap.values()],malSnap.docs.map(d=>({id:d.id,...d.data()})),chiusSnap.docs.map(d=>({id:d.id,...d.data()})));
+  // Da qui in memoria c'è solo l'anno in uso: lo storico va ricaricato alla prossima richiesta.
+  // (Azzerato qui e non all'inizio: uno storico scaricato mentre loadDashboard era in corso verrebbe
+  // altrimenti sovrascritto restando marcato come "già caricato".)
+  STORICO_ASSENZE_P=null;
+  mostraPulsanteStoricoFerie(true);
 
   // Giorni per dipendente, con assenze iniettate
   tsRes.forEach(({emp,snaps})=>{
@@ -2042,13 +2222,11 @@ async function loadDashboard(){
       // I totali della dashboard restano riferiti al solo ANNO corrente
       const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(days).filter(([id])=>id.startsWith(String(ANNO)+'-')).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0)});
       dipDataCache[emp.username]={days,totals};
-    }catch{dipDataCache[emp.username]={days:{},totals:{}}}
+    }catch{dipDataCache[emp.username]={days:{},totals:{},errore:true}}
   });
-  // Salva tutteR e tutteMalattie per la pagina Ferie & Assenze
-  tutteR=richSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
-  tutteMalattie=malSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
 
   renderDashboardFromCache();
+  aggiornaBadgeStraord();
   if(typeof renderStoricoImportBanner==='function')renderStoricoImportBanner();
   if(typeof renderCorrezioneStoricoBanner==='function')renderCorrezioneStoricoBanner();
   if(typeof renderDupCleanupBanner==='function')renderDupCleanupBanner();
@@ -2082,21 +2260,9 @@ function renderDashboardFromCache(){
   // Tabella saldi
   const tbodySaldi=document.getElementById('tbody-saldi');
   tbodySaldi.innerHTML=dipList.map(emp=>{
-    const oreGiorno=oreGiornoDip(emp);
-    const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
-    let permessiUsati=0,rolUsato=0,giorniMal=0;
-    const richFerieApprovate=[];
-    (richPerUser[emp.username]||[]).forEach(r=>{
-      if(r.stato==='approvata'){
-        if(r.tipo==='ferie')richFerieApprovate.push(r);
-        if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
-        if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
-      }
-    });
-    // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
-    const ferieUsate=oreFerieConChiusure(richFerieApprovate,oreGiorno);
-    (malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
-    const ferieRes=monteFerie-ferieUsate;
+    // Saldi dell'anno in uso: il monte da contratto riparte da zero ogni 1° gennaio
+    const sa=calcolaSaldiAnno(emp,ANNO);
+    const monteFerie=sa.monteFerie,ferieUsate=sa.ferieUsate,ferieRes=sa.ferieRes,giorniMal=sa.giorniMal;
     const cls=ferieRes>monteFerie*0.3?'color:var(--verde)':ferieRes>0?'color:var(--amber)':'color:var(--rosso);font-weight:700';
     return `<tr style="cursor:pointer" onclick="apriDettaglio('${emp.username}')">
       <td style="font-weight:500">${emp.nome||''} ${emp.cognome||''}</td>
@@ -2104,8 +2270,8 @@ function renderDashboardFromCache(){
       <td class="td-r">${monteFerie}h</td>
       <td class="td-r">${ferieUsate}h</td>
       <td class="td-r" style="${cls}">${ferieRes}h</td>
-      <td class="td-r">${montePermesso-permessiUsati}h</td>
-      <td class="td-r">${monteRol-rolUsato}h</td>
+      <td class="td-r">${sa.permRes}h</td>
+      <td class="td-r">${sa.rolRes}h</td>
       <td class="td-r" style="color:var(--viola)">${giorniMal} gg</td>
     </tr>`;
   }).join('');
@@ -2156,22 +2322,11 @@ async function apriDettaglio(username){
 }
 
 function caricaDetSaldi(emp){
-  const oreGiorno=oreGiornoDip(emp);
-  const monteFerie=emp.monteFerie||0,montePermesso=emp.montePermesso||0,monteRol=emp.monteRol||0;
-  let permessiUsati=0,rolUsato=0,giorniMal=0;
-  const richFerieApprovate=[];
-  // Legge dalla cache globale — ZERO query Firestore
-  (ADM_richPerUser[emp.username]||[]).forEach(r=>{
-    if(r.stato==='approvata'){
-      if(r.tipo==='ferie')richFerieApprovate.push(r);
-      if(r.tipo==='permesso')permessiUsati+=parseFloat(r.oreRichieste)||0;
-      if(r.tipo==='rol')rolUsato+=parseFloat(r.oreRichieste)||0;
-    }
-  });
-  // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
-  const ferieUsate=oreFerieConChiusure(richFerieApprovate,oreGiorno);
-  (ADM_malPerUser[emp.username]||[]).forEach(r=>{giorniMal+=r.giorniLavorativi||0});
-  const ferieRes=monteFerie-ferieUsate,permRes=montePermesso-permessiUsati,rolRes=monteRol-rolUsato;
+  // Saldi dell'anno in uso dalla cache globale — ZERO query Firestore
+  const sa=calcolaSaldiAnno(emp,ANNO);
+  const monteFerie=sa.monteFerie,montePermesso=sa.montePermesso,monteRol=sa.monteRol;
+  const ferieUsate=sa.ferieUsate,permessiUsati=sa.permessiUsati,rolUsato=sa.rolUsato,giorniMal=sa.giorniMal;
+  const ferieRes=sa.ferieRes,permRes=sa.permRes,rolRes=sa.rolRes;
   function cls(res,tot){return res>tot*0.3?'ok':res>0?'warn':'danger'}
   document.getElementById('det-saldi').innerHTML=`
     <div class="saldo-card"><div class="saldo-tipo">🏖️ Ferie</div><div class="saldo-dettaglio">Monte ${monteFerie}h · Usate ${ferieUsate}h</div>
@@ -2375,7 +2530,23 @@ function mostraDettaglioAssenza(id){
   if(r.oraInizio&&r.oraFine)msg+=`\nOrario: ${r.oraInizio} - ${r.oraFine}`;
   alert(msg);
 }
-function calFeriePrev(){calFerieMese.setMonth(calFerieMese.getMonth()-1);renderCalendarioFerie()}
+function calFeriePrev(){
+  calFerieMese.setMonth(calFerieMese.getMonth()-1);
+  // Mese di un anno precedente: scarica lo storico assenze (una volta sola) prima di disegnare
+  if(calFerieMese.getFullYear()<ANNO)assicuraStoricoAssenze().then(renderCalendarioFerie).catch(e=>console.error('Storico assenze:',e));
+  else renderCalendarioFerie();
+}
+async function caricaStoricoFerie(){
+  const btn=document.getElementById('btn-ferie-storico');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Caricamento...';}
+  try{
+    await assicuraStoricoAssenze();
+    loadRichieste();
+  }catch(e){
+    alert('Errore caricamento anni precedenti: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='📚 Anni precedenti';}
+  }
+}
 function calFerieNext(){calFerieMese.setMonth(calFerieMese.getMonth()+1);renderCalendarioFerie()}
 function renderCalendarioFerie(){
   const grid=document.getElementById('cal-ferie-grid');
@@ -2508,6 +2679,8 @@ function loadRichieste(){
   if(df&&df.options.length<=1)dipList.forEach(d=>{const o=document.createElement('option');o.value=d.username;o.textContent=d.nomeCompleto||d.username;df.appendChild(o)});
   renderCalendarioFerie();
   renderFerie();
+  // Calendario fermo su un mese di un anno precedente (es. dopo "Aggiorna"): serve lo storico
+  if(calFerieMese.getFullYear()<ANNO&&!STORICO_ASSENZE_P)assicuraStoricoAssenze().then(renderCalendarioFerie).catch(e=>console.error('Storico assenze:',e));
   }catch(e){console.error('Errore caricamento richieste:',e)}
 }
 
@@ -3286,17 +3459,9 @@ function esportaTuttiExcel(){
   const rr=dipList.map(e=>{const t=dipDataCache[e.username]?.totals||{};return[`${e.nome||''} ${e.cognome||''}`.trim(),...CN.map(c=>t[c.k]||0),ggFestLavAnno*oreGiornoDip(e)]});
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Riepilogo Ore Dipendenti','Anno '+ANNO,hh,rr),'Riepilogo');
   // Saldo ferie
-  const richPerUser=ADM_richPerUser;
+  // Saldi dell'anno in uso (monte da contratto meno goduto nell'anno)
   const shHH=['Dipendente','Monte Ferie','Ferie Usate','Ferie Residue','Monte Permessi','Permessi Usati','Monte ROL','ROL Usato'];
-  const shRows=[];
-  dipList.forEach(emp=>{
-    let pu=0,ru=0;
-    const richFerieApprovate=[];
-    (richPerUser[emp.username]||[]).forEach(r=>{if(r.stato==='approvata'){if(r.tipo==='ferie')richFerieApprovate.push(r);if(r.tipo==='permesso')pu+=parseFloat(r.oreRichieste)||0;if(r.tipo==='rol')ru+=parseFloat(r.oreRichieste)||0}});
-    // Ferie usate = richieste approvate + chiusure ufficio (scalate automaticamente a tutti), senza doppi conteggi
-    const fu=oreFerieConChiusure(richFerieApprovate,oreGiornoDip(emp));
-    shRows.push([`${emp.nome||''} ${emp.cognome||''}`.trim(),emp.monteFerie||0,fu,(emp.monteFerie||0)-fu,emp.montePermesso||0,pu,emp.monteRol||0,ru]);
-  });
+  const shRows=dipList.map(emp=>{const sa=calcolaSaldiAnno(emp,ANNO);return[`${emp.nome||''} ${emp.cognome||''}`.trim(),sa.monteFerie,sa.ferieUsate,sa.ferieRes,sa.montePermesso,sa.permessiUsati,sa.monteRol,sa.rolUsato]});
   XLSX.utils.book_append_sheet(wb,expFoglioExcel('Saldi Ferie/Permessi/ROL','Anno '+ANNO,shHH,shRows),'Saldi Ferie');
   XLSX.writeFile(wb,`Timesheets_Tutti_${ANNO}.xlsx`);
 }
@@ -3310,10 +3475,7 @@ function esportaDetPeriodo(formato){
   apriSelettorePeriodo(async(p)=>{
     let all={};
     for(const y of periodoAnni(p)){
-      try{
-        const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(detUser).collection('giorni').get();
-        snap.forEach(d=>{all[d.id]=d.data()});
-      }catch(e){}
+      try{Object.assign(all,await giorniAnnoDip(detUser,y))}catch(e){console.error('Giorni '+y,e)}
     }
     iniettaAssenzeInGiorni(all,detUser,oreGiorno);
     aggiungiWeekendMancanti(all,p);
@@ -3474,9 +3636,10 @@ async function esportaDetPDF(){
   const tariffe=emp.tariffe||{};
   const{anno:pdfAnno,mese:pdfMese}=annoMese(detMese);
   const pref=pdfAnno+'-'+pad(pdfMese+1);
-  const snap=await db.collection('timesheets').doc(String(pdfAnno)).collection('dipendenti').doc(detUser).collection('giorni').get();
-  const all={};snap.forEach(d=>{if(d.id.startsWith(pref))all[d.id]=d.data()});
+  const giorniAnno=await giorniAnnoDip(detUser,pdfAnno);
+  const all={};Object.entries(giorniAnno).forEach(([id,d])=>{if(id.startsWith(pref))all[id]=d});
   iniettaAssenzeInGiorni(all,detUser,oreGiornoDip(emp));
+  Object.keys(all).forEach(id=>{if(!id.startsWith(pref))delete all[id]});
   const giorni=Object.keys(all).sort();
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -3510,45 +3673,35 @@ async function esportaDetPDF(){
 }
 
 // ── MODAL ANNO NUOVO ──────────────────────────────────────────────────
-async function mostraModalAnnoNuovo(){
-  const snap=await db.collection('dipendenti').get();
-  const dipArr=snap.docs.map(d=>({username:d.id,...d.data()}));
-  document.getElementById('modal-anno-sub').textContent=`Inizio anno ${ANNO} — Decidi cosa fare con le ferie residue dell'anno ${ANNO_PREC} per ogni dipendente.`;
-  let html='<div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto">';
-  dipArr.forEach(d=>{
-    html+=`<div style="background:var(--paper);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div><div style="font-weight:600;font-size:13px">${d.nome||''} ${d.cognome||''}</div><div style="font-size:11px;color:var(--ink4)">Ferie residue: ${d.monteFerie||0}h</div></div>
-      <select class="fi" id="anno-choice-${d.username}" style="width:auto;font-size:12px">
-        <option value="mantieni">Mantieni residuo</option>
-        <option value="azzera">Azzera a 0</option>
-        <option value="riporta">Riporta sul nuovo monte</option>
-      </select>
-    </div>`;
-  });
-  html+='</div>';
-  document.getElementById('modal-anno-content').innerHTML=html;
-  document.getElementById('modal-anno-nuovo').classList.add('open');
-}
-
-async function salvaDecisioneAnno(){
-  const snap=await db.collection('dipendenti').get();
-  const promises=[];
-  snap.forEach(docSnap=>{
-    const d=docSnap.data();
-    const scelta=document.getElementById('anno-choice-'+docSnap.id)?.value;
-    if(!scelta)return;
-    // Salva storico anno precedente
-    const archivioData={anno:ANNO_PREC,monteFerie:d.monteFerie||0,montePermesso:d.montePermesso||0,monteRol:d.monteRol||0,salvatoIl:new Date().toISOString()};
-    promises.push(db.collection('dipendenti').doc(docSnap.id).collection('archivio').doc(String(ANNO_PREC)).set(archivioData));
-    // Applica scelta
-    if(scelta==='azzera'){
-      promises.push(db.collection('dipendenti').doc(docSnap.id).update({monteFerie:0}));
-    }
-    // 'mantieni' non fa nulla, 'riporta' lascia invariato il monte
-  });
-  await Promise.all(promises);
-  document.getElementById('modal-anno-nuovo').classList.remove('open');
-  loadDashboard();
+// Saldi annuali: il 1° gennaio ferie, permessi e ROL ripartono dal monte da contratto (nessun riporto).
+// Durante gennaio (anno precedente ancora modificabile) a ogni accesso admin si salva/aggiorna in
+// dipendenti/{u}/archivio/{annoPrec} il consuntivo dell'anno chiuso, come traccia storica.
+async function archiviaConsuntivoAnnoPrec(){
+  try{
+    const dal=ANNO_PREC+'-01-01';
+    const [rS,mS,cS,...archS]=await Promise.all([
+      db.collection('richieste_assenza').where('dataFine','>=',dal).get(),
+      db.collection('malattie').where('dataFine','>=',dal).get(),
+      db.collection('chiusure').where('dataFine','>=',dal).get(),
+      ...dipList.map(emp=>db.collection('dipendenti').doc(emp.username).collection('archivio').doc(String(ANNO_PREC)).get())
+    ]);
+    // Mappe locali: non toccano le cache dell'anno in uso
+    const fonte={rich:{},mal:{},chius:cS.docs.map(d=>d.data())};
+    rS.forEach(d=>{const r=d.data();(fonte.rich[r.username]=fonte.rich[r.username]||[]).push(r)});
+    mS.forEach(d=>{const r=d.data();(fonte.mal[r.username]=fonte.mal[r.username]||[]).push(r)});
+    const batch=db.batch();
+    const ora=new Date().toISOString();
+    dipList.forEach((emp,i)=>{
+      // Monte dell'anno chiuso: quello già archiviato se esiste (in gennaio si può aggiornare il monte per il nuovo anno)
+      const prec=archS[i]&&archS[i].exists?archS[i].data():null;
+      const monti=prec&&prec.monteFerie!==undefined?{monteFerie:prec.monteFerie,montePermesso:prec.montePermesso,monteRol:prec.monteRol}:{};
+      const sa=calcolaSaldiAnno({...emp,...monti},ANNO_PREC,fonte);
+      batch.set(db.collection('dipendenti').doc(emp.username).collection('archivio').doc(String(ANNO_PREC)),
+        {anno:ANNO_PREC,...sa,salvatoIl:ora,salvatoDa:ADM?ADM.username:''},{merge:true});
+    });
+    await batch.commit();
+    console.log('Consuntivo '+ANNO_PREC+' archiviato per',dipList.length,'dipendenti');
+  }catch(e){console.log('Archivio consuntivo:',e.message)}
 }
 
 // ── COSTI MENSILI ─────────────────────────────────────────────────────
@@ -3558,12 +3711,8 @@ async function loadCostiMensili(){
   el.innerHTML='<div class="empty-state">Caricamento...</div>';
   if(!dipList.length){await loadDashboard();}
   // Carica tutti i giorni per tutti i dipendenti
-  const tuttiDati=await Promise.all(dipList.map(async emp=>{
-    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-    const days={};snap.forEach(d=>{days[d.id]=d.data()});
-    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
-    return{...emp,days};
-  }));
+  // Anno in uso dalla cache; anni precedenti da Firestore solo la prima volta
+  const tuttiDati=await Promise.all(dipList.map(async emp=>({...emp,days:await giorniAnnoConAssenze(emp,anno)})));
   // Crea tabella per mese
   let html='<div style="overflow-x:auto">';
   html+=`<table style="width:100%;border-collapse:collapse;font-size:12px;background:white;border-radius:10px;overflow:hidden;border:.5px solid var(--border)">`;
@@ -3607,12 +3756,8 @@ async function loadCostiMensili(){
 async function esportaCostiExcel(){
   const anno=parseInt(document.getElementById('costi-anno')?.value)||ANNO;
   if(!dipList.length){await loadDashboard();}
-  const tuttiDati=await Promise.all(dipList.map(async emp=>{
-    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-    const days={};snap.forEach(d=>{days[d.id]=d.data()});
-    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
-    return{...emp,days};
-  }));
+  // Anno in uso dalla cache; anni precedenti da Firestore solo la prima volta
+  const tuttiDati=await Promise.all(dipList.map(async emp=>({...emp,days:await giorniAnnoConAssenze(emp,anno)})));
   const wb=XLSX.utils.book_new();
   // Foglio riepilogo costi
   const hh=['Dipendente',...MESI,'TOTALE ANNO'];
@@ -3760,9 +3905,7 @@ async function loadArchivio(){
   // Legge i dati di TUTTI i dipendenti in parallelo invece che uno alla volta: stesso risultato, molto più veloce
   // (prima impiegava una query Firestore alla volta in sequenza, una per dipendente)
   const cards=await Promise.all(dipDaVisualizzare.map(async emp=>{
-    const snap=await db.collection('timesheets').doc(String(anno)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-    const days={};snap.forEach(d=>{days[d.id]=d.data()});
-    iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
+    const days=await giorniAnnoConAssenze(emp,anno);
     const tariffe=emp.tariffe||{};
     const totals={};CN.forEach(c=>{totals[c.k]=Object.values(days).reduce((s,d)=>s+(parseFloat(d[c.k])||0),0)});
     const totOre=CN.filter(c=>!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+totals[c.k],0);
@@ -3868,13 +4011,15 @@ let tuttiStraord=[];
 let filtroStraord='da_convalidare';
 
 async function aggiornaBadgeStraord(){
+  // Conta dai dati già in memoria (dipDataCache) — ZERO query Firestore
   try{
-    if(!dipList.length)return;
-    let cnt=0;
-    await Promise.all(dipList.map(async emp=>{
-      const s=await db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-      s.forEach(g=>{const d=g.data();if((parseFloat(d.oreStraordinariElettrico)||0)+(parseFloat(d.oreStraordinariMeccanico)||0)>0&&(!d.statoStraordinari||d.statoStraordinari==='da_convalidare'))cnt++;});
-    }));
+    let cnt=0;const pref=ANNO+'-';
+    dipList.forEach(emp=>{
+      Object.entries(dipDataCache[emp.username]?.days||{}).forEach(([id,d])=>{
+        if(!id.startsWith(pref))return;
+        if((parseFloat(d.oreStraordinariElettrico)||0)+(parseFloat(d.oreStraordinariMeccanico)||0)>0&&(!d.statoStraordinari||d.statoStraordinari==='da_convalidare'))cnt++;
+      });
+    });
     const badge=document.getElementById('badge-straord');
     if(badge){badge.textContent=cnt;badge.className='nav-badge'+(cnt>0?' alert':'');}
   }catch(e){console.log('Badge straord:',e.message)}
@@ -3993,7 +4138,7 @@ async function esportaStraordExcel(){
 
 // ── BACKUP COMPLETO ────────────────────────────────────────────────────
 async function eseguiBackup(){
-  const btn=event.target;btn.textContent='Backup...';btn.disabled=true;
+  const btn=(arguments[0]&&arguments[0].target)||document.querySelector('[onclick^="eseguiBackup"]');btn.textContent='Backup...';btn.disabled=true;
   try{
     const backup={dataBackup:new Date().toISOString(),anno:ANNO,dipendenti:[],richieste_assenza:[],malattie:[],timesheets:{}};
     (await db.collection('dipendenti').get()).forEach(d=>backup.dipendenti.push({id:d.id,...d.data()}));
@@ -4019,6 +4164,7 @@ async function eseguiBackup(){
 
 // ── EXPORT FERIE EXCEL
 async function esportaFerieExcel(){
+  try{await assicuraStoricoAssenze()}catch(e){alert('Errore caricamento storico assenze: '+e.message);return}
   const T={ferie:'Ferie',permesso:'Permesso',rol:'ROL',malattia:'Malattia'};
   const hh=['Dipendente','Tipo','Data Inizio','Data Fine','Ore/Giorni','Stato','Note','Nota Admin'];
   const rr=[...tutteR.map(r=>[r.nomeCompleto||r.username,T[r.tipo]||r.tipo,r.dataInizio,r.dataFine,(r.oreRichieste||0)+'h',r.stato==='approvata'?'Approvata':r.stato==='rifiutata'?'Rifiutata':'In attesa',r.note||'',r.notaAdmin||'']),
@@ -5376,6 +5522,7 @@ let STAT_periodo=null,STAT_tipologia=[],STAT_assenze=[],STAT_commesse=[];
 let STAT_chartTip=null,STAT_chartComm=null;
 
 function initStatistiche(){
+  STAT_RIGHE_CACHE={}; // le righe possono essere cambiate da Budget Contract / Registro Titolare
   if(!STAT_periodo){
     const oggi=new Date();
     STAT_periodo={annoIni:ANNO,meseIni:0,annoFin:ANNO,meseFin:oggi.getFullYear()===ANNO?oggi.getMonth():11};
@@ -5395,6 +5542,8 @@ async function statCalcolaTutto(){
   const p=STAT_periodo;if(!p)return;
   document.getElementById('stat-loading').style.display='';
   try{
+    // Periodo che tocca anni precedenti: serve lo storico assenze (scaricato una volta sola)
+    if(p.annoIni<ANNO)await assicuraStoricoAssenze();
     await Promise.all([statCalcolaTipologia(p),statCalcolaAssenze(p),statCalcolaCommesse(p),statCalcolaAttGen(p)]);
   }catch(e){console.error('Errore statistiche:',e)}
   document.getElementById('stat-loading').style.display='none';
@@ -5417,10 +5566,8 @@ async function statCalcolaTipologia(p){
   periodoAnni(p).forEach(y=>(dipList||[]).forEach(emp=>tasks.push({y,emp})));
   const risultati=await Promise.all(tasks.map(async({y,emp})=>{
     try{
-      const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-      const days={};snap.forEach(d=>{days[d.id]=d.data()});
-      iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
-      return days;
+      // Anno in uso dalla cache, altri anni da Firestore solo la prima volta
+      return await giorniAnnoConAssenze(emp,y);
     }catch(e){return {}}
   }));
   risultati.forEach(days=>{
@@ -5536,8 +5683,8 @@ async function statCalcolaAttGen(p){
   periodoAnni(p).forEach(y=>(dipList||[]).forEach(emp=>tasks.push({y,emp})));
   const risultati=await Promise.all(tasks.map(async({y,emp})=>{
     try{
-      const snap=await db.collection('timesheets').doc(String(y)).collection('dipendenti').doc(emp.username).collection('giorni').get();
-      const giorni=[];snap.forEach(d=>giorni.push(d.data()));
+      const days=await giorniAnnoDip(emp.username,y);
+      const giorni=Object.values(days);
       return {emp,giorni};
     }catch(e){return {emp,giorni:[]}}
   }));
@@ -5595,9 +5742,13 @@ async function statCalcolaCommesse(p){
   // commesse accumulate negli anni la versione sequenziale diventava via via più lenta.
   const risultati=await Promise.all(commesseRilevanti.map(async c=>{
     try{
-      const snap=await db.collection('commesse').doc(c.numero).collection('righe').get();
+      // Righe della commessa: scaricate la prima volta, poi riusate cambiando periodo (fino ad "Aggiorna")
+      if(!STAT_RIGHE_CACHE[c.numero]){
+        const snap=await db.collection('commesse').doc(c.numero).collection('righe').get();
+        STAT_RIGHE_CACHE[c.numero]=snap.docs.map(d=>d.data());
+      }
       let ore=0,km=0,trovato=false;
-      snap.forEach(d=>{const r=d.data();if(!periodoInRange(r.data,p))return;trovato=true;ore+=parseFloat(r.ore)||0;km+=parseFloat(r.km)||0});
+      STAT_RIGHE_CACHE[c.numero].forEach(r=>{if(!periodoInRange(r.data,p))return;trovato=true;ore+=parseFloat(r.ore)||0;km+=parseFloat(r.km)||0});
       return trovato?{numero:c.numero,committente:c.committente||'',ore,km}:null;
     }catch(e){return null}
   }));
@@ -5642,15 +5793,6 @@ function statEsportaCommessePDF(){
 }
 </script>
 <script src="contab_module.js" defer></script>
-<script src="importa_storico_orario.js" defer></script>
-<script src="correzione_storico_orario.js" defer></script>
-<script src="pulizia_duplicati.js" defer></script>
-<script src="correzione_nomi_commesse.js" defer></script>
-<script src="monte_ore_preventivato_data.js" defer></script>
-<script src="migrazione_monte_ore_split.js" defer></script>
-<script src="storico_budget_v2_data.js" defer></script>
-<script src="migrazione_storico_v2.js" defer></script>
-<script src="aggiorna_tariffe_standard.js" defer></script>
 <script src="bc_esporta_tutti.js" defer></script>
 </body>
 </html>
