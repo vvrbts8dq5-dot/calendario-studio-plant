@@ -1099,7 +1099,7 @@ auth.onAuthStateChanged(async user=>{
   try{
     const trovato=await trovaDipendentePerEmail(user.email);
     if(trovato&&trovato.data.abilitato&&!trovato.data.bloccatoInattivita){
-      U={username:trovato.username};profilo=trovato.data();
+      U={username:trovato.username};profilo=trovato.data;
       await db.collection('dipendenti').doc(trovato.username).update({ultimoAccesso:new Date().toISOString()});
       startApp();
     }else if(trovato&&trovato.data.bloccatoInattivita){
@@ -1167,7 +1167,9 @@ async function caricaTuttiDati(){
   }
 }
 
+let APP_AVVIATA=false; // evita il doppio avvio (doLogin + onAuthStateChanged scattano entrambi al login)
 async function startApp(){
+  if(APP_AVVIATA)return;APP_AVVIATA=true;
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
   const nome=`${profilo.nome||''} ${profilo.cognome||''}`.trim();
@@ -1194,6 +1196,7 @@ document.getElementById('btn-logout').addEventListener('click',async()=>{
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('inp-user').value='';document.getElementById('inp-pass').value='';
   try{await auth.signOut()}catch(e){console.log('Logout:',e.message)}
+  location.reload(); // riparte pulito: niente listener o cache residui al login successivo
 });
 
 // SIDEBAR MOBILE

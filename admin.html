@@ -1760,7 +1760,9 @@ function iniettaAssenzeInGiorni(days,username,oreGiorno){
   malattie.forEach(m=>espandiGiorniLavorativi(m.dataInizio,m.dataFine).forEach(ds=>aggiungi(ds,'oreFestivitaMalattia',oreGiorno)));
 }
 
+let APP_AVVIATA=false; // evita il doppio avvio (doLogin + onAuthStateChanged scattano entrambi al login)
 function startApp(){
+  if(APP_AVVIATA)return;APP_AVVIATA=true;
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app').classList.add('visible');
   document.getElementById('sidebar-nome').textContent=ADM.nome||ADM.username;
@@ -1965,6 +1967,7 @@ document.getElementById('btn-logout').addEventListener('click',async()=>{
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display='flex';
   try{await auth.signOut()}catch(e){console.log('Logout:',e.message)}
+  location.reload(); // riparte pulito: niente listener o cache residui al login successivo
 });
 
 // SIDEBAR MOBILE
@@ -2009,32 +2012,38 @@ async function loadDashboard(){
   const usersSnap=await db.collection('dipendenti').get();
   dipList=usersSnap.docs.map(d=>({username:d.id,...d.data()}));
 
-  // Carica dati timesheets per ogni dipendente
+  // Timesheet e saldi (richieste/malattie/chiusure) in parallelo; le assenze si iniettano
+  // nei giorni solo DOPO che i saldi sono arrivati (prima venivano iniettate con dati vuoti o vecchi)
   dipDataCache={};
-  await Promise.all(dipList.map(async emp=>{
+  const saldiP=Promise.all([
+    db.collection('richieste_assenza').get(),
+    db.collection('malattie').get(),
+    db.collection('chiusure').get()
+  ]);
+  const tsP=Promise.all(dipList.map(emp=>Promise.all([
+      db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get(),
+      db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
+    ]).then(r=>({emp,snaps:r})).catch(e=>{console.error('Timesheet '+emp.username,e);return {emp,snaps:null}})));
+  const [[richSnap,malSnap,chiusSnap],tsRes]=await Promise.all([saldiP,tsP]);
+
+  // Carica saldi per tutti
+  chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
+  ADM_richPerUser={};ADM_malPerUser={};
+  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_richPerUser[r.username])ADM_richPerUser[r.username]=[];ADM_richPerUser[r.username].push(r)});
+  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_malPerUser[r.username])ADM_malPerUser[r.username]=[];ADM_malPerUser[r.username].push(r)});
+
+  // Giorni per dipendente, con assenze iniettate
+  tsRes.forEach(({emp,snaps})=>{
     try{
-      const[snap,snapNext]=await Promise.all([
-        db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(emp.username).collection('giorni').get(),
-        db.collection('timesheets').doc(String(ANNO+1)).collection('dipendenti').doc(emp.username).collection('giorni').get()
-      ]);
+      if(!snaps)throw new Error('timesheet non caricato');
+      const[snap,snapNext]=snaps;
       const days={};snap.forEach(d=>{days[d.id]=d.data()});snapNext.forEach(d=>{days[d.id]=d.data()});
       iniettaAssenzeInGiorni(days,emp.username,oreGiornoDip(emp));
       // I totali della dashboard restano riferiti al solo ANNO corrente
       const totals={};CN.forEach(c=>{totals[c.k]=Object.entries(days).filter(([id])=>id.startsWith(String(ANNO)+'-')).reduce((s,[,d])=>s+(parseFloat(d[c.k])||0),0)});
       dipDataCache[emp.username]={days,totals};
     }catch{dipDataCache[emp.username]={days:{},totals:{}}}
-  }));
-
-  // Carica saldi per tutti
-  const [richSnap,malSnap,chiusSnap]=await Promise.all([
-    db.collection('richieste_assenza').get(),
-    db.collection('malattie').get(),
-    db.collection('chiusure').get()
-  ]);
-  chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
-  ADM_richPerUser={};ADM_malPerUser={};
-  richSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_richPerUser[r.username])ADM_richPerUser[r.username]=[];ADM_richPerUser[r.username].push(r)});
-  malSnap.forEach(d=>{const r={id:d.id,...d.data()};if(!ADM_malPerUser[r.username])ADM_malPerUser[r.username]=[];ADM_malPerUser[r.username].push(r)});
+  });
   // Salva tutteR e tutteMalattie per la pagina Ferie & Assenze
   tutteR=richSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
   tutteMalattie=malSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toDate?b.createdAt.toDate().getTime():new Date(b.createdAt||0).getTime())-(a.createdAt&&a.createdAt.toDate?a.createdAt.toDate().getTime():new Date(a.createdAt||0).getTime())));
