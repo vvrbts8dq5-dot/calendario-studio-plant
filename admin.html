@@ -1612,7 +1612,7 @@ function totGiorno(d){if(!d)return 0;return CN.filter(c=>!ESCL_TOT_ORE.includes(
 // Formatta un totale ore giornaliero per le etichette accanto alla data (es. "4.5h", "7h"). Stringa vuota se 0/assente.
 function fmtOreGiorno(v){const n=parseFloat(v)||0;if(n<=0)return'';return(n%1===0?n:n.toFixed(1))+'h'}
 function oreLav(t){return(t?.oreElectriciMD||0)+(t?.oreMeccaniciMA||0)+(t?.oreAttivitaGenerali||0)+(t?.oreStraordinariElettrico||0)+(t?.oreStraordinariMeccanico||0)}
-function giorniLav(dal,al){let cnt=0;const d=new Date(dal),fine=new Date(al);while(d<=fine){const dow=d.getDay(),ds=d.toISOString().split('T')[0];if(dow!==0&&dow!==6&&!FESTIVITA.includes(ds))cnt++;d.setDate(d.getDate()+1)}return cnt}
+function giorniLav(dal,al){return espandiGiorniLavorativi(dal,al).length} // date locali: niente errori al cambio dell'ora legale
 function initials(n,c){return ((n||'?')[0]+(c||'?')[0]).toUpperCase()}
 // Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
 // con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
@@ -1704,6 +1704,15 @@ function isFestivitaNazionale(ds){
 // Data locale 'YYYY-MM-DD' (senza passare da UTC: con toISOString il cambio dell'ora legale
 // faceva saltare o ripetere un giorno nei periodi a cavallo di fine marzo / fine ottobre)
 function dsLocale(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function espandiTuttiGiorni(dal,al){
+  // Tutti i giorni (weekend compresi) tra due date 'YYYY-MM-DD', in ora locale: niente salti al cambio dell'ora legale
+  const out=[];
+  if(!dal||!al)return out;
+  const d=new Date(String(dal).slice(0,10)+'T12:00:00'),fine=new Date(String(al).slice(0,10)+'T12:00:00');
+  let guard=0;
+  while(d<=fine&&guard<800){out.push(dsLocale(d));d.setDate(d.getDate()+1);guard++}
+  return out;
+}
 function espandiGiorniLavorativi(dal,al){
   const out=[];
   if(!dal||!al)return out;
@@ -2007,7 +2016,7 @@ async function checkInattivita(){
       cur.setDate(cur.getDate()+1);
       while(cur<oggi){
         const dow=cur.getDay();
-        const ds=cur.toISOString().split('T')[0];
+        const ds=dsLocale(cur);
         if(dow!==0&&dow!==6&&!FESTIVITA_CHECK.includes(ds))ggLav++;
         cur.setDate(cur.getDate()+1);
       }
@@ -2372,14 +2381,12 @@ function loadDetMese(){
   // Assenze approvate dalla cache
   (ADM_richPerUser[detUser]||[]).forEach(r=>{
     if(r.stato==='approvata'&&(r.tipo==='ferie'||r.tipo==='permesso'||r.tipo==='rol'||r.tipo==='congedo')){
-      const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
-      while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}cur.setDate(cur.getDate()+1)}
+      espandiTuttiGiorni(r.dataInizio,r.dataFine).forEach(ds=>{if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']=r.tipo}});
     }
   });
   // Malattie dalla cache
   (ADM_malPerUser[detUser]||[]).forEach(r=>{
-    const cur=new Date(r.dataInizio),fine=new Date(r.dataFine);
-    while(cur<=fine){const ds=cur.toISOString().split('T')[0];if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia';detDays[ds]['_protocollo']=r.protocollo||''}cur.setDate(cur.getDate()+1)}
+    espandiTuttiGiorni(r.dataInizio,r.dataFine).forEach(ds=>{if(ds.startsWith(pref)){if(!detDays[ds])detDays[ds]={};detDays[ds]['_assenza']='malattia';detDays[ds]['_protocollo']=r.protocollo||''}});
   });
   renderDetCal();
   renderDetTotali();
@@ -4506,7 +4513,7 @@ function apriFormTit(id){
   document.getElementById('tit-form-alert').innerHTML='';
   const r=id?TIT_righe.find(x=>x.id===id):null;
   document.getElementById('tit-descrizione').value=r&&r.descrizione?r.descrizione:'';
-  document.getElementById('tit-data').value=r&&r.data?r.data:new Date().toISOString().split('T')[0];
+  document.getElementById('tit-data').value=r&&r.data?r.data:dsLocale(new Date());
   const selCommessaTit=document.getElementById('tit-commessa');
   selCommessaTit.innerHTML='<option value="">— Nessuna —</option>'+BC_commesse.map(c=>{
     const fasi=bcFasi(c);
@@ -5478,7 +5485,7 @@ function bcRenderStampe(stampe){
 
 function apriFormRigaBC(){
   document.getElementById('bc-riga-alert').innerHTML='';
-  document.getElementById('bc-r-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-r-data').value=dsLocale(new Date());
   document.getElementById('bc-r-descrizione').value='';
   document.getElementById('bc-r-ore').value='';
   document.getElementById('bc-r-spese').value='';
@@ -5554,7 +5561,7 @@ async function eliminaRigaBC(id){
 
 function apriFormStampaBC(){
   document.getElementById('bc-stampa-alert').innerHTML='';
-  document.getElementById('bc-s-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-s-data').value=dsLocale(new Date());
   document.getElementById('bc-s-copie').value=1;
   document.getElementById('bc-s-note').value='';
   const c=BC_commesse.find(x=>x.numero===BC_current);

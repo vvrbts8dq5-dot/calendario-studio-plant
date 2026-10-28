@@ -958,6 +958,15 @@ function isFestivitaNazionale(ds){
   if(!FESTIVITA_ALTRI_ANNI[y])FESTIVITA_ALTRI_ANNI[y]=festivitaAnno(y);
   return FESTIVITA_ALTRI_ANNI[y].includes(ds);
 }
+function espandiTuttiGiorni(dal,al){
+  // Tutti i giorni (weekend compresi) tra due date 'YYYY-MM-DD', in ora locale: niente salti al cambio dell'ora legale
+  const out=[];
+  if(!dal||!al)return out;
+  const d=new Date(String(dal).slice(0,10)+'T12:00:00'),fine=new Date(String(al).slice(0,10)+'T12:00:00');
+  let guard=0;
+  while(d<=fine&&guard<800){out.push(dsLocale(d));d.setDate(d.getDate()+1);guard++}
+  return out;
+}
 function espandiGiorniLavorativi(dal,al){
   const out=[];
   if(!dal||!al)return out;
@@ -1409,7 +1418,24 @@ function initCal(){
   document.getElementById('mese-succ').addEventListener('click',()=>{if(meseSel<MESE_MAX_ABS){meseSel++;document.getElementById('sel-mese').value=meseSel;loadMese(meseSel)}});
 }
 
+// AUTOSAVE — il salvataggio programmato resta legato al giorno MODIFICATO (non a quello selezionato
+// quando scatta il timer) e viene eseguito subito se si cambia giorno/mese prima dei 1,5 s.
+let saveDsPending=null;
+function programmaSalvataggio(){
+  if(!giornoSel)return;
+  if(saveTimer)clearTimeout(saveTimer);
+  if(saveDsPending&&saveDsPending!==giornoSel)saveDay(saveDsPending);
+  const ds=giornoSel;saveDsPending=ds;
+  saveTimer=setTimeout(()=>{saveTimer=null;saveDsPending=null;saveDay(ds)},1500);
+}
+function salvaInSospeso(){
+  if(saveTimer){clearTimeout(saveTimer);saveTimer=null}
+  const ds=saveDsPending;saveDsPending=null;
+  if(ds)saveDay(ds);
+}
+window.addEventListener('beforeunload',()=>{try{salvaInSospeso()}catch(e){}});
 function loadMese(m){
+  salvaInSospeso();
   const{anno:annoM,mese:meseM}=annoMese(m);
   const pref=annoM+'-'+pad(meseM+1);
   cache={};
@@ -1419,23 +1445,15 @@ function loadMese(m){
   });
   // Assenze approvate per colorare il calendario
   ALL_ASSENZE.filter(r=>r.stato==='approvata').forEach(r=>{
-    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
-    const cur=new Date(inizio);
-    while(cur<=fine){
-      const ds=cur.toISOString().split('T')[0];
+    espandiTuttiGiorni(r.dataInizio,r.dataFine).forEach(ds=>{
       if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']=r.tipo}
-      cur.setDate(cur.getDate()+1);
-    }
+    });
   });
   // Malattie
   ALL_MALATTIE.forEach(r=>{
-    const inizio=new Date(r.dataInizio),fine=new Date(r.dataFine);
-    const cur=new Date(inizio);
-    while(cur<=fine){
-      const ds=cur.toISOString().split('T')[0];
+    espandiTuttiGiorni(r.dataInizio,r.dataFine).forEach(ds=>{
       if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
-      cur.setDate(cur.getDate()+1);
-    }
+    });
   });
   renderCal(m);
 }
@@ -1474,6 +1492,7 @@ function renderCal(m){
 }
 
 function selectDay(ds){
+  if(saveDsPending&&saveDsPending!==ds)salvaInSospeso();
   giornoSel=ds;renderCal(meseSel);
   let dati=cache[ds]||ALL_GIORNI[ds]||null;
   renderForm(ds,dati||{});
@@ -1617,8 +1636,7 @@ function rcChange(i,field,value){
   }else{
     arr[i][field]=field==='ore'?(value===''?'':(parseFloat(value)||0)):value;
   }
-  if(saveTimer)clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+  programmaSalvataggio();
 }
 function rcClear(i){
   const arr=rcEnsure();
@@ -1629,8 +1647,7 @@ function rcClear(i){
   rcApplicaDeltaTotale('kmPercorsi',-kmVecchio);
   rcApplicaDeltaTotale('speseExtra',-speseVecchie);
   renderForm(giornoSel,cache[giornoSel]);
-  if(saveTimer)clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+  programmaSalvataggio();
 }
 
 function fieldChange(k,v){
@@ -1648,7 +1665,7 @@ function fieldChange(k,v){
     div.innerHTML=`<span class="totale-giorno-label">TOTALE ORE GIORNATA</span><span class="totale-giorno-val">${tot}h</span>`;
     form.appendChild(div);
   }
-  saveTimer=setTimeout(()=>saveDay(giornoSel),1500);
+  programmaSalvataggio();
 }
 
 // Collega/scollega le righe "Ore per Commessa" del giorno ds alle righe reali
@@ -1693,16 +1710,16 @@ async function saveDay(ds){
     toSave.hasStraordinari=(straEl>0||straMec>0);
     const salvaGiornoP=db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').doc(ds).set({...toSave,username:U.username,data:ds,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     const syncP=syncRigheCommesseBC(ds,toSave.righeCommesse||[]);
+    // Aggiorna subito la cache locale: se nel frattempo si cambia mese, il calendario mostra già i valori nuovi
+    ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
     await Promise.all([salvaGiornoP,syncP]);
     segnalaAttivita('ore');
-    // Aggiorna cache locale immediatamente
-    ALL_GIORNI[ds]={...toSave,username:U.username,data:ds};
     if(st)st.innerHTML='<span class="save-ok">✓ Salvato</span>';
     renderCal(meseSel);
     setTimeout(()=>{if(st)st.innerHTML=''},2500);
-  }catch(e){if(st)st.innerHTML='<span class="save-err">✗ Errore</span>'}
+  }catch(e){console.error('Salvataggio giorno '+ds+':',e);if(st)st.innerHTML='<span class="save-err">✗ Errore — riprova</span>'}
 }
-function saveDayManual(){if(saveTimer)clearTimeout(saveTimer);saveDay(giornoSel)}
+function saveDayManual(){if(saveTimer){clearTimeout(saveTimer);saveTimer=null}saveDsPending=null;saveDay(giornoSel)}
 
 // Segnala all'admin (pulsante Aggiorna) che ci sono nuovi dati da vedere
 function segnalaAttivita(tipo){
@@ -2988,7 +3005,7 @@ function bcRenderStampe(stampe){
 
 function apriFormRigaBC(){
   document.getElementById('bc-riga-alert').innerHTML='';
-  document.getElementById('bc-r-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-r-data').value=dsOggi();
   document.getElementById('bc-r-descrizione').value='';
   document.getElementById('bc-r-ore').value='';
   document.getElementById('bc-r-spese').value='';
@@ -3037,7 +3054,7 @@ async function eliminaRigaBC(id){
 
 function apriFormStampaBC(){
   document.getElementById('bc-stampa-alert').innerHTML='';
-  document.getElementById('bc-s-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('bc-s-data').value=dsOggi();
   document.getElementById('bc-s-copie').value=1;
   document.getElementById('bc-s-note').value='';
   const c=BC_commesse.find(x=>x.numero===BC_current);
