@@ -23,6 +23,7 @@
   --gc-chiusura:#DC2626;--gc-chiusura-bg:#FEE2E2;
   --gc-ferie:#F97316;--gc-ferie-bg:#FFEDD5;
   --gc-malattia:#8B5CF6;--gc-malattia-bg:#EDE9FE;
+  --gc-benefici:#475569;--gc-benefici-bg:#E2E8F0;
   --gc-permesso:#2563EB;--gc-permesso-bg:#DBEAFE;
   --gc-rol:#CA8A04;--gc-rol-bg:#FEF9C3;
   --gc-congedo:#0891B2;--gc-congedo-bg:#CFFAFE;
@@ -118,6 +119,8 @@ a{text-decoration:none;color:inherit}
 .badge-approvata{background:var(--verde-light);color:var(--verde)}
 .badge-rifiutata{background:var(--rosso-light);color:var(--rosso)}
 .badge-malattia{background:var(--viola-light);color:var(--viola)}
+.badge-benefici{background:var(--gc-benefici-bg);color:var(--gc-benefici)}
+.btn-benefici{background:var(--gc-benefici);color:#fff;border-color:var(--gc-benefici)}
 
 /* CALENDARIO */
 .cal-layout{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
@@ -140,12 +143,13 @@ a{text-decoration:none;color:inherit}
 .cal-day.gc-chiusura{background:var(--gc-chiusura-bg);color:var(--gc-chiusura);font-weight:600}
 .cal-day.gc-ferie{background:var(--gc-ferie-bg);color:var(--gc-ferie);font-weight:600}
 .cal-day.gc-malattia{background:var(--gc-malattia-bg);color:var(--gc-malattia);font-weight:600}
+.cal-day.gc-benefici{background:var(--gc-benefici-bg);color:var(--gc-benefici);font-weight:600}
 .cal-day.gc-permesso{background:var(--gc-permesso-bg);color:var(--gc-permesso);font-weight:600}
 .cal-day.gc-rol{background:var(--gc-rol-bg);color:var(--gc-rol);font-weight:600}
 .cal-day.gc-congedo{background:var(--gc-congedo-bg);color:var(--gc-congedo);font-weight:600}
 .cal-day.gc-chiusura-festivo,.cal-ferie-cell.gc-chiusura-festivo{background:repeating-linear-gradient(45deg,var(--gc-chiusura-bg) 0 8px,var(--gc-festivo-bg) 8px 16px);color:var(--gc-chiusura);font-weight:600}
 .cal-day.gc-compilato{background:#F8FAFC;color:var(--ink4);opacity:.55}
-.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-congedo.selected,.cal-day.gc-chiusura-festivo.selected,.cal-day.gc-compilato.selected{background:var(--blu)!important;color:#fff!important;opacity:1}
+.cal-day.gc-festivo.selected,.cal-day.gc-chiusura.selected,.cal-day.gc-ferie.selected,.cal-day.gc-malattia.selected,.cal-day.gc-benefici.selected,.cal-day.gc-permesso.selected,.cal-day.gc-rol.selected,.cal-day.gc-congedo.selected,.cal-day.gc-chiusura-festivo.selected,.cal-day.gc-compilato.selected{background:var(--blu)!important;color:#fff!important;opacity:1}
 .cal-day.selected{background:var(--blu)!important;color:#fff!important;border-color:var(--blu-dark)!important}
 .cal-day.selected::after{display:none}
 .cal-day.gc-mancante::before{content:'❗';position:absolute;top:-4px;right:-3px;font-size:12px;line-height:1;filter:drop-shadow(0 0 1px rgba(255,255,255,.9))}
@@ -413,6 +417,10 @@ tbody tr:last-child{border-bottom:none}
         <span class="saldo-label">Giorni malattia</span>
         <span class="saldo-val" id="sb-malattia" style="color:var(--viola)">0 gg</span>
       </div>
+      <div class="saldo-row">
+        <span class="saldo-label">Benefici di legge</span>
+        <span class="saldo-val" id="sb-benefici" style="color:var(--gc-benefici)">0 gg</span>
+      </div>
     </div>
     <div class="sidebar-footer">
       <div class="user-name" id="sidebar-nome"></div>
@@ -446,6 +454,7 @@ tbody tr:last-child{border-bottom:none}
                 <span><span class="cal-legend-dot" style="background:var(--gc-chiusura)"></span>Chiusura uffici</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-ferie)"></span>Ferie</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-malattia)"></span>Malattia</span>
+                <span><span class="cal-legend-dot" style="background:var(--gc-benefici)"></span>Benefici di legge</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-permesso)"></span>Permesso</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-rol)"></span>ROL</span>
                 <span><span class="cal-legend-dot" style="background:var(--gc-congedo)"></span>Congedo</span>
@@ -499,6 +508,7 @@ tbody tr:last-child{border-bottom:none}
           <button class="ass-tab" onclick="setAssTab(this,'rol')">🔄 ROL</button>
           <button class="ass-tab" onclick="setAssTab(this,'congedo')">🗂️ Congedi</button>
           <button class="ass-tab" onclick="setAssTab(this,'malattia')">🤒 Malattia</button>
+          <button class="ass-tab" onclick="setAssTab(this,'benefici')">⚖️ Benefici di legge</button>
         </div>
 
         <!-- TAB FERIE -->
@@ -619,6 +629,25 @@ tbody tr:last-child{border-bottom:none}
           </div>
           <div class="section-title">Storico Malattie</div>
           <div id="lista-malattia"><div class="empty-state">Caricamento...</div></div>
+        </div>
+
+        <!-- TAB BENEFICI DI LEGGE (donazione sangue, L.104, ecc.): nessun monte ore scalato, solo calendario + buste paga -->
+        <div class="ass-subtab" id="subtab-benefici">
+          <div class="malattia-form">
+            <div class="section-title">Registra Benefici di legge</div>
+            <div style="font-size:12px;color:var(--ink4);margin:-6px 0 12px">Permessi previsti dalla legge (es. donazione di sangue): non vengono scalati da ferie, permessi o ROL. Compaiono nel calendario e servono all'amministrazione per le buste paga.</div>
+            <div id="alert-benefici"></div>
+            <div class="form-grid">
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Tipo di beneficio</label><select class="f-input" style="margin:0" id="ben-tipo"></select></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Inizio</label><input class="f-input" style="margin:0" type="date" id="ben-inizio"></div>
+              <div><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Data Fine</label><input class="f-input" style="margin:0" type="date" id="ben-fine"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Numero di certificato * (obbligatorio)</label><input class="f-input" style="margin:0" type="text" id="ben-certificato" placeholder="es. numero del certificato rilasciato" autocomplete="off"></div>
+              <div style="grid-column:1/-1"><label class="f-label" style="margin-bottom:5px;font-size:11px;color:var(--ink4)">Note (facoltative)</label><textarea class="f-input field-textarea" style="margin:0" id="ben-note" rows="2" placeholder="Eventuali note..."></textarea></div>
+            </div>
+            <button class="btn btn-benefici" style="margin-top:12px" onclick="inserisciBeneficio()">⚖️ Registra Benefici di legge</button>
+          </div>
+          <div class="section-title">Storico Benefici di legge</div>
+          <div id="lista-benefici"><div class="empty-state">Caricamento...</div></div>
         </div>
       </div>
 
@@ -906,7 +935,8 @@ const TIPI_ATTIVITA_GENERALI=[
 ];
 const CN=CAMPI.filter(c=>c.t==='number');
 // Colonne che NON entrano nei totali ore: km, spese e Malattia (la malattia ha il suo totale separato)
-const ESCL_TOT_ORE=['kmPercorsi','speseExtra','oreFestivitaMalattia'];
+// Anche i Benefici di legge restano fuori dal totale ore (totale separato, come la malattia)
+const ESCL_TOT_ORE=['kmPercorsi','speseExtra','oreFestivitaMalattia','oreBeneficiLegge'];
 // Colonne virtuali di assenza (Ferie/Permesso/ROL/Malattia): NON fanno parte dei campi compilabili
 // nel form del giorno (CAMPI) — vengono calcolate al volo dal sistema "Ferie & Assenze" solo per i
 // report (Riepilogo Mensile a schermo + esportazioni), esattamente come già avviene in admin.html.
@@ -915,7 +945,17 @@ const CN_ASSENZE=[
   {k:'orePermesso',l:'Ore Permesso',t:'number'},
   {k:'oreRol',l:'Ore ROL',t:'number'},
   {k:'oreFestivitaMalattia',l:'Ore Malattia',t:'number'},
+  {k:'oreBeneficiLegge',l:'Ore Benefici di legge',t:'number'},
 ];
+// Tipi di "Benefici di legge" (stesse chiavi usate in admin.html)
+const TIPI_BENEFICI=[
+  {k:'donazione_sangue',l:'Donazione di sangue / emocomponenti'},
+  {k:'donazione_midollo',l:'Donazione di midollo osseo'},
+  {k:'legge_104',l:'Permesso L. 104/92'},
+  {k:'seggio_elettorale',l:'Seggio elettorale'},
+  {k:'altro',l:'Altro'},
+];
+function labelTipoBeneficio(k){return (TIPI_BENEFICI.find(t=>t.k===k)||{}).l||'Benefici di legge'}
 // CN con le colonne di assenza inserite dopo "Ore Attività Generali", stesso ordine usato in admin.html
 const CN_REPORT=(()=>{const i=CN.findIndex(c=>c.k==='oreAttivitaGenerali');const a=CN.slice();a.splice(i+1,0,...CN_ASSENZE);return a})();
 function totaleGiornoReport(d){if(!d)return 0;return CN_REPORT.filter(c=>!ESCL_TOT_ORE.includes(c.k)).reduce((s,c)=>s+(parseFloat(d[c.k])||0),0)}
@@ -927,6 +967,7 @@ let assTab='ferie';
 let ALL_GIORNI={};  // {data_string: {campi...}} — tutti i giorni dell'anno
 let ALL_ASSENZE=[]; // [{id,tipo,stato,dataInizio,...}] — tutte le richieste assenza
 let ALL_MALATTIE=[]; // [{id,dataInizio,dataFine,...}] — tutte le malattie
+let ALL_BENEFICI=[]; // [{id,tipoBeneficio,dataInizio,dataFine,certificato,...}] — benefici di legge
 let ALL_ASSENZE_TUTTI=[]; // ferie/permessi/rol approvati di TUTTI (dipendenti+titolari) — calendario condiviso
 let chiusureUfficio=[]; // chiusure ufficio programmate dall'admin
 let DATI_CARICATI=false;
@@ -1023,6 +1064,8 @@ function iniettaAssenzeInGiorniDip(days,oreGiorno){
   ripartisci('rol','oreRol');
   // Malattia: giorni lavorativi del periodo, valorizzati a ore/giorno standard (nessun workflow di approvazione)
   ALL_MALATTIE.forEach(m=>espandiGiorniLavorativi(m.dataInizio,m.dataFine).forEach(ds=>aggiungi(ds,'oreFestivitaMalattia',oreGiorno)));
+  // Benefici di legge: come la malattia (ore/giorno standard), colonna separata, nessun monte ore scalato
+  ALL_BENEFICI.forEach(b=>espandiGiorniLavorativi(b.dataInizio,b.dataFine).forEach(ds=>aggiungi(ds,'oreBeneficiLegge',oreGiorno)));
 }
 // Ore giornaliere del dipendente: legge il valore numerico (2-9) salvato in tipoOrario,
 // con fallback per i vecchi record che usavano le stringhe 'pieno'/'ridotto'
@@ -1173,17 +1216,20 @@ async function assicuraAssenzeTuttiStorico(){
 // CARICAMENTO DATI CENTRALIZZATO — una sola volta all'avvio
 async function caricaTuttiDati(){
   try{
-    const [giorniSnap, assenzeSnap, malattieSnap, tutteAssenzeSnap, chiusSnap] = await Promise.all([
+    const [giorniSnap, assenzeSnap, malattieSnap, tutteAssenzeSnap, chiusSnap, beneficiSnap] = await Promise.all([
       db.collection('timesheets').doc(String(ANNO)).collection('dipendenti').doc(U.username).collection('giorni').get(),
       db.collection('richieste_assenza').where('username','==',U.username).get(),
       db.collection('malattie').where('username','==',U.username).get(),
       caricaAssenzeApprovateTutti(ANNO+'-01-01'),
-      db.collection('chiusure').get()
+      db.collection('chiusure').get(),
+      // Se la regola Firestore non c'è ancora, non blocca il resto del caricamento
+      db.collection('benefici_legge').where('username','==',U.username).get().catch(e=>{console.error('Benefici di legge:',e);return {docs:[]}})
     ]);
     ALL_GIORNI={};
     giorniSnap.forEach(d=>{ALL_GIORNI[d.id]=d.data()});
     ALL_ASSENZE=assenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
     ALL_MALATTIE=malattieSnap.docs.map(d=>({id:d.id,...d.data()}));
+    ALL_BENEFICI=beneficiSnap.docs.map(d=>({id:d.id,...d.data()}));
     if(!ASSENZE_TUTTI_DA_NAV)ALL_ASSENZE_TUTTI=tutteAssenzeSnap.docs.map(d=>({id:d.id,...d.data()}));
     chiusureUfficio=chiusSnap.docs.map(d=>({id:d.id,...d.data()}));
     DATI_CARICATI=true;
@@ -1307,6 +1353,7 @@ function setAssTab(btn,tab){
   btn.classList.add('active');
   document.getElementById('subtab-'+tab).classList.add('active');
   if(tab==='malattia')loadMalattie();
+  if(tab==='benefici')loadBenefici();
 }
 
 // BTN NUOVA RICHIESTA
@@ -1374,6 +1421,8 @@ function aggiornaRiepilogoSaldi(){
   document.getElementById('sb-rol').textContent=rolRes+'h';
   document.getElementById('sb-rol').className='saldo-val '+(rolRes>0?'ok':'danger');
   document.getElementById('sb-malattia').textContent=giorniMalattia+' gg';
+  const giorniBenefici=ALL_BENEFICI.reduce((s,r)=>s+espandiGiorniLavorativi(r.dataInizio,r.dataFine).filter(inA).length,0);
+  const sbBen=document.getElementById('sb-benefici');if(sbBen)sbBen.textContent=giorniBenefici+' gg';
 
   // Cards nella pagina assenze
   const html=`
@@ -1398,6 +1447,10 @@ function aggiornaRiepilogoSaldi(){
     <div class="saldo-card">
       <div class="saldo-info"><div class="saldo-tipo">🤒 Malattia</div><div class="saldo-dettaglio">Giorni registrati nel 2026</div></div>
       <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--viola)">${giorniMalattia}</div><div class="saldo-sub">giorni</div></div>
+    </div>
+    <div class="saldo-card">
+      <div class="saldo-info"><div class="saldo-tipo">⚖️ Benefici di legge</div><div class="saldo-dettaglio">Giorni registrati nel ${ANNO} · non scalati da nessun monte ore</div></div>
+      <div class="saldo-numeri"><div class="saldo-residuo" style="color:var(--gc-benefici)">${giorniBenefici}</div><div class="saldo-sub">giorni</div></div>
     </div>
     <div class="saldo-card">
       <div class="saldo-info"><div class="saldo-tipo">🗂️ Congedi</div><div class="saldo-dettaglio">${congediInAttesa>0?congediInAttesa+' in attesa di approvazione':'Nessuna richiesta in attesa'}</div></div>
@@ -1455,6 +1508,12 @@ function loadMese(m){
       if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};cache[ds]['_tipo_assenza']='malattia'}
     });
   });
+  // Benefici di legge (la malattia, se coincide, ha la precedenza)
+  ALL_BENEFICI.forEach(r=>{
+    espandiTuttiGiorni(r.dataInizio,r.dataFine).forEach(ds=>{
+      if(ds.startsWith(pref)){if(!cache[ds])cache[ds]={};if(cache[ds]['_tipo_assenza']!=='malattia')cache[ds]['_tipo_assenza']='benefici'}
+    });
+  });
   renderCal(m);
 }
 
@@ -1476,6 +1535,7 @@ function renderCal(m){
     if(chius&&festivo)cls+=' gc-chiusura-festivo';
     else if(chius)cls+=' gc-chiusura';
     else if(assenza==='malattia')cls+=' gc-malattia';
+    else if(assenza==='benefici')cls+=' gc-benefici';
     else if(assenza==='ferie')cls+=' gc-ferie';
     else if(assenza==='congedo')cls+=' gc-congedo';
     else if(festivo)cls+=' gc-festivo';
@@ -2028,6 +2088,69 @@ function loadMalattie(){
     </div>
   `).join('');
 }
+// BENEFICI DI LEGGE — registrati subito (nessuna approvazione), certificato obbligatorio, nessun monte ore scalato
+function popolaTipiBenefici(){
+  const sel=document.getElementById('ben-tipo');
+  if(sel&&!sel.options.length)sel.innerHTML=TIPI_BENEFICI.map(t=>`<option value="${t.k}">${t.l}</option>`).join('');
+}
+async function inserisciBeneficio(){
+  popolaTipiBenefici();
+  const tipoBeneficio=document.getElementById('ben-tipo').value||'altro';
+  const ini=document.getElementById('ben-inizio').value;
+  const fin=document.getElementById('ben-fine').value;
+  const note=document.getElementById('ben-note').value||'';
+  const certificato=(document.getElementById('ben-certificato').value||'').trim();
+  const ad=document.getElementById('alert-benefici');ad.innerHTML='';
+  if(!ini||!fin){ad.innerHTML='<div class="alert-box alert-err">Seleziona le date.</div>';return}
+  if(fin<ini){ad.innerHTML='<div class="alert-box alert-err">La data fine deve essere successiva alla data inizio.</div>';return}
+  if(!certificato){ad.innerHTML='<div class="alert-box alert-err">Inserisci il numero di certificato: è obbligatorio.</div>';return}
+  const gg=giorniLavorativi(ini,fin);
+  try{
+    const rec={username:U.username,nomeCompleto:`${profilo.nome||''} ${profilo.cognome||''}`.trim(),tipoBeneficio,dataInizio:ini,dataFine:fin,certificato,note,giorniLavorativi:gg,createdAt:new Date().toISOString()};
+    const ref=await db.collection('benefici_legge').add(rec);
+    segnalaAttivita('benefici');
+    ALL_BENEFICI.push({id:ref.id,...rec});
+    ['ben-inizio','ben-fine','ben-note','ben-certificato'].forEach(i=>document.getElementById(i).value='');
+    ad.innerHTML='<div class="alert-box alert-ok">Benefici di legge registrati ('+gg+' giorni lavorativi).</div>';
+    setTimeout(()=>ad.innerHTML='',3000);
+    loadBenefici();aggiornaRiepilogoSaldi();
+    try{loadMese(meseSel)}catch(e){}
+  }catch(e){ad.innerHTML=`<div class="alert-box alert-err">Errore: ${e.message}</div>`}
+}
+function loadBenefici(){
+  popolaTipiBenefici();
+  const el=document.getElementById('lista-benefici');
+  if(!el)return;
+  const t=x=>x.createdAt&&x.createdAt.toDate?x.createdAt.toDate().getTime():new Date(x.createdAt||0).getTime();
+  const lista=[...ALL_BENEFICI].sort((a,b)=>t(b)-t(a));
+  if(!lista.length){el.innerHTML='<div class="empty-state">Nessun beneficio di legge registrato.</div>';return}
+  const esc=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  el.innerHTML=lista.map(r=>`
+    <div class="mal-item">
+      <div>
+        <div class="mal-date">${fmtD(r.dataInizio)}${r.dataInizio!==r.dataFine?' → '+fmtD(r.dataFine):''}</div>
+        <div class="mal-giorni">${esc(labelTipoBeneficio(r.tipoBeneficio))} · ${r.giorniLavorativi||0} giorni lavorativi${r.certificato?' · <b>Cert. n. '+esc(r.certificato)+'</b>':''}</div>
+        ${r.note?`<div class="mal-nota">${esc(r.note)}</div>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge badge-benefici">Benefici di legge</span>
+        <button class="btn btn-rosso btn-sm" title="Elimina" onclick="eliminaBeneficioDip('${r.id}')">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+async function eliminaBeneficioDip(id){
+  if(!confirm('Eliminare questa registrazione? Verrà spostata nel Cestino.'))return;
+  try{
+    const r=ALL_BENEFICI.find(x=>x.id===id);
+    if(r){const{id:_id,...dati}=r;await spostaNelCestino('beneficio',['benefici_legge',id],dati,'Benefici di legge: '+U.username+' '+(dati.dataInizio||''),U.username);}
+    await db.collection('benefici_legge').doc(id).delete();
+    ALL_BENEFICI=ALL_BENEFICI.filter(x=>x.id!==id);
+    loadBenefici();aggiornaRiepilogoSaldi();
+    try{loadMese(meseSel)}catch(e){}
+  }catch(e){alert('Errore: '+e.message)}
+}
+
 async function eliminaMalattiaDip(id){
   if(!confirm('Eliminare questa malattia? Verrà spostata nel Cestino, come se non fosse mai stata registrata.'))return;
   const r=ALL_MALATTIE.find(x=>x.id===id);
@@ -2312,8 +2435,11 @@ const EXP_CONT_GRUPPI=[
   {l:'Ore Ferie',ks:['oreFerie']},
   {l:'Ore Permesso',ks:['orePermesso']},
   {l:'Ore ROL',ks:['oreRol']},
-  {l:'Ore Malattia',ks:['oreFestivitaMalattia']}
+  {l:'Ore Malattia',ks:['oreFestivitaMalattia']},
+  {l:'Ore Benefici di legge',ks:['oreBeneficiLegge']}
 ];
+// Mappa giorno -> numero di certificato dei Benefici di legge (stesso formato dei protocolli malattia)
+function expCertificatiPerGiorno(benefici){return expProtocolliPerGiorno((benefici||[]).map(b=>({...b,protocollo:b.certificato})))}
 function expValGruppo(d,g){return g.ks.reduce((s,k)=>s+(parseFloat(d&&d[k])||0),0)}
 // Mappa giorno -> numero di protocollo, per i giorni lavorativi coperti da una malattia con protocollo
 function expProtocolliPerGiorno(malattie){
@@ -2365,13 +2491,14 @@ function esportaPeriodoDip(formato){
     iniettaAssenzeInGiorniDip(all,oreGiornoDip(profilo));
     aggiungiWeekendMancanti(all,p);
     p.prot=expProtocolliPerGiorno(ALL_MALATTIE); // giorno -> n. protocollo malattia
+    p.cert=expCertificatiPerGiorno(ALL_BENEFICI); // giorno -> n. certificato benefici di legge
     const giorni=Object.keys(all).filter(ds=>periodoInRange(ds,p)).sort();
     if(formato==='excel')generaExcelPeriodoDip(nome,all,giorni,p);else generaPDFPeriodoDip(nome,all,giorni,p);
   },{titolo:'Esporta le mie ore',exportOre:true});
 }
 function generaExcelPeriodoDip(nome,all,giorni,p){
-  const cont=p.formato==='contabile',nota=p.nota||'',prot=p.prot||{};
-  const haProt=giorni.some(ds=>prot[ds]);
+  const cont=p.formato==='contabile',nota=p.nota||'',prot=p.prot||{},cert=p.cert||{};
+  const haProt=giorni.some(ds=>prot[ds]),haCert=giorni.some(ds=>cert[ds]);
   const titolo=`Riepilogo Ore — ${nome}`+(cont?' (per contabile)':'');
   const wb=XLSX.utils.book_new();
   const hdr=['Campo','Totale'];
@@ -2390,15 +2517,16 @@ function generaExcelPeriodoDip(nome,all,giorni,p){
     const totMese=gg.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0);
     let hh,rr,footRow;
     if(cont){
-      hh=['Data',...EXP_CONT_GRUPPI.map(g=>g.l),'Km Percorsi','Spese Extra (€)','Totale Ore (escl. malattia)'];
+      hh=['Data',...EXP_CONT_GRUPPI.map(g=>g.l),'Km Percorsi','Spese Extra (€)','Totale Ore (escl. malattia e benefici)'];
       rr=gg.map(ds=>{const d=all[ds];return[lbl(ds),...EXP_CONT_GRUPPI.map(g=>expValGruppo(d,g)),parseFloat(d.kmPercorsi)||0,parseFloat(d.speseExtra)||0,totaleGiornoReport(d)]});
       footRow=['TOTALE',...EXP_CONT_GRUPPI.map(g=>gg.reduce((s,ds)=>s+expValGruppo(all[ds],g),0)),sm('kmPercorsi'),sm('speseExtra'),totMese];
     }else{
-      hh=['Data',...CN_REPORT.map(c=>c.l),'Totale Ore (escl. malattia)'];
+      hh=['Data',...CN_REPORT.map(c=>c.l),'Totale Ore (escl. malattia e benefici)'];
       rr=gg.map(ds=>{const d=all[ds];return[lbl(ds),...CN_REPORT.map(c=>parseFloat(d[c.k])||0),totaleGiornoReport(d)]});
       footRow=['TOTALE',...CN_REPORT.map(c=>sm(c.k)),totMese];
     }
     if(haProt){hh.push('Protocollo malattia');rr=rr.map((r,i)=>[...r,prot[gg[i]]||'']);footRow.push('')}
+    if(haCert){hh.push('Certificato benefici di legge');rr=rr.map((r,i)=>[...r,cert[gg[i]]||'']);footRow.push('')}
     const nomeFoglio=(MESI[parseInt(m)-1]+' '+y).substring(0,31);
     XLSX.utils.book_append_sheet(wb,expNotaExcel(expFoglioExcel(titolo,MESI[parseInt(m)-1]+' '+y,hh,rr,footRow),nota,hh.length),nomeFoglio);
   });
@@ -2407,8 +2535,8 @@ function generaExcelPeriodoDip(nome,all,giorni,p){
 function generaPDFPeriodoDip(nome,all,giorni,p){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const cont=p.formato==='contabile',prot=p.prot||{};
-  const haProt=giorni.some(ds=>prot[ds]);
+  const cont=p.formato==='contabile',prot=p.prot||{},cert=p.cert||{};
+  const haProt=giorni.some(ds=>prot[ds]),haCert=giorni.some(ds=>cert[ds]);
   const lbl=ds=>{const[y,m,g]=ds.split('-');return `${giornoSett(ds)} ${g}/${m}/${y}`};
   let head,rowFn,footFn;
   if(cont){
@@ -2428,11 +2556,17 @@ function generaPDFPeriodoDip(nome,all,giorni,p){
     rowFn=ds=>[...rf(ds),expTestoProt(prot,ds)];
     footFn=gg=>[...ff(gg),''];
   }
+  if(haCert){
+    head.push('Certificato benefici');if(idxTesto===undefined)idxTesto=head.length-1;
+    const rf=rowFn,ff=footFn;
+    rowFn=ds=>[...rf(ds),cert[ds]?'Cert. n. '+cert[ds]:''];
+    footFn=gg=>[...ff(gg),''];
+  }
   // Una pagina per mese: tutti i giorni + TOTALE su un solo foglio A4 (vedi expPDFOreCompatto)
   expPDFOreCompatto(doc,{
     titolo:`Riepilogo Ore${cont?' (per contabile)':''} — ${nome}`,
     giorni,head,rowFn,footFn,
-    righeFinali:['Totale ore periodo: '+giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)+'h (escluse le ore di malattia)','Totale ore malattia: '+giorni.reduce((s,ds)=>s+(parseFloat(all[ds].oreFestivitaMalattia)||0),0)+'h (separato dal totale)'],
+    righeFinali:['Totale ore periodo: '+giorni.reduce((s,ds)=>s+totaleGiornoReport(all[ds]),0)+'h (escluse le ore di malattia e benefici di legge)','Totale ore malattia: '+giorni.reduce((s,ds)=>s+(parseFloat(all[ds].oreFestivitaMalattia)||0),0)+'h (separato dal totale)','Totale ore benefici di legge: '+giorni.reduce((s,ds)=>s+(parseFloat(all[ds].oreBeneficiLegge)||0),0)+'h (separato dal totale)'],
     nota:p.nota||'',idxTot,idxTesto
   });
   doc.save(`${nome.replace(/\s+/g,'_')}_${periodoFile(p)}${cont?'_contabile':''}.pdf`);
